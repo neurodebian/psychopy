@@ -69,17 +69,17 @@ TB_REDO= 80
 TB_RUN = 100
 TB_STOP = 110
 
-class FlowPanel(wx.ScrolledWindow):
-    def __init__(self, parent, id=-1,size = wx.DefaultSize):
+class FlowPanel(scrolled.ScrolledPanel):
+    def __init__(self, parent, id=-1,size = (600,100)):
         """A panel that shows how the routines will fit together
         """
-        wx.ScrolledWindow.__init__(self, parent, id, (0, 0), size=size)
+        scrolled.ScrolledPanel.__init__(self, parent, id, (0, 0), size=size)
+        self.panel = wx.Panel(self,-1,size=(600,200))
         self.parent=parent   
         self.needUpdate=True
         self.maxWidth  = 1000
         self.maxHeight = 200
         self.mousePos = None
-        
         #if we're adding a loop or routine then add spots to timeline
         self.drawNearestRoutinePoint = True
         self.drawNearestLoopPoint = False
@@ -93,13 +93,13 @@ class FlowPanel(wx.ScrolledWindow):
         self.Bind(wx.EVT_BUTTON, self.onInsertRoutine,self.btnInsertRoutine) 
         self.Bind(wx.EVT_PAINT, self.onPaint)
         
-        self.btnSizer.Add(self.btnInsertRoutine)
-        self.btnSizer.Add(self.btnInsertLoop)        
-        self.SetSizer(self.btnSizer)
-        
         #self.SetAutoLayout(True)
         self.SetVirtualSize((self.maxWidth, self.maxHeight))
         self.SetScrollRate(20,20)
+        
+        self.btnSizer.Add(self.btnInsertRoutine)
+        self.btnSizer.Add(self.btnInsertLoop) 
+        self.SetSizer(self.btnSizer)
         
     def onInsertRoutine(self, evt):
         """Someone pushed the insert routine button.
@@ -293,11 +293,11 @@ class DlgAddRoutineToFlow(wx.Dialog):
             self.btnOK.Enable(True)
             self.loc=int(event.GetString())
                     
-class RoutinePage(wx.ScrolledWindow):
+class RoutinePage(scrolled.ScrolledPanel):
     """A frame to represent a single routine
     """
     def __init__(self, parent, id=-1, routine=None):
-        wx.ScrolledWindow.__init__(self, parent, id)
+        scrolled.ScrolledPanel.__init__(self, parent, id)
         self.panel = wx.Panel(self)
         self.parent=parent       
         self.routine=routine
@@ -443,7 +443,7 @@ class RoutineButtonsPanel(scrolled.ScrolledPanel):
     def __init__(self, parent, id=-1):
         """A panel that shows how the routines will fit together
         """
-        scrolled.ScrolledPanel.__init__(self,parent,id,size=(80,600))
+        scrolled.ScrolledPanel.__init__(self,parent,id,size=(80,800))
         self.parent=parent    
         self.sizer=wx.BoxSizer(wx.VERTICAL)        
         
@@ -590,11 +590,10 @@ class BuilderFrame(wx.Frame):
 
     def __init__(self, parent, id=-1, title='PsychoPy Builder',
                  pos=wx.DefaultPosition, size=(800, 600),files=None,
-                 style=wx.DEFAULT_FRAME_STYLE):
+                 style=wx.DEFAULT_FRAME_STYLE, app=None):
         wx.Frame.__init__(self, parent, id, title, pos, size, style)
         self.panel = wx.Panel(self)
-        self.parent=parent
-        
+        self.app=app
         #load icons for the various stimulus events 
         self.bitmaps={}
         for eventType in eventTypes:
@@ -617,21 +616,23 @@ class BuilderFrame(wx.Frame):
         self.flowPanel=FlowPanel(parent=self, size=(600,200))
         self.routinePanel=RoutinesNotebook(self)
         self.routineButtons=RoutineButtonsPanel(self)
-        # add the panes to the manager
-#        self._mgr = wx.aui.AuiManager(self)
-#        self._mgr.AddPane(self.routinePanel,wx.CENTER, 'Routines')
-#        self._mgr.AddPane(self.routineButtons, wx.RIGHT)
-#        self._mgr.AddPane(self.flowPanel,wx.BOTTOM, 'Flow')
-        # tell the manager to 'commit' all the changes just made
-#        self._mgr.Update()
-        self.routineSizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.routineSizer.Add(self.routinePanel, 1)
-        self.routineSizer.Add(self.routineButtons, 1)
-        self.mainSizer = wx.BoxSizer(wx.VERTICAL)
-        self.mainSizer.Add(self.routineSizer, 1)
-        self.mainSizer.Add(self.flowPanel, 1)
-        self.SetSizer(self.mainSizer)
         
+        if True: #control the panes using aui manager
+            self._mgr = wx.aui.AuiManager(self)
+            self._mgr.AddPane(self.routinePanel,wx.CENTER, 'Routines')
+            self._mgr.AddPane(self.routineButtons, wx.RIGHT)
+            self._mgr.AddPane(self.flowPanel,wx.BOTTOM, 'Flow')
+#             tell the manager to 'commit' all the changes just made
+            self._mgr.Update()
+        else:
+            self.routineSizer = wx.BoxSizer(wx.HORIZONTAL)
+            self.routineSizer.Add(self.routinePanel, 0, wx.ALIGN_LEFT|wx.EXPAND, 15)
+            self.routineSizer.Add(self.routineButtons,0, wx.ALIGN_RIGHT, 15) 
+            self.mainSizer = wx.BoxSizer(wx.VERTICAL)
+            self.mainSizer.Add(self.routineSizer, 1)
+            self.mainSizer.Add(self.flowPanel, 1, wx.ALIGN_BOTTOM)
+            self.SetSizer(self.mainSizer)
+            
         self.SetAutoLayout(True)
         self.makeToolbar()
         self.makeMenus()

@@ -1,4 +1,4 @@
-import wx, sys, os
+import wx, sys, os, cPickle
 from keybindings import *
 import psychopy, coder, builder
 
@@ -6,21 +6,23 @@ import psychopy, coder, builder
 homeDir = os.getcwd()
 #on mac __file__ might be a local path
 fullAppPath= os.path.abspath(__file__)
-appDir, appName = os.path.split(fullAppPath)
+dirApp, appName = os.path.split(fullAppPath)
 #get path to settings
 join = os.path.join
 if sys.platform=='win32':
-    settingsFolder = join(os.environ['APPDATA'],'PsychoPy', 'IDE') #this is the folder that this file is stored in
+    dirSettings = join(os.environ['APPDATA'],'PsychoPy') #this is the folder that this file is stored in
 else:
-    settingsFolder = join(os.environ['HOME'], '.PsychoPy' , 'IDE')
+    dirSettings = join(os.environ['HOME'], '.PsychoPy')
     
-if not os.path.isdir(settingsFolder):
-    os.makedirs(settingsFolder)
-optionsPath = join(settingsFolder, 'options.pickle')
+if not os.path.isdir(dirSettings):
+    os.makedirs(dirSettings)
+optionsPath = join(dirSettings, 'PsychoPyAppOptions.pickle')
 #path to Resources (icons etc)
-if os.path.isdir(join(appDir, 'Resources')):
-    iconDir = join(appDir, 'Resources')
-else:iconDir = appDir
+if os.path.isdir(join(dirApp, 'Resources')):
+    dirRes = join(dirApp, 'Resources')
+else:dirRes = dirApp
+#path to PsychoPy's root folder
+dirPsychopy = os.path.split(dirApp)[0]
 
 def toPickle(filename, data):
     """save data (of any sort) as a pickle file
@@ -48,7 +50,7 @@ class PsychoSplashScreen(wx.SplashScreen):
         # This is a recipe to a the screen.
         # Modify the following variables as necessary.
         self.parent=parent
-        splashFile = os.path.join(iconDir, 'psychopySplash.png')
+        splashFile = os.path.join(dirRes, 'psychopySplash.png')
         aBitmap = wx.Image(name = splashFile).ConvertToBitmap()
         splashStyle = wx.SPLASH_CENTRE_ON_SCREEN | wx.NO_BORDER
         # Call the constructor with the above arguments in exactly the
@@ -87,15 +89,50 @@ class PsychoPyApp(wx.App):
         else:
             args=[]
         
+        #set default paths and import options
+        self.dirApp = dirApp
+        self.dirRes = dirRes
+        self.dirPsychopy = dirPsychopy
+        try:
+            self.options = fromPickle(optionsPath)
+        except: 
+            self.options={}
+            self.options['winSize']=[800,800]
+            self.options['analyseAuto']=True
+            self.options['showOutput']=True   
+            self.options['auiPerspective']=None
+            self.options['winPos']=wx.DefaultPosition
+            self.options['recentFiles']={}    
+            self.options['prevFiles']=[]
+            if sys.platform=='darwin':
+                self.options['showSourceAsst']=False  
+            else:
+                self.options['showSourceAsst']=True
+        
+        if False:# force reinitialise (don't use file)
+            self.options={}
+            self.options['winSize']=[800,800]
+            self.options['analyseAuto']=True
+            self.options['showOutput']=True   
+            self.options['auiPerspective']=None
+            self.options['winPos']=wx.DefaultPosition
+            self.options['recentFiles']={}   
+            self.options['prevFiles']=[]        
+            if sys.platform=='darwin':
+                self.options['showSourceAsst']=False  
+            else:
+                self.options['showSourceAsst']=True
+                
         if mainFrame == 'coder':
+            #NB a frame doesn't have an app as a parent
             self.frame = coder.CoderFrame(None, -1, 
                                       title="PsychoPy Coder (IDE) (v%s)" %psychopy.__version__,
-                                      files = args)  
+                                      files = args, app=self)  
         else:
-            print 'running builder'
+            #NB a frame doesn't have an app as a parent
             self.frame = builder.BuilderFrame(None, -1, 
                                       title="PsychoPy Experiment Builder",
-                                      files = args)
+                                      files = args, app=self)
         splash = PsychoSplashScreen(self.frame)
         if splash:
             splash.Show()
@@ -105,6 +142,13 @@ class PsychoPyApp(wx.App):
         return True
     def MacOpenFile(self,fileName):
         self.frame.setCurrentDoc(fileName)
+    def Quit(self):
+        
+        print 'prevFiles', self.options['prevFiles']
+        toPickle(optionsPath, self.options)
+        self.frame.Destroy()
+#        self.Destroy()
+#        sys.exit(0)
         
 if __name__=='__main__':
     app = PsychoPyApp(0)
