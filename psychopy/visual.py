@@ -4,7 +4,7 @@ import psychopy.misc
 import psychopy #so we can get the __path__
 from psychopy import core, ext, log
 import psychopy.event
-import monitors
+import psychopy.monitors as monitors
 import Image
 import sys, os, time, glob, copy
 import makeMovies
@@ -24,10 +24,10 @@ try:
 except:
     havePyglet=False    
 
-import OpenGL.GL, OpenGL.GL.ARB.multitexture
-import pygame
 #import _shadersPygame
 try:
+    import OpenGL.GL, OpenGL.GL.ARB.multitexture
+    import pygame
     havePygame=True
     if OpenGL.__version__ > '3':
         cTypesOpenGL = True
@@ -108,7 +108,7 @@ class Window:
         else:
             self.rgb = numpy.asarray(rgb, float)
         self._defDepth=0.0
-
+        
         #settings for the monitor: local settings (if available) override monitor
         #if we have a monitors.Monitor object (psychopy 0.54 onwards)
         #convert to a Monitor object
@@ -200,6 +200,9 @@ class Window:
         self.frames = 0         #frames since last fps calc
         self.movieFrames=[] #list of captured frames (Image objects)
         
+        self.recordFrameIntervals=False
+        self.frameIntervals=[]
+        
         self._refreshThreshold=1/59.0
         if list(self.gamma)!=[1,1,1]:
             self.setGamma(self.gamma)#using either pygame or bits++
@@ -207,7 +210,30 @@ class Window:
         self.update()#do a screen refresh straight away
 
 
-
+    def setRecordFrameIntervals(self, value=True):
+        """To provide accurate measures of frame intervals, to determine whether frames
+        are being dropped. Set this to False while the screen is not being updated
+        e.g. during event.waitkeys() and set to True during critical parts of the script
+        
+        see also:
+            Window.saveFrameIntervals()
+        """
+        self.recordFrameIntervals=value
+    def saveFrameIntervals(self, fileName=None):
+        """Save recorded screen frame intervals to disk, as comma-separated values.
+        
+        Arguments:
+            - fileName (=None). The filename (including path if necessary) in which 
+            to store the data
+        """
+        if fileName==None: 
+            fileName = 'lastFrameIntervals.log'
+        if len(self.frameIntervals):
+            intervalStr = str(self.frameIntervals)[1:-1]
+            f = open(fileName, 'w')
+            f.write(intervalStr)
+            f.close()
+            
     def whenIdle(self,func):
         """Defines the function to use during idling (GLUT only)
         """
@@ -279,12 +305,15 @@ class Window:
                 pygame.event.pump()#keeps us in synch with system event queue
             else:
                 core.quit()#we've unitialised pygame so quit
-
+                        
         self.frames +=1
         now = core.getTime()
         deltaT = now - self.lastFrameT; self.lastFrameT=now
         if deltaT>self._refreshThreshold: log.warning('t of last frame was %.2fms (=1/%i)' %(deltaT*1000, 1/deltaT))
-
+        
+        if self.recordFrameIntervals:
+            self.frameIntervals.append(deltaT)
+        
         if haveFB:
             #set rendering back to the framebuffer object
             FB.glBindFramebufferEXT(FB.GL_FRAMEBUFFER_EXT, self.frameBuffer)
@@ -397,7 +426,7 @@ class Window:
         self.frameClock.reset()
         self.frames = 0
         return fps
-
+    
     def setScale(self, units, font='dummyFont', prevScale=[1.0,1.0]):
         """This method is called from within the draw routine and sets the
         scale of the OpenGL context to map between units. Could potentially be
@@ -2423,7 +2452,8 @@ class MovieStim:
                  pos      =(0.0,0.0),
                  ori     =0.0,
                  flipVert = False,
-                 flipHoriz = False):
+                 flipHoriz = False,
+                 opacity=1.0):
         """
         **Arguments:**
 
@@ -2453,6 +2483,9 @@ class MovieStim:
             - **size**:
                 size of the stimulus in units given. If not specified then the movie will take its
                 original dimensions. Thes can be interrogated by 
+                
+            - **opacity**:
+                the movie can be made transparent by reducing this
         """
         self.win = win        
         self._movie=None # the actual pyglet media object
@@ -2466,6 +2499,7 @@ class MovieStim:
         self.pos = numpy.asarray(pos)
         self.flipVert = flipVert
         self.flipHoriz = flipHoriz
+        self.opacity = opacity
         self.playing=0
         
         #size
@@ -2516,7 +2550,7 @@ class MovieStim:
         self.win.setScale(self.units)
         
         frameTexture = self._player.get_texture()
-        
+        GL.glColor4f(1,1,1,self.opacity)
         GL.glPushMatrix()
         #move to centre of stimulus and rotate
         GL.glTranslatef(self.pos[0],self.pos[1],thisDepth)
@@ -2810,7 +2844,8 @@ class TextStim(_BaseVisualStim):
                  italic=False,
                  alignHoriz='center',
                  alignVert='center',
-                 fontFiles=[]):
+                 fontFiles=[],
+                 wrapWidth=None):
         """
             **Arguments:**
         
@@ -2858,6 +2893,9 @@ class TextStim(_BaseVisualStim):
                     
                 - **fontFiles**
                     A list of additional files if the font is not in the standard system location (include the full path)
+                    
+                - **wrapWidth**
+                    The width the text should run before wrapping
         """
         self.win = win
         if win._haveShaders: self._useShaders=True
@@ -2873,6 +2911,7 @@ class TextStim(_BaseVisualStim):
         self.text='' #NB just a placeholder - real value set below
         self.depth=depth
         self.ori=ori
+        self.wrapWidth=wrapWidth
         self._pygletTextObj=None
 
         if len(units): self.units = units
@@ -2896,6 +2935,16 @@ class TextStim(_BaseVisualStim):
             if height: self.height = height
             else: self.height = 20#default text height
             self.heightPix = self.height
+        
+        if self.wrapWidth ==None:
+            if self.units=='norm': self.wrapWidth=1
+            elif self.units=='deg': self.wrapWidth=15
+            elif self.units=='cm': self.wrapWidth=15
+            elif self.units=='pix': self.wrapWidth=500
+        if self.units=='norm': self._wrapWidthPIX= self.wrapWidth*win.size[0]/2
+        elif self.units=='deg': self._wrapWidthPIX= psychopy.misc.deg2pix(self.wrapWidth, win.monitor)
+        elif self.units=='cm': self._wrapWidthPIX= psychopy.misc.cm2pix(self.wrapWidth, win.monitor)
+        elif self.units=='pix': self._wrapWidthPIX=self.wrapWidth
         
         for thisFont in fontFiles:
             pyglet.font.add_file(thisFont)
@@ -2977,8 +3026,16 @@ class TextStim(_BaseVisualStim):
         if self.win.winType=="pyglet":
             self._pygletTextObj = pyglet.font.Text(self._font, self.text,
                                                        halign=self.alignHoriz, valign=self.alignVert,
-                                                       color = (self.rgb[0],self.rgb[1], self.rgb[2], self.opacity)
-                                                       )#width of the frame            
+                                                       color = (self.rgb[0],self.rgb[1], self.rgb[2], self.opacity),
+                                                       width=self._wrapWidthPIX)#width of the frame     
+#            self._pygletTextObj = pyglet.text.Label(self.text,self.fontname, int(self.heightPix),
+#                                                       anchor_x=self.alignHoriz, anchor_y=self.alignVert,#the point we rotate around
+#                                                       halign=self.alignHoriz,
+#                                                       color = (int(127.5*self.rgb[0]+127.5),
+#                                                            int(127.5*self.rgb[1]+127.5),
+#                                                            int(127.5*self.rgb[2]+127.5),
+#                                                            int(255*self.opacity)),
+#                                                       multiline=True, width=self._wrapWidthPIX)#width of the frame           
             self.width, self.height = self._pygletTextObj.width, self._pygletTextObj.height
         else:   
             self._surf = self._font.render(value, self.antialias, [255,255,255])
@@ -3189,6 +3246,11 @@ class TextStim(_BaseVisualStim):
         GL.glRotatef(self.ori,0.0,0.0,1.0)
         #then scale back to pixels
         self.win.setScale('pix', None, unitScale)
+        #and align based on x anchor
+        if self.alignHoriz=='right':
+            GL.glTranslatef(-self.width,0,0)#NB depth is set already
+        if self.alignHoriz=='center':
+            GL.glTranslatef(-self.width/2,0,0)#NB depth is set already
 
         if self._useShaders: #then rgb needs to be set as glColor
             #setup color
