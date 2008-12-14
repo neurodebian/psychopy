@@ -74,7 +74,7 @@ class PsychoPyApp(wx.App):
                 args = sys.argv[2:] # program was excecuted as "python.exe PsychoPyIDE.py %1'
             else:
                 args = sys.argv[1:] # program was excecuted as "PsychoPyIDE.py %1'
-            print args
+
             #choose which frame to start with
             if args[0] in ['builder', '--builder', '-b']:
                     mainFrame='builder'

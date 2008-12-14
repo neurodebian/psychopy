@@ -1362,7 +1362,7 @@ class CoderFrame(wx.Frame):
         else:
             self.options['state']='normal'
         self.options['winSize']=self.GetSize()
-        self.options['winPos']=self.GetPosition()
+        self.options['winPos']=self.GetPosition() 
         self.options['auiPerspective'] = self.paneManager.SavePerspective()
         
         self.app.Quit()

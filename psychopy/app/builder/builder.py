@@ -439,7 +439,7 @@ class RoutinesNotebook(wx.aui.AuiNotebook):
             self.addRoutinePage(routineName, exp.routines[routineName])#then to the notebook
 
         dlg.Destroy()
-class RoutineButtonsPanel(scrolled.ScrolledPanel):
+class ComponentsPanel(scrolled.ScrolledPanel):
     def __init__(self, parent, id=-1):
         """A panel that shows how the routines will fit together
         """
@@ -448,7 +448,7 @@ class RoutineButtonsPanel(scrolled.ScrolledPanel):
         self.sizer=wx.BoxSizer(wx.VERTICAL)        
         
         # add a button for each type of event that can be added
-        self.routineButtons={}; self.componentFromID={}
+        self.componentButtons={}; self.componentFromID={}
         for eventType in eventTypes:
             img =wx.Bitmap(
                 os.path.join(iconDir,"%sAdd.png" %eventType.lower()))    
@@ -458,7 +458,7 @@ class RoutineButtonsPanel(scrolled.ScrolledPanel):
             self.componentFromID[btn.GetId()]=eventType
             self.Bind(wx.EVT_BUTTON, self.onComponentAdd,btn)  
             self.sizer.Add(btn, 0,wx.EXPAND|wx.ALIGN_CENTER )
-            self.routineButtons[eventType]=btn#store it for elsewhere
+            self.componentButtons[eventType]=btn#store it for elsewhere
             
         self.SetSizer(self.sizer)
         self.SetAutoLayout(1)
@@ -476,6 +476,15 @@ class RoutineButtonsPanel(scrolled.ScrolledPanel):
             currRoutine = self.parent.routinePanel.getCurrentRoutine()
             currRoutine.append(newComp)#add to the actual routing
             currRoutinePage.redraw()#update the routine's view with the new component too
+
+class DlgLoopProperties(wx.Dialog):    
+    def __init__(self,parent,title,params=None,
+            pos=wx.DefaultPosition, size=wx.DefaultSize,
+            style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
+        style=style|wx.RESIZE_BORDER
+        
+        wx.Dialog.__init__(self, parent,-1,title,pos,size,style)
+        
 class DlgComponentProperties(wx.Dialog):    
     def __init__(self,parent,title,params,hints,fixed=[],
             pos=wx.DefaultPosition, size=wx.DefaultSize,
@@ -615,19 +624,19 @@ class BuilderFrame(wx.Frame):
         # create our panels
         self.flowPanel=FlowPanel(parent=self, size=(600,200))
         self.routinePanel=RoutinesNotebook(self)
-        self.routineButtons=RoutineButtonsPanel(self)
+        self.componentButtons=ComponentsPanel(self)
         
         if True: #control the panes using aui manager
             self._mgr = wx.aui.AuiManager(self)
             self._mgr.AddPane(self.routinePanel,wx.CENTER, 'Routines')
-            self._mgr.AddPane(self.routineButtons, wx.RIGHT)
+            self._mgr.AddPane(self.componentButtons, wx.RIGHT)
             self._mgr.AddPane(self.flowPanel,wx.BOTTOM, 'Flow')
 #             tell the manager to 'commit' all the changes just made
             self._mgr.Update()
         else:
             self.routineSizer = wx.BoxSizer(wx.HORIZONTAL)
             self.routineSizer.Add(self.routinePanel, 0, wx.ALIGN_LEFT|wx.EXPAND, 15)
-            self.routineSizer.Add(self.routineButtons,0, wx.ALIGN_RIGHT, 15) 
+            self.routineSizer.Add(self.componentButtons,0, wx.ALIGN_RIGHT, 15) 
             self.mainSizer = wx.BoxSizer(wx.VERTICAL)
             self.mainSizer.Add(self.routineSizer, 1)
             self.mainSizer.Add(self.flowPanel, 1, wx.ALIGN_BOTTOM)

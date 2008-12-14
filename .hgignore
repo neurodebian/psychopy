@@ -1,5 +1,1 @@
-syntax: glob
-
-dist
 .svn
-.DS_Store
