@@ -46,7 +46,7 @@ class Experiment:
                     names.append(thisEntry.params['name'])
                     print 'found component: %s' %names[-1]
                     
-class LoopHandler(list):    
+class TrialHandler(list):    
     """A looping experimental control object
             (e.g. generating a psychopy TrialHandler or StairHandler).
             """
@@ -55,17 +55,24 @@ class LoopHandler(list):
         @param name: name of the loop e.g. trials
         @type name: string
         @param loopType:
-        @type loopType: string ('rand', 'seq', 'stair'...)
+        @type loopType: string ('rand', 'seq')
         @param nReps: number of reps (for all trial types)
         @type nReps:int
         @param trialList: list of different trial conditions to be used
         @type trialList: list (of dicts?)
         """
         list.__init__(self)
-        self.loopType=loopType
-        self.name = name
-        self.nReps=nReps
-        self.trialList=trialList
+        self.type='TrialHandler'
+        self.params={}
+        self.params['loopType']=loopType
+        self.params['name'] = name
+        self.params['nReps']=nReps
+        self.params['trialList']=trialList
+        self.hints={}
+        self.hints['loopType']="'random','sequential'"
+        self.hints['name'] = 'Name of this loop'
+        self.hints['nReps']='Number of repeats (for each type of trial)'
+        self.hints['trialList']="A list of dictionaries describing the differences between each trial type"
     def generateInitCode(self,buff):
         buff.write("init loop '%s' (%s)\n" %(self.name, self.loopType))
         buff.write("%s=data.TrialHandler(trialList=%s,nReps=%i,\n)" \
@@ -75,7 +82,41 @@ class LoopHandler(list):
         thisName = ("this"+self.name.capitalize()[:-1])
         buff.write("for %s in %s:\n" %(thisName, self.name))
     def getType(self):
-        return 'LoopHandler'        
+        return 'LoopHandler'     
+class StairHandler(list):    
+    """A staircase experimental control object.
+    """
+    def __init__(self, name, loopType, nReps, stepSizes):
+        """
+        @param name: name of the loop e.g. trials
+        @type name: string
+        @param nReps: number of reps (for all trial types)
+        @type nReps:int
+        """
+        list.__init__(self)
+        self.type='TrialHandler'
+        self.params={}
+        self.params['name'] = name
+        self.params['nReps']=nReps
+        self.params['step sizes']=[0.8,0.8,0.4,0.4,0.2]
+        self.params['step type']='log'
+        self.hints={}
+        self.hints['name'] = 'Name of this loop'
+        self.hints['nReps']='Number of repeats (for each type of trial)'
+        self.hints['step type']="The units of the step size (e.g. 'linear' will add/subtract that value each step, whereas 'log' will ad that many log units)"
+        self.hints['step sizes']="The size of the jump at each step (can change on each 'reversal')"
+        self.allowed={}
+        self.allowed['step types']=['linear','log','db']
+    def generateInitCode(self,buff):
+        buff.write("init loop '%s' (%s)\n" %(self.name, self.loopType))
+        buff.write("%s=data.StairHandler(nReps=%i,\n)" \
+            %(self.name, self.nReps))
+    def generateRunCode(self,buff, indent):
+        #work out a name for e.g. thisTrial in trials:
+        thisName = ("this"+self.name.capitalize()[:-1])
+        buff.write("for %s in %s:\n" %(thisName, self.name))
+    def getType(self):
+        return 'StairHandler'   
 class LoopInitiator:
     """A simple class for inserting into the flow.
     This is created automatically when the loop is created"""
@@ -167,6 +208,8 @@ class BaseComponent:
         self.type='Base'
         self.params['name']=name
         self.hints['name']= 'A name for the component'
+        #for choiceboxes what are the allowed options?
+        self.allowed={}
     def generateInitCode(self,buff):
         pass
     def generateRunCode(self,buff, indent):
@@ -186,9 +229,6 @@ class TextComponent(BaseComponent):
         self.params['ori']=ori
         self.params['times']=times
         
-        #params that can change in time
-        self.changeable=['ori','pos','rgb','size']
-        
         self.hints={}
         self.hints['name']="A name for the component e.g. 'thanksMsg'"
         self.hints['text']="The text to be displayed"
@@ -197,6 +237,13 @@ class TextComponent(BaseComponent):
         self.hints['size']= "Specifies the height of the letter (the width is then determined by the font)"
         self.hints['ori']= "The orientation of the text in degrees"
         self.hints['times']="A series of one or more onset/offset times, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]"
+        
+        #for choiceboxes what are the allowed options?
+        self.allowed={}
+        self.allowed['units']=['as window','deg','pix','cm']        
+        
+        #params that can change in time
+        self.changeable=['ori','pos','rgb','size']
         
     def generateInitCode(self,buff):
         s = "%s=TextStim(win=win, pos=%s, size=%s" %(self.params['name'], self.params['pos'],self.params['size'])
@@ -221,6 +268,7 @@ class PatchComponent(BaseComponent):
         self.params['sf']=sf
         self.params['ori']=ori
         self.params['times']=times
+        self.params['interpolate']=False
         
         self.hints['name']="A name for the component e.g. 'fixationPt'"
         self.hints['image']="The image to use (a filename or 'sin', 'sqr'...)"
@@ -230,7 +278,13 @@ class PatchComponent(BaseComponent):
         self.hints['ori']= "The orientation of the stimulus in degrees"
         self.hints['sf']= "The spatial frequency of cycles of the image on the stimulus"
         self.hints['times']="A series of one or more onset/offset times, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]"
-                
+        self.hints['interpolate']="If checked then, if the image is scaled up and down, linear interpolation will be used instead of nearest neighbour" 
+        
+        #for choiceboxes what are the allowed options?
+        self.allowed={}
+        self.allowed['units']=['as window','deg','pix','cm'] 
+        self.allowed['interpolate']=[False,True]
+        
     def generateInitCode(self,buff):
         s = "%s=PatchStim(win=win, pos=%s, size=%s" %(self.params['name'], self.params['pos'],self.params['size'])
         buff.write(s)   
@@ -260,6 +314,9 @@ class MovieComponent(BaseComponent):
         self.hints['ori']= "The orientation of the stimulus in degrees"
         self.hints['times']="A series of one or more onset/offset times, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]"
                 
+        #for choiceboxes what are the allowed options?
+        self.allowed={}
+        self.allowed['units']=['window','deg','pix','cm'] 
     def generateInitCode(self,buff):
         s = "%s=MovieStim(win=win, pos=%s, movie=%s, size=%s" %(self.params['name'], self.params['movie'],self.params['pos'],self.params['size'])
         buff.write(s)   
@@ -283,6 +340,8 @@ class SoundComponent(BaseComponent):
         self.hints['sound']="A sound can be a string (e.g. 'A' or 'Bf') or a number to specify Hz, or a filename"
         self.hints['times']="A series of one or more onset/offset times, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]"
                 
+        #for choiceboxes what are the allowed options?
+        self.allowed={}
     def generateInitCode(self,buff):
         s = "%s=Sound(%s, secs=%s" %(self.params['name'], self.params['sound'],self.params['times'][1]-self.params['times'][0])
         buff.write(s)   
@@ -304,6 +363,8 @@ class KeyboardComponent(BaseComponent):
         self.hints['name']=""
         self.hints['allowedKeys']="The keys the user may press, e.g. a,b,q,left,right"
         self.hints['times']="A series of one or more periods to read the keyboard, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]"
+        #for choiceboxes what are the allowed options?
+        self.allowed={}
     def generateInitCode(self,buff):
         pass#no need to initialise keyboards?
     def generateRunCode(self,buff,indent):
@@ -320,6 +381,8 @@ class MouseComponent(BaseComponent):
         self.hints={}
         self.hints['name']="Even mice have names"
         self.hints['times']="A series of one or more periods to read the mouse, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]"
+        #for choiceboxes what are the allowed options?
+        self.allowed={}
     def generateInitCode(self,buff):
         pass#no need to initialise?
     def generateRunCode(self,buff,indent):

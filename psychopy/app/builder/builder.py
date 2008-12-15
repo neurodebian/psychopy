@@ -69,35 +69,7 @@ TB_REDO= 80
 TB_RUN = 100
 TB_STOP = 110
 
-def addDlgField(self, sizer, label='', initial='', hint=''):
-        """
-        Adds a (labelled) input field to a dialogue box
-        Returns a handle to the field (but not to the label).
         
-        usage: field = addDlgField(sizer, label='', initial='', hint='')
-        
-        """
-        if type(initial)==numpy.ndarray:
-            initial=initial.tolist() #convert numpy arrays to lists
-        labelLength = wx.Size(9*len(label)+16,25)#was 8*until v0.91.4
-        container=wx.BoxSizer(wx.HORIZONTAL)
-        inputLabel = wx.StaticText(self,-1,label,
-                                        size=labelLength,
-                                        style=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT)
-        if label=='text':
-            #for text input we need a bigger (multiline) box
-            inputBox = wx.TextCtrl(self,-1,str(initial),
-                style=wx.TE_MULTILINE,
-                size=wx.Size(30*self.maxFieldLength,-1))            
-        else:
-            inputBox = wx.TextCtrl(self,-1,str(initial),size=wx.Size(10*self.maxFieldLength,-1))
-        inputBox.SetToolTipString(hint)
-        container.Add(inputLabel, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT|wx.ALL, border=3)
-        container.Add(inputBox,proportion=1, flag=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_LEFT|wx.ALL, border=3)
-        sizer.Add(container, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT|wx.ALL, border=3)
-        
-        return inputBox
-    
 class FlowPanel(scrolled.ScrolledPanel):
     def __init__(self, parent, id=-1,size = (600,100)):
         """A panel that shows how the routines will fit together
@@ -492,7 +464,7 @@ class ComponentsPanel(scrolled.ScrolledPanel):
     def onComponentAdd(self,evt):
         componentName = self.componentFromID[evt.GetId()]
         newClassStr = componentName+'Component'
-        exec('newComp = ExperimentObjects.%s()' %newClassStr)
+        exec('newComp = experiment.%s()' %newClassStr)
         dlg = DlgComponentProperties(parent=self.parent,
             title=componentName+' Properties',
             params = newComp.params, hints=newComp.hints)
@@ -502,78 +474,10 @@ class ComponentsPanel(scrolled.ScrolledPanel):
             currRoutine.append(newComp)#add to the actual routing
             currRoutinePage.redraw()#update the routine's view with the new component too
 
-class DlgLoopProperties(wx.Dialog):    
-    def __init__(self,parent,title="Loop properties",params=None,
-            pos=wx.DefaultPosition, size=wx.DefaultSize,
-            style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
-        style=style|wx.RESIZE_BORDER
-        
-        wx.Dialog.__init__(self, parent,-1,title,pos,size,style)
-        self.parent=parent
-        self.Center()
-        
-        self.loopTypes=['random','sequential','staircase']
-        self.currentType=self.loopTypes[0]
-        typeLabel = wx.StaticText(parent=self,id=-1,label='loop type')
-        typeChooser=wx.Choice(parent=self, id=-1,choices=self.loopTypes)
-        self.Bind(wx.EVT_CHOICE, self.onTypeChanged)
-        
-        self.sizer = wx.BoxSizer(wx.VERTICAL)
-        self.sizer.AddMany([(typeLabel,wx.ALIGN_RIGHT), typeChooser])
-        
-        self.makeStaircaseCtrls()
-        self.makeRandAndSeqCtrls()
-        self.setCtrls(self.currentType)
-        self.SetSizer(self.sizer)
-        self.SetAutoLayout(True)
-        self.showAndGetData()
-        
-    def makeRandAndSeqCtrls(self):
-        #a list of controls for the random/sequential versions
-        #that can be hidden or shown
-        self.randParamNames=
-        self.randCtrls = []
-        self.ctrlNreps=wx.TextCtrl(parent=self, value='5', size=(100,20))
-        self.randCtrls.append(self.ctrlNreps)
-        self.sizer.AddMany([self.ctrlNreps])
-    def makeStaircaseCtrls(self):
-        """Setup the controls for a StairHandler"""
-        self.staircaseCtrls=[]
-        self.ctrlStairNreps=wx.TextCtrl(parent=self, value='50', size=(100,20))
-        self.staircaseCtrls.append(self.ctrlStairNreps)
-        self.sizer.AddMany([self.ctrlStairNreps])
-            
-    def setCtrls(self, ctrlType):
-        if ctrlType=='staircase':
-            for ctrl in self.randCtrls:
-                ctrl.Hide()
-            for ctrl in self.staircaseCtrls:
-                ctrl.Show()
-        else:
-            for ctrl in self.staircaseCtrls:
-                ctrl.Hide()
-            for ctrl in self.randCtrls:
-                ctrl.Show()
-        self.sizer.Layout()
-    def onTypeChanged(self, evt=None):
-        newType = evt.GetString()
-        if newType==self.currentType:
-            return
-        self.setCtrls(newType)
-        self.currentType = newType
-    def showAndGetData(self):
-        #add buttons for OK and Cancel
-        buttons = wx.BoxSizer(wx.HORIZONTAL)
-        OK = wx.Button(self, wx.ID_OK, " OK ")
-        OK.SetDefault()
-        CANCEL = wx.Button(self, wx.ID_CANCEL, " Cancel ")
-        self.sizer.AddMany([OK, CANCEL])#,1,flag=wx.ALIGN_RIGHT|wx.ALIGN_BOTTOM|wx.ALL,border=3)
-        
-        self.SetSizerAndFit(self.sizer)
-        if self.ShowModal() == wx.ID_OK:
-            print 'loop props returned OK'
-class DlgComponentProperties(wx.Dialog):    
-    def __init__(self,parent,title,params,hints,fixed=[],
+
+
+class _BaseParamsDlg(wx.Dialog):   
+    def __init__(self,parent,title,params,hints,fixed=[],allowed=[],
             pos=wx.DefaultPosition, size=wx.DefaultSize,
             style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
         style=style|wx.RESIZE_BORDER
@@ -584,6 +488,7 @@ class DlgComponentProperties(wx.Dialog):
         
         self.params=params
         self.fixed=fixed
+        self.allowed=allowed
         self.hints=hints
         self.inputFields = []
         self.inputFieldTypes= []
@@ -597,27 +502,26 @@ class DlgComponentProperties(wx.Dialog):
         self.maxFieldLength = 10#max( len(str(self.params[x])) for x in keys )
         types=dict([])
         
-        #for components with names (all?) we want that a the top of the dlg
+        #for components with names (all?) we want that at the top of the dlg
         if 'name' in keys:
             keys.remove('name')
             keys.insert(0,'name')
         #loop through the params    
         for field in keys:
-            #create it (with a label)
-            fieldCtrl=self.addField(field,self.params[field],self.hints[field]))
+            #check if it has limited set of options
+            if field in self.allowed.keys(): allowed=self.allowed[field]
+            else: allowed=[]
+            #create the field (with a label)
+            fieldCtrl= self.addField(field,self.params[field], allowed,self.hints[field])
             if field in fixed: fieldCtrl.Disable()
-            #store info abou the field
-            self.inputFieldNames.append(label)
+            #store info about the field
+            self.inputFields.append(fieldCtrl)
+            self.inputFieldNames.append(field)
             self.inputFieldTypes.append(self.params[field])
-            self.inputField.append(fieldCtrl)
-                
+            
         #show it and collect data
         self.sizer.Fit(self)
-        self.showAndGetData()
-        if self.OK:
-            for n,thisKey in enumerate(keys):
-                self.params[thisKey]=self.data[n]
-                
+    
     def addText(self, text):
         textLength = wx.Size(8*len(text)+16, 25)
         myTxt = wx.StaticText(self,-1,
@@ -642,7 +546,7 @@ class DlgComponentProperties(wx.Dialog):
         if self.ShowModal() == wx.ID_OK:
             self.data=[]
             #get data from input fields
-            for n in range(len(self.inputFields)):
+            for n,thisKey in enumerate(self.inputFields):
                 thisVal = self.inputFields[n].GetValue()
                 thisType= self.inputFieldTypes[n]
                 #try to handle different types of input from strings
@@ -651,13 +555,159 @@ class DlgComponentProperties(wx.Dialog):
                     exec("self.data.append("+thisVal+")")#evaluate it
                 elif thisType==numpy.ndarray:
                     exec("self.data.append(numpy.array("+thisVal+"))")
-                elif thisType==str:#a num array or string?
+                elif thisType==bool:
+                    self.data.append(bool(thisVal))
+                elif thisType==str:
                     self.data.append(thisVal)
                 else:
-                    self.data.append(thisVal)
+                    print "GOT %s (type=%s) for %s" %(thisVal, type(thisVal), self.inputFields[n])  
+                
+                self.params[thisKey]=self.data[n]
+                
             self.OK=True
         else: 
             self.OK=False
+        
+    def addField(self, label='', initial='',allowed=[], hint=''):
+        """
+        Adds a (labelled) input field to a dialogue box
+        Returns a handle to the field (but not to the label)
+                
+        usage: field = addDlgField(sizer, label='', initial='', hint='')
+        
+        """
+        if type(initial)==numpy.ndarray:
+            initial=initial.tolist() #convert numpy arrays to lists
+        labelLength = wx.Size(9*len(label)+16,25)#was 8*until v0.91.4
+        container=wx.BoxSizer(wx.HORIZONTAL)
+        inputLabel = wx.StaticText(self,-1,label,
+                                        size=labelLength,
+                                        style=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT)
+        if label=='text':
+            #for text input we need a bigger (multiline) box
+            inputBox = wx.TextCtrl(parent,-1,str(initial),
+                style=wx.TE_MULTILINE,
+                size=wx.Size(30*self.maxFieldLength,-1))       
+        elif len(allowed)==2 and (True in allowed) and (False in allowed): 
+            #only True or False - use a checkbox   
+             inputBox = wx.CheckBox(self)
+             inputBox.SetValue(initial)
+        elif len(allowed)>1:
+            #there are limitted options - use a Choice control
+            inputBox = wx.Choice(self, choices=allowed)
+        else:
+            inputBox = wx.TextCtrl(self,-1,str(initial),size=wx.Size(10*self.maxFieldLength,-1))
+        inputBox.SetToolTipString(hint)
+        container.Add(inputLabel, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT|wx.ALL, border=3)
+        container.Add(inputBox,proportion=1, flag=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_LEFT|wx.ALL, border=3)
+        self.sizer.Add(container, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT|wx.ALL, border=3)
+        
+        return inputBox
+class DlgLoopProperties(_BaseParamsDlg):    
+    def __init__(self,parent,title="Loop properties",
+            params=None,hints=None,allowed=None,
+            pos=wx.DefaultPosition, size=wx.DefaultSize,
+            style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
+        style=style|wx.RESIZE_BORDER
+        
+        self.parent=parent
+        self.Center()
+        self.sizer = wx.BoxSizer(wx.VERTICAL)#needs to be done before any addField calls
+        
+        self.nameField = self.addField('name','',[],hint="Every object (including loops) needs a unique name")
+        
+        #create instances of the two loop types
+        self.trialHandler=experiment.TrialHandler('random',5,[]) #for 'random','sequential'
+        self.stairHandler=experiment.StairHandler(50,4) #for staircases
+        #setup the chooser to set which type we need
+        self.loopTypes=['random','sequential','staircase']
+        self.currentType=self.loopTypes[0]
+        self.choiceLoop = self.addField(label='loop type',initial=self.currentType, allowed=self.loopTypes,
+            hint='How does the next trial get chosen?')
+        self.Bind(wx.EVT_CHOICE, self.onTypeChanged, self.choiceLoop)
+        
+        self.makeGlobalCtrls()
+        self.makeStaircaseCtrls()
+        self.makeRandAndSeqCtrls()
+        self.setCtrls(self.currentType)
+        self.SetSizer(self.sizer)
+        self.SetAutoLayout(True)
+        
+        #show dialog and get most of the data
+        self.showAndGetData()#stores data as self.params
+        if self.OK:
+            self.params['name']=self.nameField.GetValue()
+            
+    def makeRandAndSeqCtrls(self):
+        #a list of controls for the random/sequential versions
+        #that can be hidden or shown
+        self.randFields = []
+        self.randFieldNames=[]
+        self.randFieldTypes=[]        
+        keys = self.params.keys()
+        
+        #loop through the params    
+        for field in keys:
+            #check if it has limited set of options
+            if field in self.allowed.keys: allowed=self.allowed[field]
+            else: allowed=None
+            #create the field (with a label)
+            fieldCtrl= addField(self,field,self.params[field], allowed,self.hints[field])
+            if field in fixed: fieldCtrl.Disable()
+            #store info about the field
+            self.randFields.append(fieldCtrl)
+            self.randFieldNames.append(field)
+            self.randFieldTypes.append(type(self.params[field]))
+            
+    def makeStaircaseCtrls(self):
+        """Setup the controls for a StairHandler"""
+        self.stairFields = []
+        self.stairFieldNames=[]
+        self.stairFieldTypes=[]        
+        
+        #loop through the params    
+        for field in keys:
+            #check if it has limited set of options
+            if field in self.allowed.keys: allowed=self.allowed[field]
+            else: allowed=None
+            #create the field (with a label)
+            fieldCtrl= addField(self,field,self.params[field], allowed, self.hints[field])
+            if field in fixed: fieldCtrl.Disable()
+            #store info about the field
+            self.stairFields.append(fieldCtrl)
+            self.stairFieldNames.append(field)
+            self.stairFieldTypes.append(type(self.params[field]))
+            
+            
+    def setCtrls(self, ctrlType):
+        if ctrlType=='staircase':
+            for ctrl in self.randFields:
+                ctrl.Hide()
+            for ctrl in self.stairFields:
+                ctrl.Show()
+        else:
+            for ctrl in self.stairFields:
+                ctrl.Hide()
+            for ctrl in self.randFields:
+                ctrl.Show()
+        self.sizer.Layout()
+    def onTypeChanged(self, evt=None):
+        newType = evt.GetString()
+        if newType==self.currentType:
+            return
+        self.setCtrls(newType)
+        self.currentType = newType
+            
+class DlgComponentProperties(_BaseParamsDlg):    
+    def __init__(self,parent,title,params,hints,fixed=[],allowed={},
+            pos=wx.DefaultPosition, size=wx.DefaultSize,
+            style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
+        style=style|wx.RESIZE_BORDER
+        
+        _BaseParamsDlg.__init__(self,parent,title,params,hints,fixed,allowed,
+            pos,size,style)
+        
+        self.showAndGetData()
         self.Destroy()
         
 class BuilderFrame(wx.Frame):
@@ -674,15 +724,14 @@ class BuilderFrame(wx.Frame):
             self.bitmaps[eventType]=wx.Bitmap( \
                 os.path.join(iconDir,"%sAdd.png" %eventType.lower()))      
         
-        
         #create a default experiment (maybe an empty one instead)
-        self.exp = ExperimentObjects.Experiment()
+        self.exp = experiment.Experiment()
         self.exp.addRoutine('trial') #create the trial routine
         self.exp.flow.addRoutine(self.exp.routines['trial'], pos=1)#add it to flow
         #adda loop to the flow as well
         trialInfo = [ {'ori':5, 'sf':1.5}, {'ori':2, 'sf':1.5},{'ori':5, 'sf':3}, ] 
         self.exp.flow.addLoop(
-            ExperimentObjects.LoopHandler(name='trialLoop', loopType='rand', nReps=5, trialList = trialInfo),
+            experiment.TrialHandler(name='trialLoop', loopType='rand', nReps=5, trialList = trialInfo),
             startPos=0.5, endPos=1.5,#specify positions relative to the
             )
         
