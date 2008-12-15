@@ -292,13 +292,13 @@ class SoundComponent(BaseComponent):
         buff.write("%splaying Sound '%s'\n" %(indent, self.params['name']))        
 class KeyboardComponent(BaseComponent):
     """An event class for checking the keyboard at given times"""
-    def __init__(self, name='', allowedKeys='q,left,right',onTimes=[0,1]):
+    def __init__(self, name='', allowedKeys='q,left,right',times=[0,1]):
         self.type='Keyboard'
                 
         self.params={}
         self.params['name']=name
         self.params['allowedKeys']=allowedKeys
-        self.params['times']=onTimes
+        self.params['times']=times
         
         self.hints={}
         self.hints['name']=""
@@ -311,14 +311,15 @@ class KeyboardComponent(BaseComponent):
 
 class MouseComponent(BaseComponent):
     """An event class for checking the mouse location and buttons at given times"""
-    def __init__(self, name='mouse', onTimes=[0,1]):
+    def __init__(self, name='mouse', times=[0,1]):
         self.type='Mouse'
         self.params={}
         self.params['name']=name
-        self.params['onTimes']=onTimes
+        self.params['times']=times
         
         self.hints={}
-        self.hints['onTimes']="A series of one or more periods to read the mouse, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]"
+        self.hints['name']="Even mice have names"
+        self.hints['times']="A series of one or more periods to read the mouse, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]"
     def generateInitCode(self,buff):
         pass#no need to initialise?
     def generateRunCode(self,buff,indent):

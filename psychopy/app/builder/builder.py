@@ -91,6 +91,7 @@ class FlowPanel(scrolled.ScrolledPanel):
         
         #bind events     
         self.Bind(wx.EVT_BUTTON, self.onInsertRoutine,self.btnInsertRoutine) 
+        self.Bind(wx.EVT_BUTTON, self.onInsertLoop,self.btnInsertLoop) 
         self.Bind(wx.EVT_PAINT, self.onPaint)
         
         #self.SetAutoLayout(True)
@@ -121,20 +122,23 @@ class FlowPanel(scrolled.ScrolledPanel):
         #remove the points from the timeline
         self.setDrawPoints(None)
         self.Refresh()
-         
-        evt.Skip()
-    def onMouse(self,mouse):
-#        if mouse.Entering() or mouse.Moving():
-#            self.mousePos = [mouse.GetX(), mouse.GetY()]
-#            #redraw scr with nearest time spots highlighted
-#            if self.drawNearestRoutinePoint or self.drawNearestLoopPoint:
-#                self.Refresh()
-#        if mouse.Leaving():
-#            self.mousePos = None
-#            #redraw scr with nearest time spots highlighted
-#            if self.drawNearestRoutinePoint or self.drawNearestLoopPoint:
-#                self.Refresh()
-        mouse.Skip()#let other part of the app get the mouse event too
+        
+    def onInsertLoop(self, evt):
+        """Someone pushed the insert loop button.
+        Fetch the dialog
+        """
+        exp = self.parent.exp
+        
+        #add routine points to the timeline
+        self.setDrawPoints('loops')
+        self.Refresh()
+        
+        #bring up listbox to choose the routine to add and/or create a new one
+        addLoopDlg = DlgLoopProperties(parent=self.parent)
+        #remove the points from the timeline
+        self.setDrawPoints(None)
+        self.Refresh()
+
     def onPaint(self, evt=None):
         """This should not be called. Use FlowPanel.Refresh()
         """                
@@ -187,14 +191,6 @@ class FlowPanel(scrolled.ScrolledPanel):
             dc.DrawText(str(n), xPos-w/2, linePos-h/2)
                 
         self.needUpdate=False
-    def hitTest(self, pts, radius=10):
-        if self.mousePos==None:
-            return []
-        else:
-            for thisPt in pts:
-                pass
-                
-
     def setDrawPoints(self, ptType, startPoint=None):
         """Set the points of 'routines', 'loops', or None
         """
@@ -478,13 +474,36 @@ class ComponentsPanel(scrolled.ScrolledPanel):
             currRoutinePage.redraw()#update the routine's view with the new component too
 
 class DlgLoopProperties(wx.Dialog):    
-    def __init__(self,parent,title,params=None,
+    def __init__(self,parent,title="Loop properties",params=None,
             pos=wx.DefaultPosition, size=wx.DefaultSize,
             style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
         style=style|wx.RESIZE_BORDER
         
         wx.Dialog.__init__(self, parent,-1,title,pos,size,style)
+        self.parent=parent
+        self.Center()
         
+        self.loopTypes=['random','sequential','staircase']
+        typeLabel = wx.StaticText(parent=self,id=-1,label='loop type')
+        typeChooser=wx.ComboBox(parent=self, id=-1, value=self.loopTypes[0], choices=self.loopTypes)
+        
+        self.sizer = wx.FlexGridSizer(3, 2, 2, 2)  # rows, cols, vgap, hgap
+        self.sizer.AddMany([typeLabel, typeChooser])
+        
+        self.showAndGetData()
+    def onTypeChanged(self, evt=None):
+        pass
+    def showAndGetData(self):
+        #add buttons for OK and Cancel
+        buttons = wx.BoxSizer(wx.HORIZONTAL)
+        OK = wx.Button(self, wx.ID_OK, " OK ")
+        OK.SetDefault()
+        CANCEL = wx.Button(self, wx.ID_CANCEL, " Cancel ")
+        self.sizer.AddMany([OK, CANCEL])#,1,flag=wx.ALIGN_RIGHT|wx.ALIGN_BOTTOM|wx.ALL,border=3)
+        
+        self.SetSizerAndFit(self.sizer)
+        if self.ShowModal() == wx.ID_OK:
+            print 'OK'
 class DlgComponentProperties(wx.Dialog):    
     def __init__(self,parent,title,params,hints,fixed=[],
             pos=wx.DefaultPosition, size=wx.DefaultSize,
@@ -492,6 +511,7 @@ class DlgComponentProperties(wx.Dialog):
         style=style|wx.RESIZE_BORDER
         
         wx.Dialog.__init__(self, parent,-1,title,pos,size,style)
+        self.parent=parent
         self.Center()
         
         self.params=params
@@ -508,6 +528,12 @@ class DlgComponentProperties(wx.Dialog):
         
         self.maxFieldLength = 10#max( len(str(self.params[x])) for x in keys )
         types=dict([])
+        
+        #for components with names (all?) we want that a the top of the dlg
+        if 'name' in keys:
+            keys.remove('name')
+            keys.insert(0,'name')
+        #loop through the params    
         for field in keys:
             #DEBUG: print field, type(params[field])
             types[field] = type(self.params[field])
@@ -528,7 +554,7 @@ class DlgComponentProperties(wx.Dialog):
                                 label=text,
                                 style=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_CENTER_HORIZONTAL,
                                 size=textLength)
-        self.sizer.Add(myTxt,1,wx.ALIGN_CENTER)
+        self.sizer.Add(myTxt,0,wx.ALIGN_CENTER)
         
     def addField(self, label='', initial='', hint=''):
         """
@@ -543,13 +569,18 @@ class DlgComponentProperties(wx.Dialog):
         container=wx.BoxSizer(wx.HORIZONTAL)
         inputLabel = wx.StaticText(self,-1,label,
                                         size=labelLength,
-                                        style=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_CENTER_HORIZONTAL)
-        container.Add(inputLabel, 1, wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT)
-#        inputBox = wx.TextCtrl(self,-1,str(initial),size=(5*self.maxFieldLength+16,25))
-        inputBox = wx.TextCtrl(self,-1,str(initial),size=wx.Size(10*self.maxFieldLength,-1))
+                                        style=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT)
+        if label=='text':
+            #for text input we need a bigger (multiline) box
+            inputBox = wx.TextCtrl(self,-1,str(initial),
+                style=wx.TE_MULTILINE,
+                size=wx.Size(30*self.maxFieldLength,-1))            
+        else:
+            inputBox = wx.TextCtrl(self,-1,str(initial),size=wx.Size(10*self.maxFieldLength,-1))
         inputBox.SetToolTipString(hint)
-        container.Add(inputBox,1)
-        self.sizer.Add(container, 1, wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT)
+        container.Add(inputLabel, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT|wx.ALL, border=3)
+        container.Add(inputBox,proportion=1, flag=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_LEFT|wx.ALL, border=3)
+        self.sizer.Add(container, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT|wx.ALL, border=3)
         
         self.inputFields.append(inputBox)#store this to get data back on OK
         return inputBox
@@ -568,10 +599,10 @@ class DlgComponentProperties(wx.Dialog):
         buttons = wx.BoxSizer(wx.HORIZONTAL)
         OK = wx.Button(self, wx.ID_OK, " OK ")
         OK.SetDefault()
-        buttons.Add(OK)	
+        buttons.Add(OK, 0, wx.ALL,border=3)
         CANCEL = wx.Button(self, wx.ID_CANCEL, " Cancel ")
-        buttons.Add(CANCEL)
-        self.sizer.Add(buttons,1,flag=wx.ALIGN_RIGHT|wx.ALIGN_BOTTOM,border=5)
+        buttons.Add(CANCEL, 0, wx.ALL,border=3)
+        self.sizer.Add(buttons,1,flag=wx.ALIGN_RIGHT|wx.ALIGN_BOTTOM|wx.ALL,border=3)
         
         self.SetSizerAndFit(self.sizer)
         if self.ShowModal() == wx.ID_OK:
