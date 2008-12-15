@@ -484,16 +484,51 @@ class DlgLoopProperties(wx.Dialog):
         self.Center()
         
         self.loopTypes=['random','sequential','staircase']
+        self.currentType=self.loopTypes[0]
         typeLabel = wx.StaticText(parent=self,id=-1,label='loop type')
         typeChooser=wx.Choice(parent=self, id=-1,choices=self.loopTypes)
         self.Bind(wx.EVT_CHOICE, self.onTypeChanged)
         
-        self.sizer = wx.FlexGridSizer(3, 2, 2, 2)  # rows, cols, vgap, hgap
+        self.sizer = wx.FlexGridSizer(5, 2, 2, 2)  # rows, cols, vgap, hgap
         self.sizer.AddMany([typeLabel, typeChooser])
         
+        self.makeStaircaseCtrls()
+        self.makeRandAndSeqCtrls()
+        self.setCtrls(self.currentType)
         self.showAndGetData()
+        
+    def makeRandAndSeqCtrls(self):
+        #a list of controls for the random/sequential versions
+        #that can be hidden or shown
+        self.randCtrls = []
+        self.ctrlNreps=wx.TextCtrl(parent=self, value='5', size=(100,20))
+        self.randCtrls.append(self.ctrlNreps)
+        self.sizer.AddMany([self.ctrlNreps])
+    def makeStaircaseCtrls(self):
+        """Setup the controls for a StairHandler"""
+        self.staircaseCtrls=[]
+        self.ctrlStairNreps=wx.TextCtrl(parent=self, value='50', size=(100,20))
+        self.staircaseCtrls.append(self.ctrlStairNreps)
+        self.sizer.AddMany([self.ctrlStairNreps])
+            
+    def setCtrls(self, ctrlType):
+        if ctrlType=='staircase':
+            for ctrl in self.randCtrls:
+                ctrl.Hide()
+            for ctrl in self.staircaseCtrls:
+                ctrl.Show()
+        else:
+            for ctrl in self.staircaseCtrls:
+                ctrl.Hide()
+            for ctrl in self.randCtrls:
+                ctrl.Show()
+        self.sizer.Layout()
     def onTypeChanged(self, evt=None):
-        print evt.GetString()
+        newType = evt.GetString()
+        if newType==self.currentType:
+            return
+        self.setCtrls(newType)
+        self.currentType = newType
     def showAndGetData(self):
         #add buttons for OK and Cancel
         buttons = wx.BoxSizer(wx.HORIZONTAL)
