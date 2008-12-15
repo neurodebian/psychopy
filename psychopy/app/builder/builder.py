@@ -2,7 +2,7 @@ import wx
 import wx.lib.scrolledpanel as scrolled
 import wx.aui
 import sys, os, glob
-import ExperimentObjects, numpy
+import experiment, numpy
 #import psychopy
 from keybindings import *
 
@@ -69,6 +69,35 @@ TB_REDO= 80
 TB_RUN = 100
 TB_STOP = 110
 
+def addDlgField(self, sizer, label='', initial='', hint=''):
+        """
+        Adds a (labelled) input field to a dialogue box
+        Returns a handle to the field (but not to the label).
+        
+        usage: field = addDlgField(sizer, label='', initial='', hint='')
+        
+        """
+        if type(initial)==numpy.ndarray:
+            initial=initial.tolist() #convert numpy arrays to lists
+        labelLength = wx.Size(9*len(label)+16,25)#was 8*until v0.91.4
+        container=wx.BoxSizer(wx.HORIZONTAL)
+        inputLabel = wx.StaticText(self,-1,label,
+                                        size=labelLength,
+                                        style=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT)
+        if label=='text':
+            #for text input we need a bigger (multiline) box
+            inputBox = wx.TextCtrl(self,-1,str(initial),
+                style=wx.TE_MULTILINE,
+                size=wx.Size(30*self.maxFieldLength,-1))            
+        else:
+            inputBox = wx.TextCtrl(self,-1,str(initial),size=wx.Size(10*self.maxFieldLength,-1))
+        inputBox.SetToolTipString(hint)
+        container.Add(inputLabel, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT|wx.ALL, border=3)
+        container.Add(inputBox,proportion=1, flag=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_LEFT|wx.ALL, border=3)
+        sizer.Add(container, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT|wx.ALL, border=3)
+        
+        return inputBox
+    
 class FlowPanel(scrolled.ScrolledPanel):
     def __init__(self, parent, id=-1,size = (600,100)):
         """A panel that shows how the routines will fit together
@@ -489,17 +518,20 @@ class DlgLoopProperties(wx.Dialog):
         typeChooser=wx.Choice(parent=self, id=-1,choices=self.loopTypes)
         self.Bind(wx.EVT_CHOICE, self.onTypeChanged)
         
-        self.sizer = wx.FlexGridSizer(5, 2, 2, 2)  # rows, cols, vgap, hgap
-        self.sizer.AddMany([typeLabel, typeChooser])
+        self.sizer = wx.BoxSizer(wx.VERTICAL)
+        self.sizer.AddMany([(typeLabel,wx.ALIGN_RIGHT), typeChooser])
         
         self.makeStaircaseCtrls()
         self.makeRandAndSeqCtrls()
         self.setCtrls(self.currentType)
+        self.SetSizer(self.sizer)
+        self.SetAutoLayout(True)
         self.showAndGetData()
         
     def makeRandAndSeqCtrls(self):
         #a list of controls for the random/sequential versions
         #that can be hidden or shown
+        self.randParamNames=
         self.randCtrls = []
         self.ctrlNreps=wx.TextCtrl(parent=self, value='5', size=(100,20))
         self.randCtrls.append(self.ctrlNreps)
@@ -571,14 +603,16 @@ class DlgComponentProperties(wx.Dialog):
             keys.insert(0,'name')
         #loop through the params    
         for field in keys:
-            #DEBUG: print field, type(params[field])
-            types[field] = type(self.params[field])
-            if field in fixed:
-                self.addFixedField(field,self.params[field],self.hints[field])
-            else:
-                self.addField(field,self.params[field],self.hints[field])
+            #create it (with a label)
+            fieldCtrl=self.addField(field,self.params[field],self.hints[field]))
+            if field in fixed: fieldCtrl.Disable()
+            #store info abou the field
+            self.inputFieldNames.append(label)
+            self.inputFieldTypes.append(self.params[field])
+            self.inputField.append(fieldCtrl)
+                
         #show it and collect data
-        self.sizer.FitInside(self)
+        self.sizer.Fit(self)
         self.showAndGetData()
         if self.OK:
             for n,thisKey in enumerate(keys):
@@ -592,43 +626,7 @@ class DlgComponentProperties(wx.Dialog):
                                 size=textLength)
         self.sizer.Add(myTxt,0,wx.ALIGN_CENTER)
         
-    def addField(self, label='', initial='', hint=''):
-        """
-        Adds a (labelled) input field to the dialogue box
-        Returns a handle to the field (but not to the label).
-        """
-        self.inputFieldNames.append(label)
-        self.inputFieldTypes.append(type(initial))
-        if type(initial)==numpy.ndarray:
-            initial=initial.tolist() #convert numpy arrays to lists
-        labelLength = wx.Size(9*len(label)+16,25)#was 8*until v0.91.4
-        container=wx.BoxSizer(wx.HORIZONTAL)
-        inputLabel = wx.StaticText(self,-1,label,
-                                        size=labelLength,
-                                        style=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT)
-        if label=='text':
-            #for text input we need a bigger (multiline) box
-            inputBox = wx.TextCtrl(self,-1,str(initial),
-                style=wx.TE_MULTILINE,
-                size=wx.Size(30*self.maxFieldLength,-1))            
-        else:
-            inputBox = wx.TextCtrl(self,-1,str(initial),size=wx.Size(10*self.maxFieldLength,-1))
-        inputBox.SetToolTipString(hint)
-        container.Add(inputLabel, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT|wx.ALL, border=3)
-        container.Add(inputBox,proportion=1, flag=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_LEFT|wx.ALL, border=3)
-        self.sizer.Add(container, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT|wx.ALL, border=3)
-        
-        self.inputFields.append(inputBox)#store this to get data back on OK
-        return inputBox
     
-    def addFixedField(self,label='',value=''):
-        """Adds a field to the dialogue box (like addField) but
-        the field cannot be edited. e.g. Display experiment
-        version.
-        """
-        thisField = self.addField(label,value)
-        thisField.Disable()
-        return thisField
         
     def showAndGetData(self):
         #add buttons for OK and Cancel
