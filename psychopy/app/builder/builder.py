@@ -610,6 +610,7 @@ class DlgLoopProperties(_BaseParamsDlg):
             style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
         style=style|wx.RESIZE_BORDER
         
+        wx.Dialog.__init__(self, parent,-1,title,pos,size,style)
         self.parent=parent
         self.Center()
         self.sizer = wx.BoxSizer(wx.VERTICAL)#needs to be done before any addField calls
