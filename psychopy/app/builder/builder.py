@@ -197,7 +197,7 @@ class FlowPanel(scrolled.ScrolledPanel):
         if ptType=='routines':
             self.pointsToDraw=self.gapMidPoints
         elif ptType=='loops':
-            self.pointsToDraw=self.gapMidPoints[1]
+            self.pointsToDraw=self.gapMidPoints
         else:
             self.pointsToDraw=[]
     def drawLoopAttach(self, dc, pos):
@@ -485,14 +485,15 @@ class DlgLoopProperties(wx.Dialog):
         
         self.loopTypes=['random','sequential','staircase']
         typeLabel = wx.StaticText(parent=self,id=-1,label='loop type')
-        typeChooser=wx.ComboBox(parent=self, id=-1, value=self.loopTypes[0], choices=self.loopTypes)
+        typeChooser=wx.Choice(parent=self, id=-1,choices=self.loopTypes)
+        self.Bind(wx.EVT_CHOICE, self.onTypeChanged)
         
         self.sizer = wx.FlexGridSizer(3, 2, 2, 2)  # rows, cols, vgap, hgap
         self.sizer.AddMany([typeLabel, typeChooser])
         
         self.showAndGetData()
     def onTypeChanged(self, evt=None):
-        pass
+        print evt.GetString()
     def showAndGetData(self):
         #add buttons for OK and Cancel
         buttons = wx.BoxSizer(wx.HORIZONTAL)
@@ -503,7 +504,7 @@ class DlgLoopProperties(wx.Dialog):
         
         self.SetSizerAndFit(self.sizer)
         if self.ShowModal() == wx.ID_OK:
-            print 'OK'
+            print 'loop props returned OK'
 class DlgComponentProperties(wx.Dialog):    
     def __init__(self,parent,title,params,hints,fixed=[],
             pos=wx.DefaultPosition, size=wx.DefaultSize,
