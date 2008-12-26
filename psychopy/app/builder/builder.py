@@ -601,10 +601,9 @@ class _BaseParamsDlg(wx.Dialog):
         container.Add(inputBox,proportion=1, flag=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_LEFT|wx.ALL, border=3)
         self.sizer.Add(container, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT|wx.ALL, border=3)
         
-        return inputBox
+        return inputBox, inputLabel
 class DlgLoopProperties(_BaseParamsDlg):    
     def __init__(self,parent,title="Loop properties",
-            params=None,hints=None,allowed=None,
             pos=wx.DefaultPosition, size=wx.DefaultSize,
             style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
         style=style|wx.RESIZE_BORDER
@@ -614,12 +613,12 @@ class DlgLoopProperties(_BaseParamsDlg):
         self.Center()
         self.sizer = wx.BoxSizer(wx.VERTICAL)#needs to be done before any addField calls
         
-        self.nameField = self.addField('name','',[],hint="Every object (including loops) needs a unique name")
         self.maxFieldLength = 10#max( len(str(self.params[x])) for x in keys )
+        self.nameField, label = self.addField('name','',[],hint="Every object (including loops) needs a unique name")
         
         #create instances of the two loop types
-        self.trialHandler=experiment.TrialHandler('random',5,[]) #for 'random','sequential'
-        self.stairHandler=experiment.StairHandler(50,4) #for staircases
+        self.trialHandler=experiment.TrialHandler('','random',5,[]) #for 'random','sequential'
+        self.stairHandler=experiment.StairHandler('',50,4) #for staircases
         #setup the chooser to set which type we need
         self.loopTypes=['random','sequential','staircase']
         self.currentType=self.loopTypes[0]
@@ -627,7 +626,7 @@ class DlgLoopProperties(_BaseParamsDlg):
             hint='How does the next trial get chosen?')
         self.Bind(wx.EVT_CHOICE, self.onTypeChanged, self.choiceLoop)
         
-        self.makeGlobalCtrls()
+        #self.makeGlobalCtrls()
         self.makeStaircaseCtrls()
         self.makeRandAndSeqCtrls()
         self.setCtrls(self.currentType)
@@ -644,40 +643,38 @@ class DlgLoopProperties(_BaseParamsDlg):
         #that can be hidden or shown
         self.randFields = []
         self.randFieldNames=[]
-        self.randFieldTypes=[]        
-        keys = self.params.keys()
+        self.randFieldTypes=[] 
+        handler=self.trialHandler
         
         #loop through the params    
-        for field in keys:
+        for field in handler.params.keys():
             #check if it has limited set of options
-            if field in self.allowed.keys: allowed=self.allowed[field]
-            else: allowed=None
+            if field in handler.allowed.keys(): allowed=handler.allowed[field]
+            else: allowed=[]
             #create the field (with a label)
-            fieldCtrl= addField(self,field,self.params[field], allowed,self.hints[field])
-            if field in fixed: fieldCtrl.Disable()
+            fieldCtrl= self.addField(field,handler.params[field], allowed,handler.hints[field])
             #store info about the field
             self.randFields.append(fieldCtrl)
             self.randFieldNames.append(field)
-            self.randFieldTypes.append(type(self.params[field]))
+            self.randFieldTypes.append(type(handler.params[field]))
             
     def makeStaircaseCtrls(self):
         """Setup the controls for a StairHandler"""
         self.stairFields = []
         self.stairFieldNames=[]
         self.stairFieldTypes=[]        
-        
+        handler=self.stairHandler
         #loop through the params    
-        for field in keys:
+        for field in handler.params.keys():
             #check if it has limited set of options
-            if field in self.allowed.keys: allowed=self.allowed[field]
-            else: allowed=None
+            if field in handler.allowed.keys(): allowed=handler.allowed[field]
+            else: allowed=[]
             #create the field (with a label)
-            fieldCtrl= addField(self,field,self.params[field], allowed, self.hints[field])
-            if field in fixed: fieldCtrl.Disable()
+            fieldNameCtrl, fieldCtrl= self.addField(field,handler.params[field], handler.allowed, handler.hints[field])
             #store info about the field
             self.stairFields.append(fieldCtrl)
             self.stairFieldNames.append(field)
-            self.stairFieldTypes.append(type(self.params[field]))
+            self.stairFieldTypes.append(type(handler.params[field]))
             
             
     def setCtrls(self, ctrlType):

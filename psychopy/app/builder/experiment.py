@@ -73,6 +73,7 @@ class TrialHandler(list):
         self.hints['name'] = 'Name of this loop'
         self.hints['nReps']='Number of repeats (for each type of trial)'
         self.hints['trialList']="A list of dictionaries describing the differences between each trial type"
+        self.allowed={}
     def generateInitCode(self,buff):
         buff.write("init loop '%s' (%s)\n" %(self.name, self.loopType))
         buff.write("%s=data.TrialHandler(trialList=%s,nReps=%i,\n)" \
@@ -86,7 +87,7 @@ class TrialHandler(list):
 class StairHandler(list):    
     """A staircase experimental control object.
     """
-    def __init__(self, name, loopType, nReps, stepSizes):
+    def __init__(self, name, nReps, stepSizes):
         """
         @param name: name of the loop e.g. trials
         @type name: string
@@ -94,7 +95,6 @@ class StairHandler(list):
         @type nReps:int
         """
         list.__init__(self)
-        self.type='TrialHandler'
         self.params={}
         self.params['name'] = name
         self.params['nReps']=nReps
