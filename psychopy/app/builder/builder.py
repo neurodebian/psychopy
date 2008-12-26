@@ -1,7 +1,7 @@
 import wx
 import wx.lib.scrolledpanel as scrolled
 import wx.aui
-import sys, os, glob
+import sys, os, glob, copy
 import experiment, numpy
 #import psychopy
 from keybindings import *
@@ -512,7 +512,7 @@ class _BaseParamsDlg(wx.Dialog):
             if field in self.allowed.keys(): allowed=self.allowed[field]
             else: allowed=[]
             #create the field (with a label)
-            fieldCtrl= self.addField(field,self.params[field], allowed,self.hints[field])
+            fieldCtrl, fieldLabel= self.addField(field,self.params[field], allowed,self.hints[field])
             if field in fixed: fieldCtrl.Disable()
             #store info about the field
             self.inputFields.append(fieldCtrl)
@@ -622,7 +622,7 @@ class DlgLoopProperties(_BaseParamsDlg):
         #setup the chooser to set which type we need
         self.loopTypes=['random','sequential','staircase']
         self.currentType=self.loopTypes[0]
-        self.choiceLoop = self.addField(label='loop type',initial=self.currentType, allowed=self.loopTypes,
+        self.choiceLoop, label = self.addField(label='loop type',initial=self.currentType, allowed=self.loopTypes,
             hint='How does the next trial get chosen?')
         self.Bind(wx.EVT_CHOICE, self.onTypeChanged, self.choiceLoop)
         
@@ -637,12 +637,15 @@ class DlgLoopProperties(_BaseParamsDlg):
         self.showAndGetData()#stores data as self.params
         if self.OK:
             self.params['name']=self.nameField.GetValue()
+            if self.currentType in ['random','sequential']:
+                self.params['loopType']=self.currentType
             
     def makeRandAndSeqCtrls(self):
         #a list of controls for the random/sequential versions
         #that can be hidden or shown
         self.randFields = []
         self.randFieldNames=[]
+        self.randFieldLabels=[]
         self.randFieldTypes=[] 
         handler=self.trialHandler
         
@@ -652,9 +655,10 @@ class DlgLoopProperties(_BaseParamsDlg):
             if field in handler.allowed.keys(): allowed=handler.allowed[field]
             else: allowed=[]
             #create the field (with a label)
-            fieldCtrl= self.addField(field,handler.params[field], allowed,handler.hints[field])
+            fieldCtrl, fieldLabelCtrl= self.addField(field,handler.params[field], allowed,handler.hints[field])
             #store info about the field
             self.randFields.append(fieldCtrl)
+            self.randFieldLabels.append(fieldLabelCtrl)
             self.randFieldNames.append(field)
             self.randFieldTypes.append(type(handler.params[field]))
             
@@ -662,32 +666,37 @@ class DlgLoopProperties(_BaseParamsDlg):
         """Setup the controls for a StairHandler"""
         self.stairFields = []
         self.stairFieldNames=[]
-        self.stairFieldTypes=[]        
+        self.stairFieldTypes=[] 
+        self.stairFieldLabels=[]      
         handler=self.stairHandler
-        #loop through the params    
+        #loop through the params
         for field in handler.params.keys():
             #check if it has limited set of options
             if field in handler.allowed.keys(): allowed=handler.allowed[field]
             else: allowed=[]
             #create the field (with a label)
-            fieldNameCtrl, fieldCtrl= self.addField(field,handler.params[field], handler.allowed, handler.hints[field])
-            #store info about the field
-            self.stairFields.append(fieldCtrl)
-            self.stairFieldNames.append(field)
-            self.stairFieldTypes.append(type(handler.params[field]))
+            if field=='loopType': 
+                continue
+            else:
+                fieldCtrl, fieldLabelCtrl= self.addField(field,handler.params[field], handler.allowed, handler.hints[field])
+                #store info about the field
+                self.stairFields.append(fieldCtrl)
+                self.stairFieldLabels.append(fieldLabelCtrl)
+                self.stairFieldNames.append(field)
+                self.stairFieldTypes.append(type(handler.params[field]))
             
             
     def setCtrls(self, ctrlType):
+        randFields=copy.copy(self.randFields)
+        randFields.extend(self.randFieldLabels)
+        stairFields=copy.copy(self.stairFields)
+        stairFields.extend(self.stairFieldLabels)
         if ctrlType=='staircase':
-            for ctrl in self.randFields:
-                ctrl.Hide()
-            for ctrl in self.stairFields:
-                ctrl.Show()
+            for ctrl in randFields: ctrl.Hide()
+            for ctrl in stairFields:ctrl.Show()
         else:
-            for ctrl in self.stairFields:
-                ctrl.Hide()
-            for ctrl in self.randFields:
-                ctrl.Show()
+            for ctrl in stairFields: ctrl.Hide()
+            for ctrl in randFields: ctrl.Show()
         self.sizer.Layout()
     def onTypeChanged(self, evt=None):
         newType = evt.GetString()
