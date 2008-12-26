@@ -321,9 +321,7 @@ class RoutinePage(scrolled.ScrolledPanel):
         
         #step through the components adding buttons
         for component in self.routine:
-            print name
             name = component.params['name']
-            ypos += self.componentStep
             
             bitmap = self.parent.parent.bitmaps[component.type]   
             btn = wx.BitmapButton(self, -1, bitmap, (self.iconXpos,ypos),
@@ -335,6 +333,7 @@ class RoutinePage(scrolled.ScrolledPanel):
             h,w =self.GetTextExtent(name)
             label=wx.StaticText(self,-1, name, pos= (self.iconXpos-w*2,ypos+bitmap.GetHeight()/2),style=wx.ALIGN_RIGHT)
             self.componentLabels[name]=label
+            ypos += self.componentStep
             
     def editComponentProperties(self, event=None):
         componentName=event.EventObject.GetName()
@@ -545,8 +544,10 @@ class _BaseParamsDlg(wx.Dialog):
         if self.ShowModal() == wx.ID_OK:
             self.data=[]
             #get data from input fields
-            for n,thisKey in enumerate(self.inputFields):
+            for n,thisField in enumerate(self.inputFields):
+                thisKey = self.inputFieldNames[n]
                 thisVal = self.inputFields[n].GetValue()
+                
                 thisType= self.inputFieldTypes[n]
                 #try to handle different types of input from strings
                 if thisType in [tuple,list,float,int]:
