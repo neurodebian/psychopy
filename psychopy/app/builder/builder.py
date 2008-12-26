@@ -359,7 +359,7 @@ class RoutinePage(scrolled.ScrolledPanel):
         except:
             dc = pdc
         #draw timeline at bottom of page
-        yPosBottom = max([300, self.yPosTop+len(self.routine)*self.componentStep])
+        yPosBottom = self.yPosTop+len(self.routine)*self.componentStep
         self.drawTimeLine(dc,self.yPosTop,yPosBottom)
         yPos = self.yPosTop
         
@@ -517,7 +517,7 @@ class _BaseParamsDlg(wx.Dialog):
             #store info about the field
             self.inputFields.append(fieldCtrl)
             self.inputFieldNames.append(field)
-            self.inputFieldTypes.append(self.params[field])
+            self.inputFieldTypes.append(type(self.params[field]))
             
         #show it and collect data
         self.sizer.Fit(self)
@@ -529,8 +529,6 @@ class _BaseParamsDlg(wx.Dialog):
                                 style=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_CENTER_HORIZONTAL,
                                 size=textLength)
         self.sizer.Add(myTxt,0,wx.ALIGN_CENTER)
-        
-    
         
     def showAndGetData(self):
         #add buttons for OK and Cancel
@@ -557,11 +555,10 @@ class _BaseParamsDlg(wx.Dialog):
                     exec("self.data.append(numpy.array("+thisVal+"))")
                 elif thisType==bool:
                     self.data.append(bool(thisVal))
-                elif thisType==str:
+                elif thisType in [str, unicode]:
                     self.data.append(thisVal)
                 else:
-                    print "GOT %s (type=%s) for %s" %(thisVal, type(thisVal), self.inputFields[n])  
-                
+                    print "GOT %s (type=%s) for %s" %(thisVal, thisType, self.inputFields[n])
                 self.params[thisKey]=self.data[n]
                 
             self.OK=True
@@ -585,7 +582,7 @@ class _BaseParamsDlg(wx.Dialog):
                                         style=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT)
         if label=='text':
             #for text input we need a bigger (multiline) box
-            inputBox = wx.TextCtrl(parent,-1,str(initial),
+            inputBox = wx.TextCtrl(self,-1,str(initial),
                 style=wx.TE_MULTILINE,
                 size=wx.Size(30*self.maxFieldLength,-1))       
         elif len(allowed)==2 and (True in allowed) and (False in allowed): 
