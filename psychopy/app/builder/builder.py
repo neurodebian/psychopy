@@ -321,6 +321,7 @@ class RoutinePage(scrolled.ScrolledPanel):
         
         #step through the components adding buttons
         for component in self.routine:
+            print name
             name = component.params['name']
             ypos += self.componentStep
             
