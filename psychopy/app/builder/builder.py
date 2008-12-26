@@ -615,6 +615,7 @@ class DlgLoopProperties(_BaseParamsDlg):
         self.sizer = wx.BoxSizer(wx.VERTICAL)#needs to be done before any addField calls
         
         self.nameField = self.addField('name','',[],hint="Every object (including loops) needs a unique name")
+        self.maxFieldLength = 10#max( len(str(self.params[x])) for x in keys )
         
         #create instances of the two loop types
         self.trialHandler=experiment.TrialHandler('random',5,[]) #for 'random','sequential'
