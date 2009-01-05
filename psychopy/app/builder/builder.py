@@ -486,10 +486,10 @@ class _BaseParamsDlg(wx.Dialog):
         self.parent=parent
         self.Center()
         
-        self.params=params
-        self.fixed=fixed
-        self.allowed=allowed
-        self.hints=hints
+        self.params=params   #dict
+        self.fixed=fixed     #list
+        self.allowed=allowed # dict
+        self.hints=hints     # dict
         self.inputFields = []
         self.inputFieldTypes= []
         self.inputFieldNames= []
@@ -608,12 +608,13 @@ class DlgLoopProperties(_BaseParamsDlg):
             style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
         style=style|wx.RESIZE_BORDER
         
-        wx.Dialog.__init__(self, parent,-1,title,pos,size,style)
+        _BaseParamsDlg.__init__(self, parent,title,
+                    params={},hints={})
         self.parent=parent
         self.Center()
         self.sizer = wx.BoxSizer(wx.VERTICAL)#needs to be done before any addField calls
         
-        self.maxFieldLength = 10#max( len(str(self.params[x])) for x in keys )
+        self.maxFieldLength = 10 #max( len(str(self.params[x])) for x in keys )
         self.nameField, label = self.addField('name','',[],hint="Every object (including loops) needs a unique name")
         
         #create instances of the two loop types
@@ -651,6 +652,7 @@ class DlgLoopProperties(_BaseParamsDlg):
         
         #loop through the params    
         for field in handler.params.keys():
+            if field in ['name','loopType']: continue
             #check if it has limited set of options
             if field in handler.allowed.keys(): allowed=handler.allowed[field]
             else: allowed=[]
@@ -671,6 +673,7 @@ class DlgLoopProperties(_BaseParamsDlg):
         handler=self.stairHandler
         #loop through the params
         for field in handler.params.keys():
+            if field in ['name','loopType']: continue
             #check if it has limited set of options
             if field in handler.allowed.keys(): allowed=handler.allowed[field]
             else: allowed=[]
