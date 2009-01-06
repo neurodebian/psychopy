@@ -111,6 +111,7 @@ class RoutineCanvas(wx.ScrolledWindow):
         # vars for handling mouse clicks
         self.dragid = -1
         self.lastpos = (0,0)
+        self.componentFromID={}#use the ID of the drawn icon to retrieve component name 
     
     def ConvertEventCoords(self, event):
         xView, yView = self.GetViewStart()
@@ -130,12 +131,9 @@ class RoutineCanvas(wx.ScrolledWindow):
         if event.LeftDown():
             x,y = self.ConvertEventCoords(event)
             #l = self.pdc.FindObjectsByBBox(x, y)
-            l = self.pdc.FindObjects(x, y, hitradius)
-            for id in l:
-                if not self.pdc.GetIdGreyedOut(id):
-                    self.dragid = id
-                    self.lastpos = (event.GetX(),event.GetY())
-                    break
+            icons = self.pdc.FindObjects(x, y, hitradius)
+            if len(icons): 
+                self.editComponentProperties(component=self.componentFromID[icons[0]])
         elif event.RightDown():
             x,y = self.ConvertEventCoords(event)
             #l = self.pdc.FindObjectsByBBox(x, y)
@@ -185,9 +183,10 @@ class RoutineCanvas(wx.ScrolledWindow):
         self.pdc.DrawToDCClipped(dc,r)
 
     def redrawRoutine(self):
-        self.objids = []
-        self.boundsdict = {}
-        self.pdc.Clear()
+        
+        self.pdc.Clear()#clear the screen
+        self.pdc.RemoveAll()#clear all objects (icon buttons)
+        
         self.pdc.BeginDrawing()
         #draw timeline at bottom of page
         yPosBottom = self.yPosTop+len(self.routine)*self.componentStep
@@ -221,7 +220,8 @@ class RoutineCanvas(wx.ScrolledWindow):
         dc.DrawText('t (secs)',xEnd+5, 
             yPosBottom-self.GetFullTextExtent('t')[1]/2.0)#y is y-half height of text
     def drawComponent(self, dc, component, yPos):  
-        """Draw the timing of one component on the timeline"""       
+        """Draw the timing of one component on the timeline"""   
+        
         bitmap = self.parent.parent.bitmaps[component.type]        
         dc.DrawBitmap(bitmap, self.iconXpos,yPos, True)
         
@@ -236,7 +236,7 @@ class RoutineCanvas(wx.ScrolledWindow):
         x = self.iconXpos-5-w
         y = yPos+bitmap.GetHeight()/2-h/2
         dc.DrawText(name, x, y)
-
+        
         #draw entries on timeline
         xScale = self.getSecsPerPixel()
         dc.SetPen(wx.Pen(wx.Colour(200, 100, 100, 0)))
@@ -251,6 +251,20 @@ class RoutineCanvas(wx.ScrolledWindow):
             xSt = self.timeXposStart + st/xScale
             thisOccW = (end-st)/xScale
             dc.DrawRectangle(xSt, y, thisOccW,h )
+        
+        ##set an id for the region where the bitmap falls (so it can act as a button)
+        #see if we created this already
+        id=None
+        for key in self.componentFromID.keys():
+            if self.componentFromID[key]==component: 
+                id=key
+        if not id: #then create one and add to the dict
+            id = wx.NewId()
+            self.componentFromID[id]=component
+        dc.SetId(id)
+        #set the area for this component
+        r = wx.Rect(self.iconXpos, yPos, bitmap.GetWidth(),bitmap.GetHeight())
+        dc.SetIdBounds(id,r)
             
             
     def setComponentYpositions(self,posList):
@@ -260,14 +274,16 @@ class RoutineCanvas(wx.ScrolledWindow):
         self.yPositions=posList
         
     
-    def editComponentProperties(self, event=None):
-        componentName=event.EventObject.GetName()
-        component=self.routine.getComponentFromName(componentName)
+    def editComponentProperties(self, event=None, component=None):
+        if event:#we got here from a wx.button press (rather than our own drawn icons)
+            componentName=event.EventObject.GetName()
+            component=self.routine.getComponentFromName(componentName)
         
         dlg = DlgComponentProperties(parent=self.parent,
-            title=componentName+' Properties',
+            title=component.params['name']+' Properties',
             params = component.params, hints=component.hints)
-        self.Refresh()#just need to refresh timings section
+        self.redrawRoutine()#need to refresh timings section
+        self.Refresh()#then redraw visible
         
     def getSecsPerPixel(self):
         return float(self.timeMax)/(self.timeXposEnd-self.timeXposStart)
