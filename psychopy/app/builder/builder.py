@@ -72,222 +72,6 @@ TB_STOP = 110
 
 global hitradius
 hitradius=5
-class RoutineCanvas(wx.ScrolledWindow):
-    def __init__(self, parent, id=-1, routine=None):
-        """This window is based heavily on the PseudoDC demo of wxPython
-        """
-        wx.ScrolledWindow.__init__(self, parent, id, (0, 0), style=wx.SUNKEN_BORDER)
-        
-        self.parent=parent
-        self.lines = []
-        self.maxWidth  = 200
-        self.maxHeight = 100
-        self.x = self.y = 0
-        self.curLine = []
-        self.drawing = False
-
-        self.SetVirtualSize((self.maxWidth, self.maxHeight))
-        self.SetScrollRate(20,20)
-        
-        self.routine=routine
-        self.yPositions=None        
-        self.yPosTop=60
-        self.componentStep=50#the step in Y between each component
-        self.iconXpos = 100 #the left hand edge of the icons
-        self.timeXposStart = 200
-        self.timeXposEnd = 600
-        self.timeMax = 10
-        
-        # create a PseudoDC to record our drawing
-        self.pdc = wx.PseudoDC()
-        self.pen_cache = {}
-        self.brush_cache = {}
-        self.redrawRoutine()
-
-        self.Bind(wx.EVT_PAINT, self.OnPaint)
-        self.Bind(wx.EVT_ERASE_BACKGROUND, lambda x:None)
-        self.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouse)
-        
-        # vars for handling mouse clicks
-        self.dragid = -1
-        self.lastpos = (0,0)
-        self.componentFromID={}#use the ID of the drawn icon to retrieve component name 
-    
-    def ConvertEventCoords(self, event):
-        xView, yView = self.GetViewStart()
-        xDelta, yDelta = self.GetScrollPixelsPerUnit()
-        return (event.GetX() + (xView * xDelta),
-            event.GetY() + (yView * yDelta))
-
-    def OffsetRect(self, r):
-        """Offset the rectangle, r, to appear in the given position in the window
-        """
-        xView, yView = self.GetViewStart()
-        xDelta, yDelta = self.GetScrollPixelsPerUnit()
-        r.OffsetXY(-(xView*xDelta),-(yView*yDelta))
-
-    def OnMouse(self, event):
-        global hitradius
-        if event.LeftDown():
-            x,y = self.ConvertEventCoords(event)
-            #l = self.pdc.FindObjectsByBBox(x, y)
-            icons = self.pdc.FindObjects(x, y, hitradius)
-            if len(icons): 
-                self.editComponentProperties(component=self.componentFromID[icons[0]])
-        elif event.RightDown():
-            x,y = self.ConvertEventCoords(event)
-            #l = self.pdc.FindObjectsByBBox(x, y)
-            l = self.pdc.FindObjects(x, y, hitradius)
-            if l:
-                self.pdc.SetIdGreyedOut(l[0], not self.pdc.GetIdGreyedOut(l[0]))
-                r = self.pdc.GetIdBounds(l[0])
-                r.Inflate(4,4)
-                self.OffsetRect(r)
-                self.RefreshRect(r, False)
-        elif event.Dragging() or event.LeftUp():
-            if self.dragid != -1:
-                x,y = self.lastpos
-                dx = event.GetX() - x
-                dy = event.GetY() - y
-                r = self.pdc.GetIdBounds(self.dragid)
-                self.pdc.TranslateId(self.dragid, dx, dy)
-                r2 = self.pdc.GetIdBounds(self.dragid)
-                r = r.Union(r2)
-                r.Inflate(4,4)
-                self.OffsetRect(r)
-                self.RefreshRect(r, False)
-                self.lastpos = (event.GetX(),event.GetY())
-            if event.LeftUp():
-                self.dragid = -1
-
-    def OnPaint(self, event):
-        # Create a buffered paint DC.  It will create the real
-        # wx.PaintDC and then blit the bitmap to it when dc is
-        # deleted.  
-        dc = wx.BufferedPaintDC(self)
-        # use PrepateDC to set position correctly
-        self.PrepareDC(dc)
-        # we need to clear the dc BEFORE calling PrepareDC
-        bg = wx.Brush(self.GetBackgroundColour())
-        dc.SetBackground(bg)
-        dc.Clear()
-        # create a clipping rect from our position and size
-        # and the Update Region
-        xv, yv = self.GetViewStart()
-        dx, dy = self.GetScrollPixelsPerUnit()
-        x, y   = (xv * dx, yv * dy)
-        rgn = self.GetUpdateRegion()
-        rgn.Offset(x,y)
-        r = rgn.GetBox()
-        # draw to the dc using the calculated clipping rect
-        self.pdc.DrawToDCClipped(dc,r)
-
-    def redrawRoutine(self):
-        
-        self.pdc.Clear()#clear the screen
-        self.pdc.RemoveAll()#clear all objects (icon buttons)
-        
-        self.pdc.BeginDrawing()
-        #draw timeline at bottom of page
-        yPosBottom = self.yPosTop+len(self.routine)*self.componentStep
-        self.drawTimeLine(self.pdc,self.yPosTop,yPosBottom)
-        yPos = self.yPosTop
-        
-        for n, component in enumerate(self.routine):
-            self.drawComponent(self.pdc, component, yPos)
-            yPos+=self.componentStep
-        
-        self.SetVirtualSize((self.maxWidth, yPos))
-        self.pdc.EndDrawing()
-        self.Refresh()#refresh the visible window after drawing (using OnPaint)
-            
-    def drawTimeLine(self, dc, yPosTop, yPosBottom):  
-        xScale = self.getSecsPerPixel()
-        xSt=self.timeXposStart
-        xEnd=self.timeXposEnd
-        dc.SetPen(wx.Pen(wx.Colour(0, 0, 0, 150)))
-        dc.DrawLine(x1=xSt,y1=yPosTop,
-                    x2=xEnd,y2=yPosTop)
-        dc.DrawLine(x1=xSt,y1=yPosBottom,
-                    x2=xEnd,y2=yPosBottom)
-        for lineN in range(10):
-            dc.DrawLine(xSt+lineN/xScale, yPosTop,
-                    xSt+lineN/xScale, yPosBottom+2)
-        #add a label
-        font = self.GetFont()
-        font.SetPointSize(12)
-        dc.SetFont(font)
-        dc.DrawText('t (secs)',xEnd+5, 
-            yPosBottom-self.GetFullTextExtent('t')[1]/2.0)#y is y-half height of text
-    def drawComponent(self, dc, component, yPos):  
-        """Draw the timing of one component on the timeline"""   
-        
-        bitmap = self.parent.parent.bitmaps[component.type]        
-        dc.DrawBitmap(bitmap, self.iconXpos,yPos, True)
-        
-        font = self.GetFont()
-        font.SetPointSize(12)
-        dc.SetFont(font)
-        
-        name = component.params['name']
-        #get size based on text
-        w,h = self.GetFullTextExtent(name)[0:2]  
-        #draw text
-        x = self.iconXpos-5-w
-        y = yPos+bitmap.GetHeight()/2-h/2
-        dc.DrawText(name, x, y)
-        
-        #draw entries on timeline
-        xScale = self.getSecsPerPixel()
-        dc.SetPen(wx.Pen(wx.Colour(200, 100, 100, 0)))
-        #for the fill, draw once in white near-opaque, then in transp colour
-        dc.SetBrush(wx.Brush(wx.Colour(200,100,100, 200)))
-        h = self.componentStep/2
-        times = component.params['times']
-        if type(times[0]) in [int,float]:
-            times=[times]
-        for thisOcc in times:#each occasion/occurence
-            st, end = thisOcc
-            xSt = self.timeXposStart + st/xScale
-            thisOccW = (end-st)/xScale
-            dc.DrawRectangle(xSt, y, thisOccW,h )
-        
-        ##set an id for the region where the bitmap falls (so it can act as a button)
-        #see if we created this already
-        id=None
-        for key in self.componentFromID.keys():
-            if self.componentFromID[key]==component: 
-                id=key
-        if not id: #then create one and add to the dict
-            id = wx.NewId()
-            self.componentFromID[id]=component
-        dc.SetId(id)
-        #set the area for this component
-        r = wx.Rect(self.iconXpos, yPos, bitmap.GetWidth(),bitmap.GetHeight())
-        dc.SetIdBounds(id,r)
-            
-            
-    def setComponentYpositions(self,posList):
-        """receive the positions of the trak locations from the RoutinePage
-        (which has created buttons for each track)
-        """
-        self.yPositions=posList
-        
-    
-    def editComponentProperties(self, event=None, component=None):
-        if event:#we got here from a wx.button press (rather than our own drawn icons)
-            componentName=event.EventObject.GetName()
-            component=self.routine.getComponentFromName(componentName)
-        
-        dlg = DlgComponentProperties(parent=self.parent,
-            title=component.params['name']+' Properties',
-            params = component.params, hints=component.hints)
-        self.redrawRoutine()#need to refresh timings section
-        self.Refresh()#then redraw visible
-        
-    def getSecsPerPixel(self):
-        return float(self.timeMax)/(self.timeXposEnd-self.timeXposStart)
-
 class FlowPanel(scrolled.ScrolledPanel):
     def __init__(self, parent, id=-1,size = (600,100)):
         """A panel that shows how the routines will fit together
@@ -508,84 +292,136 @@ class DlgAddRoutineToFlow(wx.Dialog):
             self.btnOK.Enable(True)
             self.loc=int(event.GetString())
                     
-class RoutinePage(scrolled.ScrolledPanel):
-    """A frame to represent a single routine
-    """
+
+class RoutineCanvas(wx.ScrolledWindow):
+    """Represents a single routine (used as page in RoutinesNotebook)"""
     def __init__(self, parent, id=-1, routine=None):
-        scrolled.ScrolledPanel.__init__(self, parent, id)
-        self.panel = wx.Panel(self)
-        self.parent=parent       
-        self.routine=routine
-        self.yPositions=None
+        """This window is based heavily on the PseudoDC demo of wxPython
+        """
+        wx.ScrolledWindow.__init__(self, parent, id, (0, 0), style=wx.SUNKEN_BORDER)
         
+        self.parent=parent
+        self.lines = []
+        self.maxWidth  = 200
+        self.maxHeight = 100
+        self.x = self.y = 0
+        self.curLine = []
+        self.drawing = False
+
+        self.SetVirtualSize((self.maxWidth, self.maxHeight))
+        self.SetScrollRate(20,20)
+        
+        self.routine=routine
+        self.yPositions=None        
         self.yPosTop=60
         self.componentStep=50#the step in Y between each component
         self.iconXpos = 100 #the left hand edge of the icons
         self.timeXposStart = 200
         self.timeXposEnd = 600
         self.timeMax = 10
-        self.componentButtons={}
-        self.componentLabels={}
-        self.Bind(wx.EVT_PAINT, self.onPaint)
-    def redrawComponentControls(self):
-        ypos = self.yPosTop
         
-        #delete the previous ones
-        for btnName in self.componentButtons:
-            self.componentButtons[btnName].Destroy()
-            self.componentLabels[btnName].Destroy()
-        self.componentButtons={}
-        self.componentLabels={}
+        # create a PseudoDC to record our drawing
+        self.pdc = wx.PseudoDC()
+        self.pen_cache = {}
+        self.brush_cache = {}
+        self.redrawRoutine()
+
+        self.Bind(wx.EVT_PAINT, self.OnPaint)
+        self.Bind(wx.EVT_ERASE_BACKGROUND, lambda x:None)
+        self.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouse)
         
-        #step through the components adding buttons
-        for component in self.routine:
-            name = component.params['name']
-            
-            bitmap = self.parent.parent.bitmaps[component.type]   
-            btn = wx.BitmapButton(self, -1, bitmap, (self.iconXpos,ypos),
-                    (bitmap.GetWidth()+10, bitmap.GetHeight()+10),style=wx.NO_BORDER,
-                    name=name)  
-            self.Bind(wx.EVT_BUTTON, self.editComponentProperties, btn)
-            self.componentButtons[name] = btn
-            
-            h,w =self.GetTextExtent(name)
-            print name, w
-            label=wx.StaticText(self,-1, name, pos= (self.iconXpos-w*2,ypos+bitmap.GetHeight()/2),style=wx.ALIGN_LEFT)
-            self.componentLabels[name]=label
-            ypos += self.componentStep
-            
-    def editComponentProperties(self, event=None):
-        componentName=event.EventObject.GetName()
-        component=self.routine.getComponentFromName(componentName)
+        # vars for handling mouse clicks
+        self.dragid = -1
+        self.lastpos = (0,0)
+        self.componentFromID={}#use the ID of the drawn icon to retrieve component name 
+    
+    def ConvertEventCoords(self, event):
+        xView, yView = self.GetViewStart()
+        xDelta, yDelta = self.GetScrollPixelsPerUnit()
+        return (event.GetX() + (xView * xDelta),
+            event.GetY() + (yView * yDelta))
+
+    def OffsetRect(self, r):
+        """Offset the rectangle, r, to appear in the given position in the window
+        """
+        xView, yView = self.GetViewStart()
+        xDelta, yDelta = self.GetScrollPixelsPerUnit()
+        r.OffsetXY(-(xView*xDelta),-(yView*yDelta))
+
+    def OnMouse(self, event):
+        global hitradius
+        if event.LeftDown():
+            x,y = self.ConvertEventCoords(event)
+            #l = self.pdc.FindObjectsByBBox(x, y)
+            icons = self.pdc.FindObjects(x, y, hitradius)
+            if len(icons): 
+                self.editComponentProperties(component=self.componentFromID[icons[0]])
+        elif event.RightDown():
+            x,y = self.ConvertEventCoords(event)
+            #l = self.pdc.FindObjectsByBBox(x, y)
+            l = self.pdc.FindObjects(x, y, hitradius)
+            if l:
+                self.pdc.SetIdGreyedOut(l[0], not self.pdc.GetIdGreyedOut(l[0]))
+                r = self.pdc.GetIdBounds(l[0])
+                r.Inflate(4,4)
+                self.OffsetRect(r)
+                self.RefreshRect(r, False)
+        elif event.Dragging() or event.LeftUp():
+            if self.dragid != -1:
+                x,y = self.lastpos
+                dx = event.GetX() - x
+                dy = event.GetY() - y
+                r = self.pdc.GetIdBounds(self.dragid)
+                self.pdc.TranslateId(self.dragid, dx, dy)
+                r2 = self.pdc.GetIdBounds(self.dragid)
+                r = r.Union(r2)
+                r.Inflate(4,4)
+                self.OffsetRect(r)
+                self.RefreshRect(r, False)
+                self.lastpos = (event.GetX(),event.GetY())
+            if event.LeftUp():
+                self.dragid = -1
+
+    def OnPaint(self, event):
+        # Create a buffered paint DC.  It will create the real
+        # wx.PaintDC and then blit the bitmap to it when dc is
+        # deleted.  
+        dc = wx.BufferedPaintDC(self)
+        # use PrepateDC to set position correctly
+        self.PrepareDC(dc)
+        # we need to clear the dc BEFORE calling PrepareDC
+        bg = wx.Brush(self.GetBackgroundColour())
+        dc.SetBackground(bg)
+        dc.Clear()
+        # create a clipping rect from our position and size
+        # and the Update Region
+        xv, yv = self.GetViewStart()
+        dx, dy = self.GetScrollPixelsPerUnit()
+        x, y   = (xv * dx, yv * dy)
+        rgn = self.GetUpdateRegion()
+        rgn.Offset(x,y)
+        r = rgn.GetBox()
+        # draw to the dc using the calculated clipping rect
+        self.pdc.DrawToDCClipped(dc,r)
+
+    def redrawRoutine(self):
         
-        dlg = DlgComponentProperties(parent=self.parent,
-            title=componentName+' Properties',
-            params = component.params, hints=component.hints)
-        self.Refresh()#just need to refresh timings section
+        self.pdc.Clear()#clear the screen
+        self.pdc.RemoveAll()#clear all objects (icon buttons)
         
-    def getSecsPerPixel(self):
-        return float(self.timeMax)/(self.timeXposEnd-self.timeXposStart)
-    def redraw(self):
-        self.redrawComponentControls()
-        self.Refresh()#this will refresh the manually painted part (the timing)
-        
-    def onPaint(self, evt=None):
-        
-        #must create a fresh drawing context each frame (not store one)
-        pdc = wx.PaintDC(self)
-        try:
-            dc = wx.GCDC(pdc)
-        except:
-            dc = pdc
+        self.pdc.BeginDrawing()
         #draw timeline at bottom of page
         yPosBottom = self.yPosTop+len(self.routine)*self.componentStep
-        self.drawTimeLine(dc,self.yPosTop,yPosBottom)
+        self.drawTimeLine(self.pdc,self.yPosTop,yPosBottom)
         yPos = self.yPosTop
         
         for n, component in enumerate(self.routine):
-            self.drawComponent(dc, component, yPos)
+            self.drawComponent(self.pdc, component, yPos)
             yPos+=self.componentStep
-            
+        
+        self.SetVirtualSize((self.maxWidth, yPos))
+        self.pdc.EndDrawing()
+        self.Refresh()#refresh the visible window after drawing (using OnPaint)
             
     def drawTimeLine(self, dc, yPosTop, yPosBottom):  
         xScale = self.getSecsPerPixel()
@@ -600,15 +436,28 @@ class RoutinePage(scrolled.ScrolledPanel):
             dc.DrawLine(xSt+lineN/xScale, yPosTop,
                     xSt+lineN/xScale, yPosBottom+2)
         #add a label
-        font = dc.GetFont()
+        font = self.GetFont()
         font.SetPointSize(12)
         dc.SetFont(font)
         dc.DrawText('t (secs)',xEnd+5, 
-            yPosBottom-dc.GetFullTextExtent('t')[1]/2.0)#y is y-half height of text
+            yPosBottom-self.GetFullTextExtent('t')[1]/2.0)#y is y-half height of text
     def drawComponent(self, dc, component, yPos):  
-        """Draw the timing of one component on the timeline"""
-        btn = self.componentButtons[component.params['name']]
-        times = component.params['times']
+        """Draw the timing of one component on the timeline"""   
+        
+        bitmap = self.parent.parent.bitmaps[component.type]        
+        dc.DrawBitmap(bitmap, self.iconXpos,yPos, True)
+        
+        font = self.GetFont()
+        font.SetPointSize(12)
+        dc.SetFont(font)
+        
+        name = component.params['name']
+        #get size based on text
+        w,h = self.GetFullTextExtent(name)[0:2]  
+        #draw text
+        x = self.iconXpos-5-w
+        y = yPos+bitmap.GetHeight()/2-h/2
+        dc.DrawText(name, x, y)
         
         #draw entries on timeline
         xScale = self.getSecsPerPixel()
@@ -616,18 +465,43 @@ class RoutinePage(scrolled.ScrolledPanel):
         #for the fill, draw once in white near-opaque, then in transp colour
         dc.SetBrush(wx.Brush(wx.Colour(200,100,100, 200)))
         h = self.componentStep/2
+        times = component.params['times']
         if type(times[0]) in [int,float]:
             times=[times]
         for thisOcc in times:#each occasion/occurence
             st, end = thisOcc
             xSt = self.timeXposStart + st/xScale
             thisOccW = (end-st)/xScale
-            dc.DrawRectangle(xSt, btn.GetPosition()[1]+h/2, thisOccW,h )
-    def setComponentYpositions(self,posList):
-        """receive the positions of the trak locations from the RoutinePage
-        (which has created buttons for each track)
-        """
-        self.yPositions=posList
+            dc.DrawRectangle(xSt, y, thisOccW,h )
+        
+        ##set an id for the region where the bitmap falls (so it can act as a button)
+        #see if we created this already
+        id=None
+        for key in self.componentFromID.keys():
+            if self.componentFromID[key]==component: 
+                id=key
+        if not id: #then create one and add to the dict
+            id = wx.NewId()
+            self.componentFromID[id]=component
+        dc.SetId(id)
+        #set the area for this component
+        r = wx.Rect(self.iconXpos, yPos, bitmap.GetWidth(),bitmap.GetHeight())
+        dc.SetIdBounds(id,r)
+                
+    def editComponentProperties(self, event=None, component=None):
+        if event:#we got here from a wx.button press (rather than our own drawn icons)
+            componentName=event.EventObject.GetName()
+            component=self.routine.getComponentFromName(componentName)
+        
+        dlg = DlgComponentProperties(parent=self.parent,
+            title=component.params['name']+' Properties',
+            params = component.params, hints=component.hints)
+        self.redrawRoutine()#need to refresh timings section
+        self.Refresh()#then redraw visible
+        
+    def getSecsPerPixel(self):
+        return float(self.timeMax)/(self.timeXposEnd-self.timeXposStart)
+
         
 class RoutinesNotebook(wx.aui.AuiNotebook):
     """A notebook that stores one or more routines
