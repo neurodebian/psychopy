@@ -825,7 +825,7 @@ class BuilderFrame(wx.Frame):
         self.bitmaps={}
         for eventType in eventTypes:
             self.bitmaps[eventType]=wx.Bitmap( \
-                os.path.join(iconDir,"%sAdd.png" %eventType.lower()))      
+                os.path.join(iconDir,"%s.png" %eventType.lower()))      
         
         #create a default experiment (maybe an empty one instead)
         self.exp = experiment.Experiment()
