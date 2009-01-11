@@ -50,7 +50,7 @@ class TrialHandler(list):
     """A looping experimental control object
             (e.g. generating a psychopy TrialHandler or StairHandler).
             """
-    def __init__(self, name, loopType, nReps, trialList):
+    def __init__(self, name, loopType, nReps, trialList=[], trialListFile=''):
         """
         @param name: name of the loop e.g. trials
         @type name: string
@@ -60,6 +60,8 @@ class TrialHandler(list):
         @type nReps:int
         @param trialList: list of different trial conditions to be used
         @type trialList: list (of dicts?)
+        @param trialListFile: filename of the .csv file that contains trialList info
+        @type trialList: string (filename)
         """
         list.__init__(self)
         self.type='TrialHandler'
@@ -68,11 +70,13 @@ class TrialHandler(list):
         self.params['name'] = name
         self.params['nReps']=nReps
         self.params['trialList']=trialList
+        self.params['trialListFile']=trialListFile
         self.hints={}
         self.hints['loopType']="'random','sequential'"
         self.hints['name'] = 'Name of this loop'
         self.hints['nReps']='Number of repeats (for each type of trial)'
         self.hints['trialList']="A list of dictionaries describing the differences between each trial type"
+        self.hints['trialListFile']='A comma-separated-value (.csv) file specifying the parameters for each trial'
         self.allowed={}
     def generateInitCode(self,buff):
         buff.write("init loop '%s' (%s)\n" %(self.name, self.loopType))
