@@ -6,3 +6,4 @@
 - undo/redo changes
 - add brief info to loops in FlowPanel to show "Name (nTrials X trialTypes)"
 
+- build installer for win32
