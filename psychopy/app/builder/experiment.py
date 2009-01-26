@@ -50,7 +50,8 @@ class TrialHandler(list):
     """A looping experimental control object
             (e.g. generating a psychopy TrialHandler or StairHandler).
             """
-    def __init__(self, name, loopType, nReps, trialList=[], trialListFile=''):
+    def __init__(self, name, loopType, nReps, 
+        trialList=[], trialListFile=''):
         """
         @param name: name of the loop e.g. trials
         @type name: string
@@ -91,7 +92,7 @@ class TrialHandler(list):
 class StairHandler(list):    
     """A staircase experimental control object.
     """
-    def __init__(self, name, nReps, stepSizes):
+    def __init__(self, name, nReps, nReversals, stepSizes, stepType):
         """
         @param name: name of the loop e.g. trials
         @type name: string
@@ -102,11 +103,13 @@ class StairHandler(list):
         self.params={}
         self.params['name'] = name
         self.params['nReps']=nReps
-        self.params['step sizes']=[0.8,0.8,0.4,0.4,0.2]
-        self.params['step type']='log'
+        self.params['step sizes']=stepSizes
+        self.params['step type']=stepType
+        self.params['nReversals']=nReversals
         self.hints={}
         self.hints['name'] = 'Name of this loop'
-        self.hints['nReps']='Number of repeats (for each type of trial)'
+        self.hints['nReps']='Minimum number of trials in the staircase'
+        self.hints['nReversals']='Minimum number of times the staircase must change direction before ending'
         self.hints['step type']="The units of the step size (e.g. 'linear' will add/subtract that value each step, whereas 'log' will ad that many log units)"
         self.hints['step sizes']="The size of the jump at each step (can change on each 'reversal')"
         self.allowed={}
