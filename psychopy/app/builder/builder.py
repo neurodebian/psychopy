@@ -1,7 +1,7 @@
 import wx
 import wx.lib.scrolledpanel as scrolled
 import wx.aui
-import sys, os, glob, copy
+import sys, os, glob, copy, cPickle
 import csv, pylab #these are used to read in csv files
 import experiment, numpy
 #import psychopy
@@ -122,6 +122,7 @@ class FlowPanel(scrolled.ScrolledPanel):
         if addRoutineDlg.ShowModal()==wx.ID_OK:
             newRoutine = exp.routines[addRoutineDlg.routine]#fetch the routine with the returned name
             self.exp.flow.addRoutine(newRoutine, addRoutineDlg.loc)
+            self.parent.setExpModified(True)
             
         #remove the points from the timeline
         self.setDrawPoints(None)
@@ -148,6 +149,7 @@ class FlowPanel(scrolled.ScrolledPanel):
             #remove the points from the timeline
             self.setDrawPoints(None)
             self.Refresh()
+            self.parent.setExpModified(True)
 
     def onPaint(self, evt=None):
         """This should not be called. Use FlowPanel.Refresh()
@@ -505,6 +507,7 @@ class RoutineCanvas(wx.ScrolledWindow):
             params = component.params, hints=component.hints)
         self.redrawRoutine()#need to refresh timings section
         self.Refresh()#then redraw visible
+        self.parent.setExpModified(True)
         
     def getSecsPerPixel(self):
         return float(self.timeMax)/(self.timeXposEnd-self.timeXposStart)
@@ -527,6 +530,7 @@ class RoutinesNotebook(wx.aui.AuiNotebook):
 #        routinePage = RoutinePage(parent=self, routine=routine)
         routinePage = RoutineCanvas(parent=self, routine=routine)
         self.AddPage(routinePage, routineName)
+        self.parent.setExpModified(True)
     def createNewRoutine(self):
         dlg = wx.TextEntryDialog(self, message="What is the name for the new Routine? (e.g. instr, trial, feedback)",
             caption='New Routine')
@@ -575,7 +579,7 @@ class ComponentsPanel(scrolled.ScrolledPanel):
             currRoutine.append(newComp)#add to the actual routing
             currRoutinePage.redrawRoutine()#update the routine's view with the new component too
             currRoutinePage.Refresh()
-            
+            self.parent.setExpModified(True)
 class _BaseParamsDlg(wx.Dialog):   
     def __init__(self,parent,title,params,hints,fixed=[],allowed={},
             pos=wx.DefaultPosition, size=wx.DefaultSize,
@@ -754,8 +758,7 @@ class DlgLoopProperties(_BaseParamsDlg):
                 self.params['nReps']= int(self.randFields['nReps'].GetValue())
             else:
                 self.params['nReversals']= int(self.stairFields['nReversals'].GetValue())
-                self.params['nReps']= int(self.stairFields['nReps'].GetValue())
-                
+                self.params['nReps']= int(self.stairFields['nReps'].GetValue())                
         
     def makeRandAndSeqCtrls(self):
         #a list of controls for the random/sequential versions
@@ -917,11 +920,13 @@ class BuilderFrame(wx.Frame):
         for eventType in eventTypes:
             self.bitmaps[eventType]=wx.Bitmap( \
                 os.path.join(iconDir,"%s.png" %eventType.lower()))      
-        
-        #create a default experiment (maybe an empty one instead)
-        self.exp = experiment.Experiment()
-        self.exp.addRoutine('trial') #create the trial routine
-        self.exp.flow.addRoutine(self.exp.routines['trial'], pos=1)#add it to flow
+                
+        self.makeToolbar()
+        self.makeMenus()
+        #setup a blank exp
+        self.filename='untitled.py'
+        self.isModified=False
+        self.fileNew()
         
         # create our panels
         self.flowPanel=FlowPanel(parent=self, size=(600,200))
@@ -945,9 +950,8 @@ class BuilderFrame(wx.Frame):
             self.SetSizer(self.mainSizer)
             
         self.SetAutoLayout(True)
-        self.makeToolbar()
-        self.makeMenus()
         self.Bind(wx.EVT_CLOSE, self.OnClose)
+        
     def makeToolbar(self):
         #---toolbar---#000000#FFFFFF----------------------------------------------
         self.toolbar = self.CreateToolBar( (wx.TB_HORIZONTAL
@@ -1060,27 +1064,106 @@ class BuilderFrame(wx.Frame):
         self.helpMenu.AppendSubMenu(self.demosMenu, 'PsychoPy Demos')
         self.SetMenuBar(menuBar)
         
-    def buildToolbar(self):
-        pass
-
     def OnClose(self, event):
         # delete the frame
         self.Destroy()
-    def fileOpen(self, event=None):
-        #todo: fileOpen
-        pass
     def fileNew(self, event=None):
-        #todo: fileNew
-        pass
-    def fileClose(self, event=None):
-        #todo: fileClose
-        pass
-    def fileSave(self, event=None):
-        #todo: fileSave
-        pass
-    def fileSaveAs(self, event=None):
-        #todo: fileSaveAs
-        pass
+        """Create a default experiment (maybe an empty one instead)"""   
+        # check whether existing file is modified
+        if self.isModified:
+            sys.stdout.flush()#make sure that any messages get printed before closing
+            dlg = wx.MessageDialog(self, message='Changes to %s will be lost. Save changes first?' %filename,
+                caption='Warning', style=wx.YES_NO|wx.CANCEL )
+            resp = dlg.ShowModal()
+            sys.stdout.flush()
+            dlg.Destroy()
+            if resp  == wx.ID_CANCEL: return -1 #return, don't quit
+            elif resp == wx.ID_YES:   self.fileSave()#save first
+            elif resp == wx.ID_NO: pass #don't save just quit
+                   
+        self.filename=='untitled.py'
+        self.exp = experiment.Experiment()
+        self.exp.addRoutine('trial') #create the trial routine
+        self.exp.flow.addRoutine(self.exp.routines['trial'], pos=1)#add it to flow        
+    def fileOpen(self, event):
+        """Open a FileDialog, then load the file if possible.
+        """
+        #todo: check whether current file has been modified and recommend save
+        dlg = wx.FileDialog(
+            self, message="Open file ...", style=wx.OPEN
+            )
+        
+        if dlg.ShowModal() == wx.ID_OK:
+            newPath = dlg.GetPath()
+            f = open(filename)
+            contents = cPickle.load(f)
+            f.close()
+            if hasattr(contents,'psychopyExperimentVersion'):
+                #this indicates we have a PsychoPy Experiment object
+                self.exp=contents
+                self.setIsModified(False)        
+            
+        self.SetStatusText('')
+        
+    def setExpModified(self, newVal=True):
+        self.isModified=newVal
+        self.toolbar.EnableTool(TB_FILESAVE, newVal)
+        self.fileMenu.Enable(wx.ID_SAVE, newVal)
+    def fileSave(self,event=None, filename=None):
+        """Save file, revert to SaveAs if the file hasn't yet been saved 
+        """
+        if filename==None: 
+            filename = self.filename
+        if filename=='untitled.py':
+            self.fileSaveAs(filename)
+        else:
+            self.SetStatusText('Saving file')
+            f = open(filename, 'w')
+            cPickle.dump(self.exp,f)
+            f.close()
+        self.setFileModified(False)        
+        
+    def fileSaveAs(self,event=None, filename=None):
+        """
+        """
+        if filename==None: filename = self.filename
+        initPath, filename = os.path.split(filename)
+        os.getcwd()
+        if sys.platform=='darwin':
+            wildcard="PsychoPy experiments (*.psyexp)|*.psyexp|Any file (*.*)|*"
+        else:
+            wildcard="PsychoPy experiments (*.psyexp)|*.psyexp|Any file (*.*)|*.*"
+
+        dlg = wx.FileDialog(
+            self, message="Save file as ...", defaultDir=initPath, 
+            defaultFile=filename, style=wx.SAVE, wildcard=wildcard)
+        if dlg.ShowModal() == wx.ID_OK:
+            newPath = dlg.GetPath()
+            self.fileSave(event=None, filename=newPath)
+            self.filename = newPath            
+            self.setFileModified(False)
+        try: #this seems correct on PC, but not on mac   
+            dlg.destroy()
+        except:
+            pass
+    def fileClose(self, event):
+        """Close the current filee (and warn if it hasn't been saved)"""
+        if self.isModified:
+            sys.stdout.flush()#make sure that any messages get printed before closing
+            dlg = wx.MessageDialog(self, message='Save changes to %s before quitting?' %filename,
+                caption='Warning', style=wx.YES_NO|wx.CANCEL )
+            resp = dlg.ShowModal()
+            sys.stdout.flush()
+            dlg.Destroy()
+            if resp  == wx.ID_CANCEL:
+                return -1 #return, don't quit
+            elif resp == wx.ID_YES:
+                #save then quit
+                self.fileSave()
+            elif resp == wx.ID_NO:
+                pass #don't save just quit
+        self.fileNew()#this is sufficient to kill the other
+        return 1
     def undo(self, event=None):
         #todo: undo
         pass
@@ -1090,12 +1173,24 @@ class BuilderFrame(wx.Frame):
     def loadDemo(self, event=None):
         #todo: loadDemo
         pass
-    def showLicense(self, event=None):
-        #todo: showLicense
-        pass
-    def showAbout(self, event=None):
-        #todo: showAbout
-        pass
+    def showAbout(self, event):
+        msg = """PsychoPy %s \nWritten by Jon Peirce.\n
+        It has a liberal license; basically, do what you like with it, 
+        don't kill me if something doesn't work! :-) But do let me know...
+        psychopy-users@lists.sourceforge.net
+        """ %psychopy.__version__
+        dlg = wx.MessageDialog(None, message=msg,
+                              caption = "About PsychoPy", style=wx.OK | wx.ICON_INFORMATION)
+        dlg.ShowModal()
+        dlg.Destroy()
+    def showLicense(self, event):
+        licFile = open(os.path.join(self.app.dirPsychopy,'LICENSE.txt'))
+        licTxt = licFile.read()
+        licFile.close()
+        dlg = wx.MessageDialog(self, licTxt,
+                              "PsychoPy License", wx.OK | wx.ICON_INFORMATION)
+        dlg.ShowModal()
+        dlg.Destroy()
     def followLink(self, event=None):
         #todo: followLink
         pass
