@@ -1,7 +1,7 @@
 import wx
 import wx.lib.scrolledpanel as scrolled
 import wx.aui
-import sys, os, glob, copy, cPickle
+import sys, os, glob, copy, pickle
 import csv, pylab #these are used to read in csv files
 import experiment, numpy
 #import psychopy
@@ -74,13 +74,13 @@ TB_STOP = 110
 global hitradius
 hitradius=5
 class FlowPanel(scrolled.ScrolledPanel):
-    def __init__(self, parent, id=-1,size = (600,100)):
+    def __init__(self, frame, id=-1,size = (600,100)):
         """A panel that shows how the routines will fit together
         """
-        scrolled.ScrolledPanel.__init__(self, parent, id, (0, 0), size=size)
+        scrolled.ScrolledPanel.__init__(self, frame, id, (0, 0), size=size)
         self.panel = wx.Panel(self,-1,size=(600,200))
-        self.parent=parent   
-        self.exp = parent.exp
+        self.frame=frame   
+        self.exp = frame.exp
         self.needUpdate=True
         self.maxWidth  = 1000
         self.maxHeight = 200
@@ -117,12 +117,12 @@ class FlowPanel(scrolled.ScrolledPanel):
         self.Refresh()
         
         #bring up listbox to choose the routine to add and/or create a new one
-        addRoutineDlg = DlgAddRoutineToFlow(parent=self.parent, 
+        addRoutineDlg = DlgAddRoutineToFlow(frame=self.frame, 
                     possPoints=self.pointsToDraw)
         if addRoutineDlg.ShowModal()==wx.ID_OK:
             newRoutine = exp.routines[addRoutineDlg.routine]#fetch the routine with the returned name
             self.exp.flow.addRoutine(newRoutine, addRoutineDlg.loc)
-            self.parent.setExpModified(True)
+            self.frame.setIsModified(True)
             
         #remove the points from the timeline
         self.setDrawPoints(None)
@@ -138,7 +138,7 @@ class FlowPanel(scrolled.ScrolledPanel):
         self.Refresh()
         
         #bring up listbox to choose the routine to add and/or create a new one
-        loopDlg = DlgLoopProperties(parent=self.parent)
+        loopDlg = DlgLoopProperties(frame=self.frame)
         if loopDlg.OK:
             params = loopDlg.params
             if params['loopType']=='staircase': #['random','sequential','staircase']
@@ -149,12 +149,12 @@ class FlowPanel(scrolled.ScrolledPanel):
             #remove the points from the timeline
             self.setDrawPoints(None)
             self.Refresh()
-            self.parent.setExpModified(True)
+            self.frame.setIsModified(True)
 
     def onPaint(self, evt=None):
         """This should not be called. Use FlowPanel.Refresh()
         """                
-        expFlow = self.parent.exp.flow #retrieve the current flow from the experiment
+        expFlow = self.frame.exp.flow #retrieve the current flow from the experiment
         
         #must create a fresh drawing context each frame (not store one)
         pdc = wx.PaintDC(self)
@@ -248,14 +248,14 @@ class FlowPanel(scrolled.ScrolledPanel):
             pts.append([xx[n],yy[n]])
         dc.DrawSpline(pts)
 class DlgAddRoutineToFlow(wx.Dialog):
-    def __init__(self, parent, possPoints, id=-1, title='Add a routine to the flow',
+    def __init__(self, frame, possPoints, id=-1, title='Add a routine to the flow',
             pos=wx.DefaultPosition, size=wx.DefaultSize,
             style=wx.DEFAULT_DIALOG_STYLE):
-        wx.Dialog.__init__(self,parent,id,title,pos,size,style)
-        self.parent=parent
+        wx.Dialog.__init__(self,frame,id,title,pos,size,style)
+        self.frame=frame
         self.Center()
         # setup choices of routines
-        routineChoices=self.parent.exp.routines.keys()
+        routineChoices=self.frame.exp.routines.keys()
         if len(routineChoices)==0:
             routineChoices=['NO PROCEDURES EXIST']
         self.choiceRoutine=wx.ComboBox(parent=self,id=-1,value=routineChoices[0],
@@ -304,12 +304,13 @@ class DlgAddRoutineToFlow(wx.Dialog):
 
 class RoutineCanvas(wx.ScrolledWindow):
     """Represents a single routine (used as page in RoutinesNotebook)"""
-    def __init__(self, parent, id=-1, routine=None):
+    def __init__(self, notebook, id=-1, routine=None):
         """This window is based heavily on the PseudoDC demo of wxPython
         """
-        wx.ScrolledWindow.__init__(self, parent, id, (0, 0), style=wx.SUNKEN_BORDER)
+        wx.ScrolledWindow.__init__(self, notebook, id, (0, 0), style=wx.SUNKEN_BORDER)
         
-        self.parent=parent
+        self.notebook=notebook
+        self.frame=notebook.frame
         self.lines = []
         self.maxWidth  = 200
         self.maxHeight = 100
@@ -453,7 +454,7 @@ class RoutineCanvas(wx.ScrolledWindow):
     def drawComponent(self, dc, component, yPos):  
         """Draw the timing of one component on the timeline"""   
         
-        bitmap = self.parent.parent.bitmaps[component.type]        
+        bitmap = self.frame.bitmaps[component.type]        
         dc.DrawBitmap(bitmap, self.iconXpos,yPos, True)
         
         font = self.GetFont()
@@ -502,12 +503,12 @@ class RoutineCanvas(wx.ScrolledWindow):
             componentName=event.EventObject.GetName()
             component=self.routine.getComponentFromName(componentName)
         
-        dlg = DlgComponentProperties(parent=self.parent,
+        dlg = DlgComponentProperties(frame=self.frame,
             title=component.params['name']+' Properties',
             params = component.params, hints=component.hints)
         self.redrawRoutine()#need to refresh timings section
         self.Refresh()#then redraw visible
-        self.parent.setExpModified(True)
+        self.frame.setIsModified(True)
         
     def getSecsPerPixel(self):
         return float(self.timeMax)/(self.timeXposEnd-self.timeXposStart)
@@ -516,10 +517,10 @@ class RoutineCanvas(wx.ScrolledWindow):
 class RoutinesNotebook(wx.aui.AuiNotebook):
     """A notebook that stores one or more routines
     """
-    def __init__(self, parent, id=-1):
-        self.parent=parent
-        wx.aui.AuiNotebook.__init__(self, parent, id)
-        exp=self.parent.exp
+    def __init__(self, frame, id=-1):
+        self.frame=frame
+        wx.aui.AuiNotebook.__init__(self, frame, id)
+        exp=self.frame.exp
         for routineName in exp.routines:         
             self.addRoutinePage(routineName, exp.routines[routineName])
     def getCurrentRoutine(self):
@@ -528,13 +529,13 @@ class RoutinesNotebook(wx.aui.AuiNotebook):
         return self.GetPage(self.GetSelection())
     def addRoutinePage(self, routineName, routine):
 #        routinePage = RoutinePage(parent=self, routine=routine)
-        routinePage = RoutineCanvas(parent=self, routine=routine)
+        routinePage = RoutineCanvas(notebook=self, routine=routine)
         self.AddPage(routinePage, routineName)
-        self.parent.setExpModified(True)
+        self.frame.setIsModified(True)
     def createNewRoutine(self):
         dlg = wx.TextEntryDialog(self, message="What is the name for the new Routine? (e.g. instr, trial, feedback)",
             caption='New Routine')
-        exp = self.parent.exp
+        exp = self.frame.exp
         if dlg.ShowModal() == wx.ID_OK:
             routineName=dlg.GetValue()
             exp.addRoutine(routineName)#add to the experiment
@@ -542,11 +543,11 @@ class RoutinesNotebook(wx.aui.AuiNotebook):
 
         dlg.Destroy()
 class ComponentsPanel(scrolled.ScrolledPanel):
-    def __init__(self, parent, id=-1):
+    def __init__(self, frame, id=-1):
         """A panel that shows how the routines will fit together
         """
-        scrolled.ScrolledPanel.__init__(self,parent,id,size=(80,800))
-        self.parent=parent    
+        scrolled.ScrolledPanel.__init__(self,frame,id,size=(80,800))
+        self.frame=frame    
         self.sizer=wx.BoxSizer(wx.VERTICAL)        
         
         # add a button for each type of event that can be added
@@ -570,24 +571,24 @@ class ComponentsPanel(scrolled.ScrolledPanel):
         componentName = self.componentFromID[evt.GetId()]
         newClassStr = componentName+'Component'
         exec('newComp = experiment.%s()' %newClassStr)
-        dlg = DlgComponentProperties(parent=self.parent,
+        dlg = DlgComponentProperties(frame=self.frame,
             title=componentName+' Properties',
             params = newComp.params, hints=newComp.hints)
         if dlg.OK:
-            currRoutinePage = self.parent.routinePanel.getCurrentPage()
-            currRoutine = self.parent.routinePanel.getCurrentRoutine()
+            currRoutinePage = self.frame.routinePanel.getCurrentPage()
+            currRoutine = self.frame.routinePanel.getCurrentRoutine()
             currRoutine.append(newComp)#add to the actual routing
             currRoutinePage.redrawRoutine()#update the routine's view with the new component too
             currRoutinePage.Refresh()
-            self.parent.setExpModified(True)
+            self.frame.setIsModified(True)
 class _BaseParamsDlg(wx.Dialog):   
-    def __init__(self,parent,title,params,hints,fixed=[],allowed={},
+    def __init__(self,frame,title,params,hints,fixed=[],allowed={},
             pos=wx.DefaultPosition, size=wx.DefaultSize,
             style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
         style=style|wx.RESIZE_BORDER
         
-        wx.Dialog.__init__(self, parent,-1,title,pos,size,style)
-        self.parent=parent
+        wx.Dialog.__init__(self, frame,-1,title,pos,size,style)
+        self.frame=frame
         self.Center()
         
         self.params=params   #dict
@@ -711,14 +712,14 @@ class _BaseParamsDlg(wx.Dialog):
         
         return inputBox, inputLabel
 class DlgLoopProperties(_BaseParamsDlg):    
-    def __init__(self,parent,title="Loop properties",
+    def __init__(self,frame,title="Loop properties",
             pos=wx.DefaultPosition, size=wx.DefaultSize,
             style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
         style=style|wx.RESIZE_BORDER
         
-        _BaseParamsDlg.__init__(self, parent,title,
+        _BaseParamsDlg.__init__(self, frame,title,
                     params={},hints={})
-        self.parent=parent
+        self.frame=frame
         self.Center()
         self.sizer = wx.BoxSizer(wx.VERTICAL)#needs to be done before any addField calls
         
@@ -894,12 +895,12 @@ class DlgLoopProperties(_BaseParamsDlg):
             self.importTrialTypes(newPath)
             
 class DlgComponentProperties(_BaseParamsDlg):    
-    def __init__(self,parent,title,params,hints,fixed=[],allowed={},
+    def __init__(self,frame,title,params,hints,fixed=[],allowed={},
             pos=wx.DefaultPosition, size=wx.DefaultSize,
             style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
         style=style|wx.RESIZE_BORDER
         
-        _BaseParamsDlg.__init__(self,parent,title,params,hints,fixed,allowed,
+        _BaseParamsDlg.__init__(self,frame,title,params,hints,fixed,allowed,
             pos,size,style)
         
         self.show()
@@ -909,10 +910,10 @@ class DlgComponentProperties(_BaseParamsDlg):
         
 class BuilderFrame(wx.Frame):
 
-    def __init__(self, parent, id=-1, title='PsychoPy Builder',
+    def __init__(self, frame, id=-1, title='PsychoPy Builder',
                  pos=wx.DefaultPosition, size=(800, 600),files=None,
                  style=wx.DEFAULT_FRAME_STYLE, app=None):
-        wx.Frame.__init__(self, parent, id, title, pos, size, style)
+        wx.Frame.__init__(self, frame, id, title, pos, size, style)
         self.panel = wx.Panel(self)
         self.app=app
         #load icons for the various stimulus events 
@@ -929,7 +930,7 @@ class BuilderFrame(wx.Frame):
         self.fileNew()
         
         # create our panels
-        self.flowPanel=FlowPanel(parent=self, size=(600,200))
+        self.flowPanel=FlowPanel(frame=self, size=(600,200))
         self.routinePanel=RoutinesNotebook(self)
         self.componentButtons=ComponentsPanel(self)
         
@@ -1095,17 +1096,16 @@ class BuilderFrame(wx.Frame):
         
         if dlg.ShowModal() == wx.ID_OK:
             newPath = dlg.GetPath()
-            f = open(filename)
-            contents = cPickle.load(f)
+            f = open(newPath)
+            contents = pickle.load(f)
             f.close()
             if hasattr(contents,'psychopyExperimentVersion'):
                 #this indicates we have a PsychoPy Experiment object
                 self.exp=contents
                 self.setIsModified(False)        
-            
-        self.SetStatusText('')
+        self.flowPanel.Refresh()
         
-    def setExpModified(self, newVal=True):
+    def setIsModified(self, newVal=True):
         self.isModified=newVal
         self.toolbar.EnableTool(TB_FILESAVE, newVal)
         self.fileMenu.Enable(wx.ID_SAVE, newVal)
@@ -1117,11 +1117,10 @@ class BuilderFrame(wx.Frame):
         if filename=='untitled.py':
             self.fileSaveAs(filename)
         else:
-            self.SetStatusText('Saving file')
             f = open(filename, 'w')
-            cPickle.dump(self.exp,f)
+            pickle.dump(self.exp,f)
             f.close()
-        self.setFileModified(False)        
+        self.setIsModified(False)        
         
     def fileSaveAs(self,event=None, filename=None):
         """
@@ -1141,7 +1140,7 @@ class BuilderFrame(wx.Frame):
             newPath = dlg.GetPath()
             self.fileSave(event=None, filename=newPath)
             self.filename = newPath            
-            self.setFileModified(False)
+            self.setIsModified(False)
         try: #this seems correct on PC, but not on mac   
             dlg.destroy()
         except:
