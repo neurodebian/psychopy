@@ -120,7 +120,7 @@ class FlowPanel(scrolled.ScrolledPanel):
         addRoutineDlg = DlgAddRoutineToFlow(frame=self.frame, 
                     possPoints=self.pointsToDraw)
         if addRoutineDlg.ShowModal()==wx.ID_OK:
-            newRoutine = exp.routines[addRoutineDlg.routine]#fetch the routine with the returned name
+            newRoutine = self.exp.routines[addRoutineDlg.routine]#fetch the routine with the returned name
             self.exp.flow.addRoutine(newRoutine, addRoutineDlg.loc)
             self.frame.setIsModified(True)
             
@@ -147,13 +147,14 @@ class FlowPanel(scrolled.ScrolledPanel):
                 handler=loopDlg.trialHandler
             self.exp.flow.addLoop(handler, startPos=loopDlg.params['endPoints'][0], endPos=loopDlg.params['endPoints'][1])
             #remove the points from the timeline
+            print 'added loopp'
             self.setDrawPoints(None)
             self.Refresh()
             self.frame.setIsModified(True)
 
     def onPaint(self, evt=None):
         """This should not be called. Use FlowPanel.Refresh()
-        """                
+        """            
         expFlow = self.frame.exp.flow #retrieve the current flow from the experiment
         
         #must create a fresh drawing context each frame (not store one)
@@ -334,17 +335,17 @@ class RoutineCanvas(wx.ScrolledWindow):
         self.pdc = wx.PseudoDC()
         self.pen_cache = {}
         self.brush_cache = {}
+        # vars for handling mouse clicks
+        self.dragid = -1
+        self.lastpos = (0,0)
+        self.componentFromID={}#use the ID of the drawn icon to retrieve component name 
+    
         self.redrawRoutine()
 
         self.Bind(wx.EVT_PAINT, self.OnPaint)
         self.Bind(wx.EVT_ERASE_BACKGROUND, lambda x:None)
         self.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouse)
         
-        # vars for handling mouse clicks
-        self.dragid = -1
-        self.lastpos = (0,0)
-        self.componentFromID={}#use the ID of the drawn icon to retrieve component name 
-    
     def ConvertEventCoords(self, event):
         xView, yView = self.GetViewStart()
         xDelta, yDelta = self.GetScrollPixelsPerUnit()
@@ -506,10 +507,11 @@ class RoutineCanvas(wx.ScrolledWindow):
         dlg = DlgComponentProperties(frame=self.frame,
             title=component.params['name']+' Properties',
             params = component.params, hints=component.hints)
-        self.redrawRoutine()#need to refresh timings section
-        self.Refresh()#then redraw visible
-        self.frame.setIsModified(True)
-        
+        if dlg.OK:
+            self.redrawRoutine()#need to refresh timings section
+            self.Refresh()#then redraw visible
+            self.frame.setIsModified(True)
+            
     def getSecsPerPixel(self):
         return float(self.timeMax)/(self.timeXposEnd-self.timeXposStart)
 
@@ -520,9 +522,10 @@ class RoutinesNotebook(wx.aui.AuiNotebook):
     def __init__(self, frame, id=-1):
         self.frame=frame
         wx.aui.AuiNotebook.__init__(self, frame, id)
-        exp=self.frame.exp
-        for routineName in exp.routines:         
-            self.addRoutinePage(routineName, exp.routines[routineName])
+        self.exp=self.frame.exp
+        for routineName in self.exp.routines:         
+            self.addRoutinePage(routineName, self.exp.routines[routineName])
+        self.Bind(wx.aui.EVT_AUINOTEBOOK_PAGE_CLOSE, self.onClosePane, self)
     def getCurrentRoutine(self):
         return self.getCurrentPage().routine
     def getCurrentPage(self):
@@ -531,7 +534,11 @@ class RoutinesNotebook(wx.aui.AuiNotebook):
 #        routinePage = RoutinePage(parent=self, routine=routine)
         routinePage = RoutineCanvas(notebook=self, routine=routine)
         self.AddPage(routinePage, routineName)
-        self.frame.setIsModified(True)
+#        self.frame.setIsModified(True)
+    def removePages(self):
+        for ii in range(self.GetPageCount()):
+            currId = self.GetSelection()
+            self.DeletePage(currId)            
     def createNewRoutine(self):
         dlg = wx.TextEntryDialog(self, message="What is the name for the new Routine? (e.g. instr, trial, feedback)",
             caption='New Routine')
@@ -540,8 +547,20 @@ class RoutinesNotebook(wx.aui.AuiNotebook):
             routineName=dlg.GetValue()
             exp.addRoutine(routineName)#add to the experiment
             self.addRoutinePage(routineName, exp.routines[routineName])#then to the notebook
-
+            self.frame.setIsModified(True)
         dlg.Destroy()
+    def onClosePane(self, event=None):
+        """Close the pane and remove the routine from the exp
+        """
+        #todo: check that the user really wants this!?
+        routine = self.GetPage(event.GetSelection()).routine
+        #update experiment object and flow window (if this is being used)
+        if routine.name in self.exp.routines.keys(): 
+            junk=self.exp.routines.pop(routine.name)
+        if routine in self.exp.flow:
+            self.exp.flow.remove(routine)
+            self.frame.flowPanel.Refresh()
+        self.frame.setIsModified(True)
 class ComponentsPanel(scrolled.ScrolledPanel):
     def __init__(self, frame, id=-1):
         """A panel that shows how the routines will fit together
@@ -910,7 +929,7 @@ class DlgComponentProperties(_BaseParamsDlg):
         
 class BuilderFrame(wx.Frame):
 
-    def __init__(self, frame, id=-1, title='PsychoPy Builder',
+    def __init__(self, frame, id=-1, title='PsychoPy (Experiment Builder)',
                  pos=wx.DefaultPosition, size=(800, 600),files=None,
                  style=wx.DEFAULT_FRAME_STYLE, app=None):
         wx.Frame.__init__(self, frame, id, title, pos, size, style)
@@ -926,14 +945,15 @@ class BuilderFrame(wx.Frame):
         self.makeMenus()
         #setup a blank exp
         self.filename='untitled.py'
-        self.isModified=False
-        self.fileNew()
-        
+        self.fileNew(closeCurrent=False)#don't try to close before opening
+        self.exp.addRoutine('trial') #create the trial routine
+        self.exp.flow.addRoutine(self.exp.routines['trial'], pos=1)#add it to flow 
         # create our panels
         self.flowPanel=FlowPanel(frame=self, size=(600,200))
         self.routinePanel=RoutinesNotebook(self)
         self.componentButtons=ComponentsPanel(self)
-        
+        self.setIsModified(False)
+        self.updateWindowTitle()
         if True: #control the panes using aui manager
             self._mgr = wx.aui.AuiManager(self)
             self._mgr.AddPane(self.routinePanel,wx.CENTER, 'Routines')
@@ -1068,25 +1088,13 @@ class BuilderFrame(wx.Frame):
     def OnClose(self, event):
         # delete the frame
         self.Destroy()
-    def fileNew(self, event=None):
+    def fileNew(self, event=None, closeCurrent=True):
         """Create a default experiment (maybe an empty one instead)"""   
         # check whether existing file is modified
-        if self.isModified:
-            sys.stdout.flush()#make sure that any messages get printed before closing
-            dlg = wx.MessageDialog(self, message='Changes to %s will be lost. Save changes first?' %filename,
-                caption='Warning', style=wx.YES_NO|wx.CANCEL )
-            resp = dlg.ShowModal()
-            sys.stdout.flush()
-            dlg.Destroy()
-            if resp  == wx.ID_CANCEL: return -1 #return, don't quit
-            elif resp == wx.ID_YES:   self.fileSave()#save first
-            elif resp == wx.ID_NO: pass #don't save just quit
-                   
+        if closeCurrent: self.fileClose()          
         self.filename=='untitled.py'
-        self.exp = experiment.Experiment()
-        self.exp.addRoutine('trial') #create the trial routine
-        self.exp.flow.addRoutine(self.exp.routines['trial'], pos=1)#add it to flow        
-    def fileOpen(self, event):
+        self.exp = experiment.Experiment() 
+    def fileOpen(self, event=None):
         """Open a FileDialog, then load the file if possible.
         """
         #todo: check whether current file has been modified and recommend save
@@ -1094,17 +1102,31 @@ class BuilderFrame(wx.Frame):
             self, message="Open file ...", style=wx.OPEN
             )
         
-        if dlg.ShowModal() == wx.ID_OK:
-            newPath = dlg.GetPath()
-            f = open(newPath)
-            contents = pickle.load(f)
-            f.close()
-            if hasattr(contents,'psychopyExperimentVersion'):
-                #this indicates we have a PsychoPy Experiment object
-                self.exp=contents
-                self.setIsModified(False)        
+        if dlg.ShowModal() != wx.ID_OK: 
+            return 0
+        newPath = dlg.GetPath()
+        f = open(newPath)
+        exp = pickle.load(f)
+        f.close()
+        if not hasattr(exp,'psychopyExperimentVersion'):#this indicates we have a PsychoPy Experiment object
+            print 'not a valid PsychoPy builder experiment'
+            return 0
+        self.fileClose()#close the existing (and prompt for save if necess)
+        #update exp vals
+        self.exp=exp
+        self.setIsModified(False)  
+        #update the views
         self.flowPanel.Refresh()
-        
+        for thisRoutineName in self.exp.routines.keys():
+            routine = self.exp.routines[thisRoutineName]
+            self.routinePanel.addRoutinePage(thisRoutineName, routine)
+        self.filename = newPath
+        self.updateWindowTitle()
+    def updateWindowTitle(self, newTitle=None):
+        if newTitle==None:
+            shortName = os.path.split(self.filename)[-1]
+            newTitle='PsychoPy (Experiment Builder) - %s' %(shortName)
+        self.SetTitle(newTitle)
     def setIsModified(self, newVal=True):
         self.isModified=newVal
         self.toolbar.EnableTool(TB_FILESAVE, newVal)
@@ -1145,11 +1167,11 @@ class BuilderFrame(wx.Frame):
             dlg.destroy()
         except:
             pass
-    def fileClose(self, event):
-        """Close the current filee (and warn if it hasn't been saved)"""
-        if self.isModified:
-            sys.stdout.flush()#make sure that any messages get printed before closing
-            dlg = wx.MessageDialog(self, message='Save changes to %s before quitting?' %filename,
+        self.updateWindowTitle()
+    def fileClose(self, event=None):
+        """Close the current file (and warn if it hasn't been saved)"""
+        if hasattr(self, 'isModified') and self.isModified:
+            dlg = wx.MessageDialog(self, message='Save changes to %s before quitting?' %self.filename,
                 caption='Warning', style=wx.YES_NO|wx.CANCEL )
             resp = dlg.ShowModal()
             sys.stdout.flush()
@@ -1161,7 +1183,10 @@ class BuilderFrame(wx.Frame):
                 self.fileSave()
             elif resp == wx.ID_NO:
                 pass #don't save just quit
-        self.fileNew()#this is sufficient to kill the other
+        self.routinePanel.removePages()
+        self.filename = 'untitled.psyexp'          
+        self.setIsModified(False)
+        self.updateWindowTitle()
         return 1
     def undo(self, event=None):
         #todo: undo
@@ -1176,7 +1201,7 @@ class BuilderFrame(wx.Frame):
         msg = """PsychoPy %s \nWritten by Jon Peirce.\n
         It has a liberal license; basically, do what you like with it, 
         don't kill me if something doesn't work! :-) But do let me know...
-        psychopy-users@lists.sourceforge.net
+        psychopy-users@googlegroups.com
         """ %psychopy.__version__
         dlg = wx.MessageDialog(None, message=msg,
                               caption = "About PsychoPy", style=wx.OK | wx.ICON_INFORMATION)
@@ -1218,7 +1243,7 @@ class BuilderApp(wx.App):
         else:
             args=[]
         self.frame = BuilderFrame(None, -1, 
-                                      title="PsychoPy Experiment Builder",
+                                      title="PsychoPy (Experiment Builder)",
                                       files = args)
                                      
         self.frame.Show(True)

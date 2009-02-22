@@ -21,7 +21,7 @@ class Experiment:
         if routine==None:
             self.routines[routineName]=Routine(routineName)#create a deafult routine with this name
         else:
-            self.routines=routine
+            self.routines[routineName]=routine
         
     def generateScript(self):
         """Generate a PsychoPy script for the experiment
