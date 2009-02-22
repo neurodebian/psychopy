@@ -153,7 +153,6 @@ class FlowPanel(scrolled.ScrolledPanel):
                 handler=loopDlg.trialHandler
             self.exp.flow.addLoop(handler, startPos=loopDlg.params['endPoints'][0], endPos=loopDlg.params['endPoints'][1])
             #remove the points from the timeline
-            print 'added loopp'
             self.setDrawPoints(None)
             self.Refresh()
             self.frame.setIsModified(True)
@@ -950,8 +949,6 @@ class BuilderFrame(wx.Frame):
             self.bitmaps[eventType]=wx.Bitmap( \
                 os.path.join(iconDir,"%s.png" %eventType.lower()))      
                 
-        self.makeToolbar()
-        self.makeMenus()
         #setup a blank exp
         self.filename='untitled.py'
         self.fileNew(closeCurrent=False)#don't try to close before opening
@@ -979,6 +976,8 @@ class BuilderFrame(wx.Frame):
             self.mainSizer.Add(self.flowPanel, 1, wx.ALIGN_BOTTOM)
             self.SetSizer(self.mainSizer)
             
+        self.makeToolbar()
+        self.makeMenus()
         self.SetAutoLayout(True)
         self.Bind(wx.EVT_CLOSE, self.OnClose)
         
@@ -1071,13 +1070,13 @@ class BuilderFrame(wx.Frame):
         self.expMenu.AppendSeparator()
         
         self.expMenu.Append(ID_ADD_ROUTINE_TO_FLOW, "Insert Routine in Flow", "Select one of your routines to be inserted into the experiment flow")
-        wx.EVT_MENU(self, ID_ADD_ROUTINE_TO_FLOW,  self.flow.onInsertRoutine)
+        wx.EVT_MENU(self, ID_ADD_ROUTINE_TO_FLOW,  self.flowPanel.onInsertRoutine)
         self.expMenu.Append(ID_REM_ROUTINE_FROM_FLOW, "Remove Routine from Flow", "Create a new loop in your flow window")
-        wx.EVT_MENU(self, ID_REM_ROUTINE_FROM_FLOW,  self.flow.onRemRoutine)
+        wx.EVT_MENU(self, ID_REM_ROUTINE_FROM_FLOW,  self.flowPanel.onRemRoutine)
         self.expMenu.Append(ID_ADD_LOOP_TO_FLOW, "Insert Loop in Flow", "Create a new loop in your flow window")
-        wx.EVT_MENU(self, ID_ADD_LOOP_TO_FLOW,  self.flow.onInsertLoop)
-        self.expMenu.Append(ID_REM_LOOP_TO_FLOW, "Remove Loop from Flow", "Remove a loop from your flow window")
-        wx.EVT_MENU(self, ID_REM_LOOP_TO_FLOW,  self.flow.onRemLoop)
+        wx.EVT_MENU(self, ID_ADD_LOOP_TO_FLOW,  self.flowPanel.onInsertLoop)
+        self.expMenu.Append(ID_REM_LOOP_FROM_FLOW, "Remove Loop from Flow", "Remove a loop from your flow window")
+        wx.EVT_MENU(self, ID_REM_LOOP_FROM_FLOW,  self.flowPanel.onRemLoop)
         
         #---_demos---#000000#FFFFFF--------------------------------------------------
         self.demosMenu = wx.Menu()
@@ -1148,8 +1147,9 @@ class BuilderFrame(wx.Frame):
         self.SetTitle(newTitle)
     def setIsModified(self, newVal=True):
         self.isModified=newVal
-        self.toolbar.EnableTool(TB_FILESAVE, newVal)
-        self.fileMenu.Enable(wx.ID_SAVE, newVal)
+        if hasattr(self, 'toolbar'):#initially there is no toolbar or menu
+            self.toolbar.EnableTool(TB_FILESAVE, newVal)
+            self.fileMenu.Enable(wx.ID_SAVE, newVal)
     def fileSave(self,event=None, filename=None):
         """Save file, revert to SaveAs if the file hasn't yet been saved 
         """
@@ -1235,11 +1235,12 @@ class BuilderFrame(wx.Frame):
         dlg.ShowModal()
         dlg.Destroy()
     def followLink(self, event=None):
-        #todo: followLink
+        #todo: add links to help menu and a method her to follow them
         pass
     def runFile(self, event=None):
         #todo: runFile
-        pass        
+        script = self.exp.generateScript()
+        print script.getvalue()      
     def stopFile(self, event=None):
         #todo: stopFile
         pass

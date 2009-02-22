@@ -27,7 +27,7 @@ class Experiment:
         """Generate a PsychoPy script for the experiment
         """
         s=StringIO.StringIO(u'') #a string buffer object
-        s.write("""#This experiment was created using PsychoPyGEN and will
+        s.write("""#This experiment was created using PsychoPy Experiment Builde) and will
         run on any platform on which PsychoPy (www.psychopy.org) can be installed\n\n""")
         
         #delegate most of the code-writing to Flow
