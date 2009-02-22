@@ -739,11 +739,15 @@ class _BaseParamsDlg(wx.Dialog):
         
         return inputBox, inputLabel
 class DlgLoopProperties(_BaseParamsDlg):    
-    def __init__(self,frame,title="Loop properties",
+    def __init__(self,frame,title="Loop properties",loop=None,
             pos=wx.DefaultPosition, size=wx.DefaultSize,
             style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
         style=style|wx.RESIZE_BORDER
-        
+        #if the loop is being created there should be no parameters
+        if hasattr(loop,'params'):
+            paramsInit=loop.params
+        else:paramsInit={}
+            
         _BaseParamsDlg.__init__(self, frame,title,
                     params={},hints={})
         self.frame=frame
@@ -810,7 +814,12 @@ class DlgLoopProperties(_BaseParamsDlg):
             if thisFieldName in ['name','loopType']: continue
             elif thisFieldName=='trialListFile':                
                 container=wx.BoxSizer(wx.HORIZONTAL)
-                fieldCtrl = wx.TextCtrl(self,-1,"",size=wx.Size(30*self.maxFieldLength,-1))          
+                if self.params.has_key('trialListFile'):
+                    initPth=self.params['trialListFile']
+                else: initPth='Need a .csv file'
+                fieldCtrl = wx.StaticText(self,-1,self.getAbbriev(initPth),
+                    style=wx.ALIGN_RIGHT,
+                    size=wx.Size(30*self.maxFieldLength,-1))          
                 fieldLabelCtrl=wx.Button(self, -1, "Browse...") #we don't need a label for this  
                 self.Bind(wx.EVT_BUTTON, self.onBrowseTrialsFile,fieldLabelCtrl)  
                 fieldType=str
@@ -818,8 +827,7 @@ class DlgLoopProperties(_BaseParamsDlg):
                 container.Add(fieldLabelCtrl)
                 self.sizer.Add(container)
             elif thisFieldName=='trialList':
-                text = """No parameters set\n\
-                        need a .csv file"""
+                text = """No parameters set  """
                 size = wx.Size(200, 50)
                 fieldCtrl = self.trialListCtrl = self.addText(text, size)
                 fieldLabelCtrl=fieldCtrl #we don't need a label for this   
@@ -836,30 +844,33 @@ class DlgLoopProperties(_BaseParamsDlg):
             self.randFields[thisFieldName]=fieldCtrl
             self.randFieldLabels[thisFieldName]=fieldLabelCtrl
             self.randFieldTypes[thisFieldName] =fieldType
-        
+    def getAbbriev(self, longStr, n=30):
+        """for a filename (or any string actually), give the first
+        5 characters, an ellipsis and then n of the final characters"""
+        if len(longStr)>20:
+            return longStr[0:10]+'...'+longStr[(-n+10):]
+        else: return longStr
     def importTrialTypes(self, fileName):
         """Import the trial data from fileName to generate a list of dicts.
         Insert this immediately into self.params['trialList']
         """
         #use csv import library to fetch the fieldNames
-        f = open(fileName, 'r')
-        reader = csv.reader(f)
+        f = open(fileName,'rU')#the U converts lineendings to os.linesep
+        #lines = f.read().split(os.linesep)#csv module is temperamental with line endings
+        reader = csv.reader(f)#.split(os.linesep))
         fieldNames = reader.next()
-        f.close()
         #use pylab to import data and intelligently check for data types
         #all data in one column will be given a single type (e.g. if one cell is string, all will be set to string)
-        trialsArr = pylab.csv2rec(fileName)
-        
+        trialsArr = pylab.csv2rec(f)
+        f.close()
         #convert the record array into a list of dicts
         trialList = []
         for trialN, trialType in enumerate(trialsArr):
             thisTrial ={}
-            for fieldName in fieldNames:
-                thisTrial[fieldName] = trialsArr[trialN][fieldName.lower()]
-            trialList.append(thisTrial)
-            
+            for fieldN, fieldName in enumerate(fieldNames):
+                thisTrial[fieldName] = trialsArr[trialN][fieldN]
+            trialList.append(thisTrial)            
         self.params['trialList']=trialList
-        
     def makeStaircaseCtrls(self):
         """Setup the controls for a StairHandler"""
         self.stairFields = {}
@@ -911,16 +922,19 @@ class DlgLoopProperties(_BaseParamsDlg):
         self.currentType = newType
         
     def onBrowseTrialsFile(self, event):
-        
         dlg = wx.FileDialog(
             self, message="Open file ...", style=wx.OPEN
-            )
-        
+            )        
         if dlg.ShowModal() == wx.ID_OK:
             newPath = dlg.GetPath()
             self.params['trialListFile'] = newPath
             self.importTrialTypes(newPath)
-            
+            self.randFields['trialListFile'].SetLabel(self.getAbbriev(newPath))
+            self.randFields['trialList'].SetLabel(
+                '%i trial types, with %i parameters\n%s' \
+                    %(len(self.params['trialList']), \
+                        len(self.params['trialList'][0]), \
+                            self.params['trialList'][0].keys()))
 class DlgComponentProperties(_BaseParamsDlg):    
     def __init__(self,frame,title,params,hints,fixed=[],allowed={},
             pos=wx.DefaultPosition, size=wx.DefaultSize,
