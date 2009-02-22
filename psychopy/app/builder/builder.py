@@ -47,7 +47,11 @@ ID_CUT=wx.NewId()
 ID_COPY=wx.NewId()
 ID_PASTE=wx.NewId()
 #experiment menu
-ID_ADDROUTINE=wx.NewId()
+ID_NEW_ROUTINE=wx.NewId()
+ID_ADD_ROUTINE_TO_FLOW=wx.NewId()
+ID_ADD_LOOP_TO_FLOW=wx.NewId()
+ID_REM_ROUTINE_FROM_FLOW=wx.NewId()
+ID_REM_LOOP_FROM_FLOW=wx.NewId()
 #view menu
 #tools menu
 ID_OPEN_MONCENTER=wx.NewId()
@@ -127,7 +131,9 @@ class FlowPanel(scrolled.ScrolledPanel):
         #remove the points from the timeline
         self.setDrawPoints(None)
         self.Refresh()
-        
+    def onRemRoutine(self,evt=None,routineName=None):
+        #todo: implement removal of routines from flow
+        print 'removal of routines form flow not yet implemented'
     def onInsertLoop(self, evt):
         """Someone pushed the insert loop button.
         Fetch the dialog
@@ -151,7 +157,10 @@ class FlowPanel(scrolled.ScrolledPanel):
             self.setDrawPoints(None)
             self.Refresh()
             self.frame.setIsModified(True)
-
+    def onRemLoop(self, event=None):
+        #todo: implement the removal of loops
+        print 'removing loops not implemented yet'
+        
     def onPaint(self, evt=None):
         """This should not be called. Use FlowPanel.Refresh()
         """            
@@ -1057,8 +1066,18 @@ class BuilderFrame(wx.Frame):
         #---_experiment---#000000#FFFFFF--------------------------------------------------
         self.expMenu = wx.Menu()    
         menuBar.Append(self.expMenu, '&Experiment')
-        self.expMenu.Append(ID_ADDROUTINE, "Add Routine", "Add a routine (e.g. the trial definition) to the experiment")
-        wx.EVT_MENU(self, ID_ADDROUTINE,  self.addRoutine)
+        self.expMenu.Append(ID_NEW_ROUTINE, "New Routine", "Create a new routine (e.g. the trial definition)")
+        wx.EVT_MENU(self, ID_NEW_ROUTINE,  self.addRoutine)
+        self.expMenu.AppendSeparator()
+        
+        self.expMenu.Append(ID_ADD_ROUTINE_TO_FLOW, "Insert Routine in Flow", "Select one of your routines to be inserted into the experiment flow")
+        wx.EVT_MENU(self, ID_ADD_ROUTINE_TO_FLOW,  self.flow.onInsertRoutine)
+        self.expMenu.Append(ID_REM_ROUTINE_FROM_FLOW, "Remove Routine from Flow", "Create a new loop in your flow window")
+        wx.EVT_MENU(self, ID_REM_ROUTINE_FROM_FLOW,  self.flow.onRemRoutine)
+        self.expMenu.Append(ID_ADD_LOOP_TO_FLOW, "Insert Loop in Flow", "Create a new loop in your flow window")
+        wx.EVT_MENU(self, ID_ADD_LOOP_TO_FLOW,  self.flow.onInsertLoop)
+        self.expMenu.Append(ID_REM_LOOP_TO_FLOW, "Remove Loop from Flow", "Remove a loop from your flow window")
+        wx.EVT_MENU(self, ID_REM_LOOP_TO_FLOW,  self.flow.onRemLoop)
         
         #---_demos---#000000#FFFFFF--------------------------------------------------
         self.demosMenu = wx.Menu()
