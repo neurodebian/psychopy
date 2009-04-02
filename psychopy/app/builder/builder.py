@@ -84,7 +84,6 @@ class FlowPanel(scrolled.ScrolledPanel):
         scrolled.ScrolledPanel.__init__(self, frame, id, (0, 0), size=size)
         self.panel = wx.Panel(self,-1,size=(600,200))
         self.frame=frame   
-        self.exp = frame.exp
         self.needUpdate=True
         self.maxWidth  = 1000
         self.maxHeight = 200
@@ -124,8 +123,9 @@ class FlowPanel(scrolled.ScrolledPanel):
         addRoutineDlg = DlgAddRoutineToFlow(frame=self.frame, 
                     possPoints=self.pointsToDraw)
         if addRoutineDlg.ShowModal()==wx.ID_OK:
-            newRoutine = self.exp.routines[addRoutineDlg.routine]#fetch the routine with the returned name
-            self.exp.flow.addRoutine(newRoutine, addRoutineDlg.loc)
+            print 'routines', self.frame.exp.routines, addRoutineDlg.routine
+            newRoutine = self.frame.exp.routines[addRoutineDlg.routine]#fetch the routine with the returned name
+            self.frame.exp.flow.addRoutine(newRoutine, addRoutineDlg.loc)
             self.frame.setIsModified(True)
             
         #remove the points from the timeline
@@ -151,7 +151,7 @@ class FlowPanel(scrolled.ScrolledPanel):
                 handler= loopDlg.stairHandler
             else:
                 handler=loopDlg.trialHandler
-            self.exp.flow.addLoop(handler, startPos=loopDlg.params['endPoints'][0], endPos=loopDlg.params['endPoints'][1])
+            self.frame.exp.flow.addLoop(handler, startPos=loopDlg.params['endPoints'][0], endPos=loopDlg.params['endPoints'][1])
             #remove the points from the timeline
             self.setDrawPoints(None)
             self.Refresh()
@@ -530,9 +530,9 @@ class RoutinesNotebook(wx.aui.AuiNotebook):
     def __init__(self, frame, id=-1):
         self.frame=frame
         wx.aui.AuiNotebook.__init__(self, frame, id)
-        self.exp=self.frame.exp
-        for routineName in self.exp.routines:         
-            self.addRoutinePage(routineName, self.exp.routines[routineName])
+        
+        for routineName in self.frame.exp.routines:         
+            self.addRoutinePage(routineName, self.frame.exp.routines[routineName])
         self.Bind(wx.aui.EVT_AUINOTEBOOK_PAGE_CLOSE, self.onClosePane, self)
     def getCurrentRoutine(self):
         return self.getCurrentPage().routine
@@ -563,10 +563,10 @@ class RoutinesNotebook(wx.aui.AuiNotebook):
         #todo: check that the user really wants this!?
         routine = self.GetPage(event.GetSelection()).routine
         #update experiment object and flow window (if this is being used)
-        if routine.name in self.exp.routines.keys(): 
-            junk=self.exp.routines.pop(routine.name)
-        if routine in self.exp.flow:
-            self.exp.flow.remove(routine)
+        if routine.name in self.frame.exp.routines.keys(): 
+            junk=self.frame.exp.routines.pop(routine.name)
+        if routine in self.frame.exp.flow:
+            self.frame.exp.flow.remove(routine)
             self.frame.flowPanel.Refresh()
         self.frame.setIsModified(True)
 class ComponentsPanel(scrolled.ScrolledPanel):

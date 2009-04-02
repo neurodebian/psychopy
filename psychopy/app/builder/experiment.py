@@ -42,7 +42,7 @@ class Experiment:
             names.append(thisRoutine.name)
             for thisEntry in thisRoutine: 
                 if isinstance(thisEntry, LoopInitiator):
-                    names.append( thisEntry.loop.name )
+                    names.append( thisEntry.loop.params['name'])
                     print 'found loop initiator: %s' %names[-1]
                 elif hasattr(thisEntry, 'params'):
                     names.append(thisEntry.params['name'])
@@ -82,13 +82,14 @@ class TrialHandler(list):
         self.hints['trialListFile']='A comma-separated-value (.csv) file specifying the parameters for each trial'
         self.allowed={}
     def generateInitCode(self,buff):
-        buff.write("init loop '%s' (%s)\n" %(self.name, self.loopType))
+        buff.write("init loop '%s' (%s)\n" %(self.params['name'], self.params['loopType']))
         buff.write("%s=data.TrialHandler(trialList=%s,nReps=%i,\n)" \
-            %(self.name, self.trialList, self.nReps))
+            %(self.params['name'], self.params['trialList'], self.params['nReps']))
     def generateRunCode(self,buff, indent):
         #work out a name for e.g. thisTrial in trials:
-        thisName = ("this"+self.name.capitalize()[:-1])
-        buff.write("for %s in %s:\n" %(thisName, self.name))
+        print 'name', self.params['name'].capitalize()
+        thisName = ("this"+self.params['name'].capitalize()[:-1])
+        buff.write("for %s in %s:\n" %(thisName, self.params['name']))
     def getType(self):
         return 'LoopHandler'     
 class StairHandler(list):    
@@ -117,13 +118,13 @@ class StairHandler(list):
         self.allowed={}
         self.allowed['step types']=['linear','log','db']
     def generateInitCode(self,buff):
-        buff.write("init loop '%s' (%s)\n" %(self.name, self.loopType))
+        buff.write("init loop '%s' (%s)\n" %(self.params['name'], self.params['loopType']))
         buff.write("%s=data.StairHandler(nReps=%i,\n)" \
-            %(self.name, self.nReps))
+            %(self.params['name'], self.params['nReps']))
     def generateRunCode(self,buff, indent):
         #work out a name for e.g. thisTrial in trials:
-        thisName = ("this"+self.name.capitalize()[:-1])
-        buff.write("for %s in %s:\n" %(thisName, self.name))
+        thisName = ("this"+self.params['name'].capitalize()[:-1])
+        buff.write("for %s in %s:\n" %(thisName, self.params['name']))
     def getType(self):
         return 'StairHandler'   
 class LoopInitiator:
@@ -146,7 +147,7 @@ class LoopTerminator:
         pass
     def generateRunCode(self,buff, indent):
         #todo: dedent
-        buff.write("# end of '%s' after %i repeats (of each entry in trialList)\n" %(self.loop.name, self.loop.nReps))
+        buff.write("# end of '%s' after %i repeats (of each entry in trialList)\n" %(self.loop.params['name'], self.loop.params['nReps']))
     def getType(self):
         return 'LoopTerminator'
 class Flow(list):
