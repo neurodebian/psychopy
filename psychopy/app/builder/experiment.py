@@ -106,6 +106,7 @@ class TrialHandler():
         self.hints['trialListFile']='A comma-separated-value (.csv) file specifying the parameters for each trial'
         self.allowed={}
     def generateInitCode(self,buff):
+<<<<<<< HEAD:psychopy/app/builder/experiment.py
         buff.writeIndented("%s=data.TrialHandler(trialList=%s,nReps=%i,\n)" \
             %(self.params['name'], self.params['trialList'], self.params['nReps']))
     def generateLoopStartCode(self,buff):
@@ -113,6 +114,15 @@ class TrialHandler():
         thisName = ("this"+self.params['name'].capitalize()[:-1])
         buff.writeIndented("\n")
         buff.writeIndented("for %s in %s:\n" %(thisName, self.params['name']))
+=======
+        buff.write("init loop '%s' (%s)\n" %(self.params['name'], self.params['loopType']))
+        buff.write("%s=data.TrialHandler(trialList=%s,nReps=%i,\n)" \
+            %(self.params['name'], self.params['trialList'], self.params['nReps']))
+    def generateRunCode(self,buff, indent):
+        #work out a name for e.g. thisTrial in trials:
+        thisName = ("this"+self.params['name'].capitalize()[:-1])
+        buff.write("for %s in %s:\n" %(thisName, self.params['name']))
+>>>>>>> _:psychopy/app/builder/experiment.py
     def getType(self):
         return 'LoopHandler'     
 class StairHandler():    
@@ -140,14 +150,23 @@ class StairHandler():
         self.allowed={}
         self.allowed['step types']=['linear','log','db']
     def generateInitCode(self,buff):
+<<<<<<< HEAD:psychopy/app/builder/experiment.py
         buff.writeIndented("init loop '%s' (%s)\n" %(self.params['name'], self.loopType))
         buff.writeIndented("%s=data.StairHandler(nReps=%i,\n)" \
+=======
+        buff.write("init loop '%s' (%s)\n" %(self.params['name'], self.loopType))
+        buff.write("%s=data.StairHandler(nReps=%i,\n)" \
+>>>>>>> _:psychopy/app/builder/experiment.py
             %(self.name, self.nReps))
     def generateLoopStartCode(self,buff):
         #work out a name for e.g. thisTrial in trials:
         thisName = ("this"+self.params['name'].capitalize()[:-1])
+<<<<<<< HEAD:psychopy/app/builder/experiment.py
         buff.writeIndented("for %s in %s:\n" %(thisName, self.params['name']))
         
+=======
+        buff.write("for %s in %s:\n" %(thisName, self.params['name']))
+>>>>>>> _:psychopy/app/builder/experiment.py
     def getType(self):
         return 'StairHandler'   
 class LoopInitiator:
@@ -169,10 +188,16 @@ class LoopTerminator:
         self.loop=loop
     def generateInitCode(self,buff):
         pass
+<<<<<<< HEAD:psychopy/app/builder/experiment.py
     def generateMainCode(self,buff):
         buff.setIndentLevel(-1, relative=True)
         buff.writeIndented("# end of '%s' after %i repeats (of each entry in trialList)\n" %(self.loop.params['name'], self.loop.params['nReps']))
         
+=======
+    def generateRunCode(self,buff, indent):
+        #todo: dedent
+        buff.write("# end of '%s' after %i repeats (of each entry in trialList)\n" %(self.loop.params['name'], self.loop.params['nReps']))
+>>>>>>> _:psychopy/app/builder/experiment.py
     def getType(self):
         return 'LoopTerminator'
 class Flow(list):
