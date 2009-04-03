@@ -1,5 +1,29 @@
 import StringIO, sys
 
+class IndentingBuffer(StringIO.StringIO):
+    def __init__(self, *args, **kwargs):
+        StringIO.StringIO.__init__(self, *args, **kwargs)
+        self.oneIndent="    "
+        self.indentLevel=0
+    def writeIndented(self,text):
+        """Write to the StringIO buffer, but add the current indent.
+        Use write() if you don't want the indent.
+        
+        To test if the prev character was a newline use::
+            self.getvalue()[-1]=='\n'
+            
+        """
+        self.write(self.oneIndent*self.indentLevel + text)
+    def setIndentLevel(self, newLevel, relative=False):
+        """Change the indent level for the buffer to a new value.
+        
+        Set relative to True if you want to increment or decrement the current value.
+        """
+        if relative:
+            self.indentLevel+=newLevel
+        else:
+            self.indentLevel=newLevel
+        
 class Experiment:
     """
     An experiment contains a single Flow and at least one
@@ -26,9 +50,10 @@ class Experiment:
     def generateScript(self):
         """Generate a PsychoPy script for the experiment
         """
-        s=StringIO.StringIO(u'') #a string buffer object
-        s.write("""#This experiment was created using PsychoPy Experiment Builde) and will
-        run on any platform on which PsychoPy (www.psychopy.org) can be installed\n\n""")
+        s=IndentingBuffer(u'') #a string buffer object
+        s.writeIndented('"""This experiment was created using PsychoPy2 (Experiment Builder) and will\n \
+run on any platform on which PsychoPy (www.psychopy.org) can be installed\n \
+\nIf you publish work using this script please cite the relevant papers (e.g. Peirce, 2007;2009)"""\n\n')
         
         #delegate most of the code-writing to Flow
         self.flow.generateCode(s)
@@ -42,13 +67,13 @@ class Experiment:
             names.append(thisRoutine.name)
             for thisEntry in thisRoutine: 
                 if isinstance(thisEntry, LoopInitiator):
-                    names.append( thisEntry.loop.params['name'])
+                    names.append( thisEntry.loop.name )
                     print 'found loop initiator: %s' %names[-1]
                 elif hasattr(thisEntry, 'params'):
                     names.append(thisEntry.params['name'])
                     print 'found component: %s' %names[-1]
                     
-class TrialHandler(list):    
+class TrialHandler():    
     """A looping experimental control object
             (e.g. generating a psychopy TrialHandler or StairHandler).
             """
@@ -66,7 +91,6 @@ class TrialHandler(list):
         @param trialListFile: filename of the .csv file that contains trialList info
         @type trialList: string (filename)
         """
-        list.__init__(self)
         self.type='TrialHandler'
         self.params={}
         self.params['loopType']=loopType
@@ -82,17 +106,16 @@ class TrialHandler(list):
         self.hints['trialListFile']='A comma-separated-value (.csv) file specifying the parameters for each trial'
         self.allowed={}
     def generateInitCode(self,buff):
-        buff.write("init loop '%s' (%s)\n" %(self.params['name'], self.params['loopType']))
-        buff.write("%s=data.TrialHandler(trialList=%s,nReps=%i,\n)" \
+        buff.writeIndented("%s=data.TrialHandler(trialList=%s,nReps=%i,\n)" \
             %(self.params['name'], self.params['trialList'], self.params['nReps']))
-    def generateRunCode(self,buff, indent):
+    def generateLoopStartCode(self,buff):
         #work out a name for e.g. thisTrial in trials:
-        print 'name', self.params['name'].capitalize()
         thisName = ("this"+self.params['name'].capitalize()[:-1])
-        buff.write("for %s in %s:\n" %(thisName, self.params['name']))
+        buff.writeIndented("\n")
+        buff.writeIndented("for %s in %s:\n" %(thisName, self.params['name']))
     def getType(self):
         return 'LoopHandler'     
-class StairHandler(list):    
+class StairHandler():    
     """A staircase experimental control object.
     """
     def __init__(self, name, nReps, nReversals, stepSizes, stepType):
@@ -102,7 +125,6 @@ class StairHandler(list):
         @param nReps: number of reps (for all trial types)
         @type nReps:int
         """
-        list.__init__(self)
         self.params={}
         self.params['name'] = name
         self.params['nReps']=nReps
@@ -118,13 +140,14 @@ class StairHandler(list):
         self.allowed={}
         self.allowed['step types']=['linear','log','db']
     def generateInitCode(self,buff):
-        buff.write("init loop '%s' (%s)\n" %(self.params['name'], self.params['loopType']))
-        buff.write("%s=data.StairHandler(nReps=%i,\n)" \
-            %(self.params['name'], self.params['nReps']))
-    def generateRunCode(self,buff, indent):
+        buff.writeIndented("init loop '%s' (%s)\n" %(self.params['name'], self.loopType))
+        buff.writeIndented("%s=data.StairHandler(nReps=%i,\n)" \
+            %(self.name, self.nReps))
+    def generateLoopStartCode(self,buff):
         #work out a name for e.g. thisTrial in trials:
         thisName = ("this"+self.params['name'].capitalize()[:-1])
-        buff.write("for %s in %s:\n" %(thisName, self.params['name']))
+        buff.writeIndented("for %s in %s:\n" %(thisName, self.params['name']))
+        
     def getType(self):
         return 'StairHandler'   
 class LoopInitiator:
@@ -134,8 +157,9 @@ class LoopInitiator:
         self.loop=loop        
     def generateInitCode(self,buff):
         self.loop.generateInitCode(buff)
-    def generateRunCode(self,buff, indent):
-        self.loop.generateRunCode(buff, indent)
+    def generateMainCode(self,buff):
+        self.loop.generateLoopStartCode(buff)
+        buff.setIndentLevel(1, relative=True)#we started a loop so increment indent        
     def getType(self):
         return 'LoopInitiator'
 class LoopTerminator:
@@ -145,9 +169,10 @@ class LoopTerminator:
         self.loop=loop
     def generateInitCode(self,buff):
         pass
-    def generateRunCode(self,buff, indent):
-        #todo: dedent
-        buff.write("# end of '%s' after %i repeats (of each entry in trialList)\n" %(self.loop.params['name'], self.loop.params['nReps']))
+    def generateMainCode(self,buff):
+        buff.setIndentLevel(-1, relative=True)
+        buff.writeIndented("# end of '%s' after %i repeats (of each entry in trialList)\n" %(self.loop.params['name'], self.loop.params['nReps']))
+        
     def getType(self):
         return 'LoopTerminator'
 class Flow(list):
@@ -164,26 +189,16 @@ class Flow(list):
         self.insert(int(pos), newRoutine)
         
     def generateCode(self, s):
-        s.write("from PsychoPy import visual, core, event, sound\n")
-        s.write("win = visual.Window([400,400])\n")
+        s.writeIndented("from PsychoPy import visual, core, event, sound\n")
+        s.writeIndented("win = visual.Window([400,400])\n")
         
         #initialise components
         for entry in self:
             entry.generateInitCode(s)
         
-        #run-time code       
-        indentLevel = 0  
+        #run-time code  
         for entry in self:
-            #tell the component to write its code at given level
-            if indentLevel==0:indent=""
-            else: indent="    "*indentLevel#insert 4 spaces for each level
-
-            entry.generateRunCode(s, indent)
-            #if component was part of a loop then update level
-            if isinstance(entry, LoopInitiator):
-                indentLevel+=1
-            if isinstance(entry, LoopTerminator):
-                indentLevel-=1
+            entry.generateMainCode(s)
         
 class Routine(list):
     """
@@ -199,12 +214,36 @@ class Routine(list):
         self.name=name
         list.__init__(self)
     def generateInitCode(self,buff):
-        buff.write('\n#Initialise components for %s routine\n' %self.name)
+        buff.writeIndented('\n')
+        buff.writeIndented('#Initialise components for %s routine\n' %self.name)
         for thisEvt in self:
             thisEvt.generateInitCode(buff)
-    def generateRunCode(self,buff,indent):
+        
+    def generateMainCode(self,buff):
+        """This defines the code for the frames of a single routine
+        """
+        clockName=self.name+"Clock"
+        #create the frame loop for this routine
+        buff.writeIndented('%s=core.Clock()\n' %(clockName))
+        buff.writeIndented('t=0\n')
+        buff.writeIndented('while t<maxTime:\n')
+        buff.setIndentLevel(1,True)
+        
+        #on each frame
+        buff.writeIndented('#get current time\n')
+        buff.writeIndented('t=%s.getTime()\n\n' %clockName)
+        
+        #write the code for each component during frame
         for event in self:
-            event.generateRunCode(buff, indent)
+            event.generateFrameCode(buff)
+            
+        #update screen
+        buff.writeIndented('\n')
+        buff.writeIndented('#refresh the screen\n')
+        buff.writeIndented('win.flip()\n')
+        
+        #that's done decrement indent to end loop
+        buff.setIndentLevel(-1,True)
     def getType(self):
         return 'Routine'
     def getComponentFromName(self, name):
@@ -212,6 +251,7 @@ class Routine(list):
             if comp.params['name']==name:
                 return comp
         return None
+    
 class BaseComponent:
     """A general template for components"""
     def __init__(self, name='', times=[0,1]):
@@ -222,10 +262,41 @@ class BaseComponent:
         self.allowed={}
     def generateInitCode(self,buff):
         pass
-    def generateRunCode(self,buff, indent):
-        pass  
+    def generateRoutineCode(self,buff):
+        """Generate the code that will be called at the beginning of 
+        a routine (e.g. to update stimulus parameters)
+        """
+        pass
+    def generateFrameCode(self,buff):
+        """Generate the code that will be called every frame
+        """
+        pass
+    def generateTimeTestCode(self, buff):
+        """Generate the code for each frame that tests whether the component is being
+        drawn/used.
+        """
+        times=self.params['times']
+        if type(times[0]) in [int, float]:
+            times=[times]#make a list of lists
         
-class TextComponent(BaseComponent):
+        #write the code for the first repeat of the stimulus
+        buff.writeIndented("if (%.f <= t < %.f)" %(times[0][0], times[0][1]))
+        if len(times)>1:
+            for epoch in times[1:]: 
+                buff.write("\n")
+                buff.writeIndented("    or (%.f <= t < %.f)" %(epoch[0], epoch[1]))
+        buff.write(':\n')#the condition is done add the : and new line to finish        
+        
+class VisualComponent(BaseComponent):
+    """Base class for most visual stimuli
+    """
+    def generateFrameCode(self,buff):
+        """Generate the code that will be called every frame
+        """    
+        self.generateTimeTestCode(buff)#writes an if statement to determine whether to draw etc
+        buff.writeIndented("    %s.draw()\n" %(self.params['name']))
+        
+class TextComponent(VisualComponent):
     """An event class for presenting image-based stimuli"""
     def __init__(self, name='', text='', font='arial', 
         pos=[0,0], size=[0,0], ori=0, times=[0,1]):
@@ -257,13 +328,16 @@ class TextComponent(BaseComponent):
         
     def generateInitCode(self,buff):
         s = "%s=TextStim(win=win, pos=%s, size=%s" %(self.params['name'], self.params['pos'],self.params['size'])
-        buff.write(s)   
+        buff.writeIndented(s)   
         
-        buff.write(")\n")
-    def generateRunCode(self,buff, indent):
-        buff.write("%sdrawing TextStim '%s'\n" %(indent, self.params['name']))
+        buff.writeIndented(")\n")
+    def generateRoutineCode(self,buff):
+        """Generate the code that will be called at the beginning of 
+        a routine (e.g. to update stimulus parameters)
+        """
+        pass
         
-class PatchComponent(BaseComponent):
+class PatchComponent(VisualComponent):
     """An event class for presenting image-based stimuli"""
     def __init__(self, name='', image='sin', mask='none', pos=[0,0], 
             sf=1, size=1, ori=0, times=[0,1]):
@@ -297,12 +371,11 @@ class PatchComponent(BaseComponent):
         
     def generateInitCode(self,buff):
         s = "%s=PatchStim(win=win, pos=%s, size=%s" %(self.params['name'], self.params['pos'],self.params['size'])
-        buff.write(s)   
+        buff.writeIndented(s)   
         
-        buff.write(")\n")
-    def generateRunCode(self,buff, indent):
-        buff.write("%sdrawing PatchStim '%s'\n" %(indent, self.params['name']))
-class MovieComponent(BaseComponent):
+        buff.writeIndented(")\n")
+
+class MovieComponent(VisualComponent):
     """An event class for presenting image-based stimuli"""
     def __init__(self, name='', movie='', pos=[0,0], 
             size=1, ori=0, times=[0,1]):
@@ -329,11 +402,10 @@ class MovieComponent(BaseComponent):
         self.allowed['units']=['window','deg','pix','cm'] 
     def generateInitCode(self,buff):
         s = "%s=MovieStim(win=win, pos=%s, movie=%s, size=%s" %(self.params['name'], self.params['movie'],self.params['pos'],self.params['size'])
-        buff.write(s)   
+        buff.writeIndented(s)   
         
-        buff.write(")\n")
-    def generateRunCode(self,buff, indent):
-        buff.write("%sdrawing MovieStim '%s'\n" %(indent, self.params['name']))
+        buff.writeIndented(")\n")
+
 class SoundComponent(BaseComponent):
     """An event class for presenting image-based stimuli"""
     def __init__(self, name='', sound='', 
@@ -354,11 +426,19 @@ class SoundComponent(BaseComponent):
         self.allowed={}
     def generateInitCode(self,buff):
         s = "%s=Sound(%s, secs=%s" %(self.params['name'], self.params['sound'],self.params['times'][1]-self.params['times'][0])
-        buff.write(s)   
+        buff.writeIndented(s)   
         
-        buff.write(")\n")
-    def generateRunCode(self,buff, indent):
-        buff.write("%splaying Sound '%s'\n" %(indent, self.params['name']))        
+        buff.writeIndented(")\n")
+    def generateRoutineCode(self,buff):
+        """Generate the code that will be called at the beginning of 
+        a routine (e.g. to update stimulus parameters)
+        """
+        pass
+    def generateFrameCode(self,buff):
+        """Generate the code that will be called every frame
+        """
+        buff.writeIndented("playing Sound '%s'\n" %(self.params['name'])) 
+            
 class KeyboardComponent(BaseComponent):
     """An event class for checking the keyboard at given times"""
     def __init__(self, name='', allowedKeys='q,left,right',times=[0,1]):
@@ -377,8 +457,11 @@ class KeyboardComponent(BaseComponent):
         self.allowed={}
     def generateInitCode(self,buff):
         pass#no need to initialise keyboards?
-    def generateRunCode(self,buff,indent):
-        buff.write("%sChecking keys" %indent)
+    def generateFrameCode(self,buff):
+        """Generate the code that will be called every frame
+        """
+        buff.writeIndented("Checking keys")
+        
 
 class MouseComponent(BaseComponent):
     """An event class for checking the mouse location and buttons at given times"""
@@ -395,6 +478,9 @@ class MouseComponent(BaseComponent):
         self.allowed={}
     def generateInitCode(self,buff):
         pass#no need to initialise?
-    def generateRunCode(self,buff,indent):
-        buff.write("%sChecking keys" %indent)
+    def generateFrameCode(self,buff):
+        """Generate the code that will be called every frame
+        """
+        buff.writeIndented("Checking keys")
+        
                 
