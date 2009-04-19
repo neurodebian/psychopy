@@ -77,11 +77,11 @@ TB_STOP = 110
 
 global hitradius
 hitradius=5
-class FlowPanel(scrolled.ScrolledPanel):
+class FlowPanel(wx.ScrolledWindow):
     def __init__(self, frame, id=-1,size = (600,100)):
         """A panel that shows how the routines will fit together
         """
-        scrolled.ScrolledPanel.__init__(self, frame, id, (0, 0), size=size)
+        wx.ScrolledWindow.__init__(self, frame, id, (0, 0), size=size)
         self.panel = wx.Panel(self,-1,size=(600,200))
         self.frame=frame   
         self.needUpdate=True
@@ -93,14 +93,26 @@ class FlowPanel(scrolled.ScrolledPanel):
         self.drawNearestLoopPoint = False
         self.pointsToDraw=[] #lists the x-vals of points to draw, eg loop locations
         
+        # create a PseudoDC to record our drawing
+        self.pdc = wx.PseudoDC()
+        self.pen_cache = {}
+        self.brush_cache = {}
+        # vars for handling mouse clicks
+        self.dragid = -1
+        self.lastpos = (0,0)
+        self.loopFromID={}#use the ID of the drawn icon to retrieve loop object
+        
         self.btnSizer = wx.BoxSizer(wx.VERTICAL)
         self.btnInsertRoutine = wx.Button(self,-1,'Insert Routine')   
         self.btnInsertLoop = wx.Button(self,-1,'Insert Loop')    
         
+        self.redrawFlow()
+        
         #bind events     
+        self.panel.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouse)
         self.Bind(wx.EVT_BUTTON, self.onInsertRoutine,self.btnInsertRoutine) 
         self.Bind(wx.EVT_BUTTON, self.onInsertLoop,self.btnInsertLoop) 
-        self.Bind(wx.EVT_PAINT, self.onPaint)
+        self.Bind(wx.EVT_PAINT, self.OnPaint)
         
         #self.SetAutoLayout(True)
         self.SetVirtualSize((self.maxWidth, self.maxHeight))
@@ -110,6 +122,19 @@ class FlowPanel(scrolled.ScrolledPanel):
         self.btnSizer.Add(self.btnInsertLoop) 
         self.SetSizer(self.btnSizer)
         
+    def ConvertEventCoords(self, event):
+        xView, yView = self.GetViewStart()
+        xDelta, yDelta = self.GetScrollPixelsPerUnit()
+        return (event.GetX() + (xView * xDelta),
+            event.GetY() + (yView * yDelta))
+
+    def OffsetRect(self, r):
+        """Offset the rectangle, r, to appear in the given position in the window
+        """
+        xView, yView = self.GetViewStart()
+        xDelta, yDelta = self.GetScrollPixelsPerUnit()
+        r.OffsetXY(-(xView*xDelta),-(yView*yDelta))
+
     def onInsertRoutine(self, evt):
         """Someone pushed the insert routine button.
         Fetch the dialog
@@ -117,7 +142,7 @@ class FlowPanel(scrolled.ScrolledPanel):
         
         #add routine points to the timeline
         self.setDrawPoints('routines')
-        self.Refresh()
+        self.redrawFlow()
         
         #bring up listbox to choose the routine to add and/or create a new one
         addRoutineDlg = DlgAddRoutineToFlow(frame=self.frame, 
@@ -130,7 +155,7 @@ class FlowPanel(scrolled.ScrolledPanel):
             
         #remove the points from the timeline
         self.setDrawPoints(None)
-        self.Refresh()
+        self.redrawFlow()
     def onRemRoutine(self,evt=None,routineName=None):
         #todo: implement removal of routines from flow
         print 'removal of routines form flow not yet implemented'
@@ -141,7 +166,7 @@ class FlowPanel(scrolled.ScrolledPanel):
         
         #add routine points to the timeline
         self.setDrawPoints('loops')
-        self.Refresh()
+        self.redrawFlow()
         
         #bring up listbox to choose the routine to add and/or create a new one
         loopDlg = DlgLoopProperties(frame=self.frame)
@@ -151,67 +176,151 @@ class FlowPanel(scrolled.ScrolledPanel):
                 handler= loopDlg.stairHandler
             else:
                 handler=loopDlg.trialHandler
+            handler.params=params
             self.frame.exp.flow.addLoop(handler, startPos=loopDlg.params['endPoints'][0], endPos=loopDlg.params['endPoints'][1])
-            #remove the points from the timeline
-            self.setDrawPoints(None)
-            self.Refresh()
             self.frame.setIsModified(True)
+        #remove the points from the timeline
+        self.setDrawPoints(None)
+        self.redrawFlow()
+    
+    def editLoopProperties(self, event=None, loop=None):
+        if event:#we got here from a wx.button press (rather than our own drawn icons)
+            loopName=event.EventObject.GetName()
+            loop=self.routine.getLoopFromName(loopName)
+        
+        #add routine points to the timeline
+        self.setDrawPoints('loops')
+        self.redrawFlow()
+        
+        loopDlg = DlgLoopProperties(frame=self.frame,
+            title=loop.params['name']+' Properties', loop=loop)
+        if loopDlg.OK:
+            params = loopDlg.params
+            if params['loopType']=='staircase': #['random','sequential','staircase']
+                handler= loopDlg.stairHandler
+            else:
+                handler=loopDlg.trialHandler
+            loop.params=params
+            self.frame.setIsModified(True)
+        #remove the points from the timeline
+        self.setDrawPoints(None)
+        self.redrawFlow()
     def onRemLoop(self, event=None):
         #todo: implement the removal of loops
         print 'removing loops not implemented yet'
-        
-    def onPaint(self, evt=None):
-        """This should not be called. Use FlowPanel.Refresh()
-        """            
+    
+    def OnMouse(self, event):
+        global hitradius
+        if event.LeftDown():
+            x,y = self.ConvertEventCoords(event)
+            #l = self.pdc.FindObjectsByBBox(x, y)
+            icons = self.pdc.FindObjects(x, y, hitradius)
+            if len(icons): 
+                self.editLoopProperties(loop=self.loopFromID[icons[0]])
+        elif event.RightDown():
+            x,y = self.ConvertEventCoords(event)
+            #l = self.pdc.FindObjectsByBBox(x, y)
+            l = self.pdc.FindObjects(x, y, hitradius)
+            if l:
+                self.pdc.SetIdGreyedOut(l[0], not self.pdc.GetIdGreyedOut(l[0]))
+                r = self.pdc.GetIdBounds(l[0])
+                r.Inflate(4,4)
+                self.OffsetRect(r)
+                self.RefreshRect(r, False)
+        elif event.Dragging() or event.LeftUp():
+            if self.dragid != -1:
+                x,y = self.lastpos
+                dx = event.GetX() - x
+                dy = event.GetY() - y
+                r = self.pdc.GetIdBounds(self.dragid)
+                self.pdc.TranslateId(self.dragid, dx, dy)
+                r2 = self.pdc.GetIdBounds(self.dragid)
+                r = r.Union(r2)
+                r.Inflate(4,4)
+                self.OffsetRect(r)
+                self.RefreshRect(r, False)
+                self.lastpos = (event.GetX(),event.GetY())
+            if event.LeftUp():
+                self.dragid = -1
+            
+    
+    def OnPaint(self, event):
+        # Create a buffered paint DC.  It will create the real
+        # wx.PaintDC and then blit the bitmap to it when dc is
+        # deleted.  
+        dc = wx.BufferedPaintDC(self)
+        # use PrepateDC to set position correctly
+        self.PrepareDC(dc)
+        # we need to clear the dc BEFORE calling PrepareDC
+        bg = wx.Brush(self.GetBackgroundColour())
+        dc.SetBackground(bg)
+        dc.Clear()
+        # create a clipping rect from our position and size
+        # and the Update Region
+        xv, yv = self.GetViewStart()
+        dx, dy = self.GetScrollPixelsPerUnit()
+        x, y   = (xv * dx, yv * dy)
+        rgn = self.GetUpdateRegion()
+        rgn.Offset(x,y)
+        r = rgn.GetBox()
+        # draw to the dc using the calculated clipping rect
+        self.pdc.DrawToDCClipped(dc,r)
+
+    def redrawFlow(self, evt=None):
         expFlow = self.frame.exp.flow #retrieve the current flow from the experiment
+        pdc=self.pdc
         
-        #must create a fresh drawing context each frame (not store one)
-        pdc = wx.PaintDC(self)
-        try: dc = wx.GCDC(pdc)
-        except: dc = pdc
+        pdc.Clear()#clear the screen
+        pdc.RemoveAll()#clear all objects (icon buttons)
+        pdc.BeginDrawing()
         
-        font = dc.GetFont()
+        font = self.GetFont()
         
         #draw the main time line
-        linePos = 80
-        dc.DrawLine(x1=100,y1=linePos,x2=500,y2=linePos)
+        linePos = 120
+        pdc.DrawLine(x1=100,y1=linePos,x2=500,y2=linePos)
         
         #step through components in flow
         currX=120; gap=40
-        self.loopInits = []
+        self.loopInits = []#these will be entry indices
         self.loopTerms = []
+        self.loops=[]#these will be copies of the actual loop obects
         self.gapMidPoints=[currX-gap/2]
         for entry in expFlow:
             if entry.getType()=='LoopInitiator':                
                 self.loopInits.append(currX)
             if entry.getType()=='LoopTerminator':
-                self.drawLoopAttach(dc,pos=[currX,linePos])
+                self.loops.append(entry.loop)
                 self.loopTerms.append(currX)
             if entry.getType()=='Routine':
-                currX = self.drawFlowBox(dc,entry.name, pos=[currX,linePos-40])
+                currX = self.drawFlowBox(pdc,entry.name, pos=[currX,linePos-40])
             self.gapMidPoints.append(currX+gap/2)
             currX+=gap
             
         #draw the loops second    
-        self.loopTerms.reverse()#reverse the terminators, so that last term goes with first init   
-        for n in range(len(self.loopInits)):
-            self.drawFlowLoop(dc,'Flow1',startX=self.loopInits[n],
-                        endX=self.loopTerms[n],base=linePos,height=20)
-            self.drawLoopAttach(dc,pos=[self.loopInits[n],linePos])
-            self.drawLoopAttach(dc,pos=[self.loopTerms[n],linePos])
+        self.loopInits.reverse()#start with last initiator (paired with first terminator)   
+        for n, loopInit in enumerate(self.loopInits):
+            name = self.loops[n].params['name']#name of the trialHandler/StairHandler
+            self.drawLoop(pdc,name,self.loops[n], 
+                        startX=self.loopInits[n], endX=self.loopTerms[n],
+                        base=linePos,height=linePos-60-n*15)
+            self.drawLoopStart(pdc,pos=[self.loopInits[n],linePos])
+            self.drawLoopEnd(pdc,pos=[self.loopTerms[n],linePos])
         
         #draw all possible locations for routines 
         for n, xPos in enumerate(self.pointsToDraw):
-            font.SetPointSize(8)
-            dc.SetFont(font)
-            w,h = dc.GetFullTextExtent(str(len(self.pointsToDraw)))[0:2]
-            dc.SetPen(wx.Pen(wx.Colour(0,0,0, 255)))
-            dc.SetBrush(wx.Brush(wx.Colour(0,0,0,255)))
-            dc.DrawCircle(xPos,linePos, w+2)
-            dc.SetPen(wx.Pen(wx.Colour(255,255,255,255)))
-            dc.DrawText(str(n), xPos-w/2, linePos-h/2)
+            font.SetPointSize(10)
+            self.SetFont(font); pdc.SetFont(font)
+            w,h = self.GetFullTextExtent(str(len(self.pointsToDraw)))[0:2]
+            pdc.SetPen(wx.Pen(wx.Colour(0,0,0, 255)))
+            pdc.SetBrush(wx.Brush(wx.Colour(0,0,0,255)))
+            pdc.DrawCircle(xPos,linePos, w+2)
+            pdc.SetTextForeground([255,255,255])   
+            pdc.DrawText(str(n), xPos-w/2, linePos-h/2)
                 
-        self.needUpdate=False
+        pdc.EndDrawing()
+        self.Refresh()#refresh the visible window after drawing (using OnPaint)
+            
     def setDrawPoints(self, ptType, startPoint=None):
         """Set the points of 'routines', 'loops', or None
         """
@@ -221,19 +330,26 @@ class FlowPanel(scrolled.ScrolledPanel):
             self.pointsToDraw=self.gapMidPoints
         else:
             self.pointsToDraw=[]
-    def drawLoopAttach(self, dc, pos):
+    def drawLoopEnd(self, dc, pos):
         #draws a spot that a loop will later attach to
-        dc.SetBrush(wx.Brush(wx.Colour(100,100,100, 250)))
+        dc.SetBrush(wx.Brush(wx.Colour(0,0,0, 250)))
         dc.SetPen(wx.Pen(wx.Colour(0,0,0, 255)))
-        dc.DrawCirclePoint(pos,3)
+        dc.DrawPolygon([[5,5],[0,0],[-5,5]], pos[0],pos[1]-5)#points up
+#        dc.DrawPolygon([[5,0],[0,5],[-5,0]], pos[0],pos[1]-5)#points down
+    def drawLoopStart(self, dc, pos):
+        #draws a spot that a loop will later attach to
+        dc.SetBrush(wx.Brush(wx.Colour(0,0,0, 250)))
+        dc.SetPen(wx.Pen(wx.Colour(0,0,0, 255)))
+#        dc.DrawPolygon([[5,5],[0,0],[-5,5]], pos[0],pos[1]-5)
+        dc.DrawPolygon([[5,0],[0,5],[-5,0]], pos[0],pos[1]-5)
     def drawFlowBox(self,dc, name,rgb=[200,50,50],pos=[0,0]):
-        font = dc.GetFont()
+        font = self.GetFont()
         font.SetPointSize(24)
         r, g, b = rgb
-
+        
         #get size based on text
-        dc.SetFont(font)
-        w,h = dc.GetFullTextExtent(name)[0:2]
+        self.SetFont(font); dc.SetFont(font)
+        w,h = self.GetFullTextExtent(name)[0:2]
         pad = 20
         #draw box
         rect = wx.Rect(pos[0], pos[1], w+pad,h+pad) 
@@ -249,13 +365,54 @@ class FlowPanel(scrolled.ScrolledPanel):
         dc.SetTextForeground(rgb) 
         dc.DrawText(name, pos[0]+pad/2, pos[1]+pad/2)
         return endX
-    def drawFlowLoop(self,dc,name,startX,endX,base,height,rgb=[200,50,50]):
+    def drawLoop(self,dc,name,loop,
+            startX,endX,
+            base,height,rgb=[0,0,0]):
         xx = [endX,  endX,   endX,   endX-5, endX-10, startX+10,startX+5, startX, startX, startX]
         yy = [base,height+10,height+5,height, height, height,  height,  height+5, height+10, base]
         pts=[]
+        r,g,b=rgb
+        pad=3
+        dc.SetPen(wx.Pen(wx.Colour(r, g, b, 200)))
         for n in range(len(xx)):
             pts.append([xx[n],yy[n]])
         dc.DrawSpline(pts)
+        
+        #add a name label that can be clicked on
+        font = self.GetFont()
+        font.SetPointSize(12)
+        self.SetFont(font); dc.SetFont(font)
+        #get size based on text
+        w,h = self.GetFullTextExtent(name)[0:2] 
+        x = startX+(endX-startX)/2-w/2
+        y = height-h/2 
+        
+        #draw box
+        rect = wx.Rect(x-pad, y-pad, w+pad*2,h+pad*2) 
+        #the edge should match the text
+        dc.SetPen(wx.Pen(wx.Colour(r, g, b, 100)))
+        #for the fill, draw once in white near-opaque, then in transp colour
+        dc.SetBrush(wx.Brush(wx.Colour(255,255,255, 250)))
+        dc.DrawRoundedRectangleRect(rect, 8)   
+        dc.SetBrush(wx.Brush(wx.Colour(r,g,b,20)))
+        dc.DrawRoundedRectangleRect(rect, 8)
+        #draw text
+        dc.SetTextForeground([r,g,b]) 
+        dc.DrawText(name, x, y)
+        
+        ##set an id for the region where the bitmap falls (so it can act as a button)
+        #see if we created this already
+        id=None
+        for key in self.loopFromID.keys():
+            if self.loopFromID[key]==loop: 
+                id=key
+        if not id: #then create one and add to the dict
+            id = wx.NewId()
+            self.loopFromID[id]=loop
+        dc.SetId(id)
+        #set the area for this component
+        dc.SetIdBounds(id,rect)
+        
 class DlgAddRoutineToFlow(wx.Dialog):
     def __init__(self, frame, possPoints, id=-1, title='Add a routine to the flow',
             pos=wx.DefaultPosition, size=wx.DefaultSize,
@@ -567,7 +724,7 @@ class RoutinesNotebook(wx.aui.AuiNotebook):
             junk=self.frame.exp.routines.pop(routine.name)
         if routine in self.frame.exp.flow:
             self.frame.exp.flow.remove(routine)
-            self.frame.flowPanel.Refresh()
+            self.frame.flowPanel.redrawFlow()
         self.frame.setIsModified(True)
 class ComponentsPanel(scrolled.ScrolledPanel):
     def __init__(self, frame, id=-1):
@@ -606,7 +763,7 @@ class ComponentsPanel(scrolled.ScrolledPanel):
             currRoutine = self.frame.routinePanel.getCurrentRoutine()
             currRoutine.append(newComp)#add to the actual routing
             currRoutinePage.redrawRoutine()#update the routine's view with the new component too
-            currRoutinePage.Refresh()
+#            currRoutinePage.Refresh()#done at the end of redrawRoutine
             self.frame.setIsModified(True)
 class _BaseParamsDlg(wx.Dialog):   
     def __init__(self,frame,title,params,hints,fixed=[],allowed={},
@@ -744,9 +901,11 @@ class DlgLoopProperties(_BaseParamsDlg):
             style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
         style=style|wx.RESIZE_BORDER
         #if the loop is being created there should be no parameters
-        if hasattr(loop,'params'):
-            paramsInit=loop.params
-        else:paramsInit={}
+        if hasattr(loop,'type') and loop.type in ['TrialHandler','StairHandler']:
+            paramsInit=loop.params; hintsInit=loop.hints
+        else:
+            print type(loop)
+            paramsInit={'name':''}; hintsInit={'name':'e.g. trials, epochs, trialLoop'}
             
         _BaseParamsDlg.__init__(self, frame,title,
                     params={},hints={})
@@ -755,11 +914,18 @@ class DlgLoopProperties(_BaseParamsDlg):
         self.sizer = wx.BoxSizer(wx.VERTICAL)#needs to be done before any addField calls
         
         self.maxFieldLength = 10 #max( len(str(self.params[x])) for x in keys )
-        self.nameField, label = self.addField('name','',[],hint="Every object (including loops) needs a unique name")
+        self.nameField, label = self.addField(label='name',initial=paramsInit['name'],
+                    allowed=[],hint=hintsInit['name'])
         
         #create instances of the two loop types
-        self.trialHandler=experiment.TrialHandler(name='',loopType='random',nReps=5,trialList=[]) #for 'random','sequential'
-        self.stairHandler=experiment.StairHandler(name='', 
+        if hasattr(loop,'type') and loop.type=='TrialHandler':
+            self.trialHandler = loop
+        else:
+            self.trialHandler=experiment.TrialHandler(name=paramsInit['name'],loopType='random',nReps=5,trialList=[]) #for 'random','sequential'
+        if hasattr(loop,'type') and loop.type=='StairHandler':
+            self.trialHandler = loop
+        else:
+            self.stairHandler=experiment.StairHandler(name=paramsInit['name'], 
             nReps=50, nReversals=12,
             stepSizes=[0.8,0.8,0.4,0.4,0.2], stepType='log') #for staircases
         #setup the chooser to set which type we need
@@ -1148,7 +1314,7 @@ class BuilderFrame(wx.Frame):
         self.exp=exp
         self.setIsModified(False)  
         #update the views
-        self.flowPanel.Refresh()
+        self.flowPanel.redrawFlow()
         for thisRoutineName in self.exp.routines.keys():
             routine = self.exp.routines[thisRoutineName]
             self.routinePanel.addRoutinePage(thisRoutineName, routine)

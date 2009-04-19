@@ -8,7 +8,7 @@ from scipy import optimize, special
 def ObjectArray(inputSeq):
     #a wrapper of numpy array(xx,'O') objects
     return numpy.array(inputSeq, 'O')
-
+    
 class TrialHandler:
     """Class to handle smoothly the selection of the next trial
     and report current values etc.

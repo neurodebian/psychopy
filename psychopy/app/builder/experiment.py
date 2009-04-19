@@ -104,6 +104,7 @@ class TrialHandler():
         self.hints['nReps']='Number of repeats (for each type of trial)'
         self.hints['trialList']="A list of dictionaries describing the differences between each trial type"
         self.hints['trialListFile']='A comma-separated-value (.csv) file specifying the parameters for each trial'
+        self.hints['endPoints']='The start and end of the loop (see flow timeline)'
         self.allowed={}
     def generateInitCode(self,buff):
         buff.writeIndented("%s=data.TrialHandler(trialList=%s,nReps=%i,\n)" \
@@ -114,7 +115,7 @@ class TrialHandler():
         buff.writeIndented("\n")
         buff.writeIndented("for %s in %s:\n" %(thisName, self.params['name']))
     def getType(self):
-        return 'LoopHandler'     
+        return 'TrialHandler'     
 class StairHandler():    
     """A staircase experimental control object.
     """
@@ -125,7 +126,9 @@ class StairHandler():
         @param nReps: number of reps (for all trial types)
         @type nReps:int
         """
+        self.type='StairHandler'
         self.params={}
+        self.params['loopType']='staircase'
         self.params['name'] = name
         self.params['nReps']=nReps
         self.params['step sizes']=stepSizes
@@ -137,6 +140,7 @@ class StairHandler():
         self.hints['nReversals']='Minimum number of times the staircase must change direction before ending'
         self.hints['step type']="The units of the step size (e.g. 'linear' will add/subtract that value each step, whereas 'log' will ad that many log units)"
         self.hints['step sizes']="The size of the jump at each step (can change on each 'reversal')"
+        self.hints['endPoints']='The start and end of the loop (see flow timeline)'
         self.allowed={}
         self.allowed['step types']=['linear','log','db']
     def generateInitCode(self,buff):
