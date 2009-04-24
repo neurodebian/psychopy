@@ -171,14 +171,16 @@ class FlowPanel(wx.ScrolledWindow):
         #bring up listbox to choose the routine to add and/or create a new one
         loopDlg = DlgLoopProperties(frame=self.frame)
         if loopDlg.OK:
-            params = loopDlg.params
-            if params['loopType']=='staircase': #['random','sequential','staircase']
+            if loopDlg.params['loopType']=='staircase': #['random','sequential','staircase']
                 handler= loopDlg.stairHandler
             else:
                 handler=loopDlg.trialHandler
-            handler.params=params
+            handler.params=loopDlg.params
             self.frame.exp.flow.addLoop(handler, startPos=loopDlg.params['endPoints'][0], endPos=loopDlg.params['endPoints'][1])
             self.frame.setIsModified(True)
+            print 'final type',handler.type, 
+            print 'final loop params',handler.params
+            print 'final dlg params', loopDlg.params
         #remove the points from the timeline
         self.setDrawPoints(None)
         self.redrawFlow()
@@ -195,12 +197,14 @@ class FlowPanel(wx.ScrolledWindow):
         loopDlg = DlgLoopProperties(frame=self.frame,
             title=loop.params['name']+' Properties', loop=loop)
         if loopDlg.OK:
-            params = loopDlg.params
-            if params['loopType']=='staircase': #['random','sequential','staircase']
-                handler= loopDlg.stairHandler
+            if loopDlg.params['loopType']=='staircase': #['random','sequential','staircase']
+                loop= loopDlg.stairHandler
             else:
-                handler=loopDlg.trialHandler
-            loop.params=params
+                loop=loopDlg.trialHandler
+            print 'final type', loop.type, 
+            print 'final loop params', loop.params
+            print 'final dlg params', loopDlg.params
+            loop.params=loop.params
             self.frame.setIsModified(True)
         #remove the points from the timeline
         self.setDrawPoints(None)
@@ -841,7 +845,8 @@ class _BaseParamsDlg(wx.Dialog):
         (self.inputFields was populated during the __init__ function)
         """
         #get data from input fields
-        self.data={}              
+        self.data={}      
+        print 'getting data from:', self.inputFields.keys()   
         for thisFieldName in self.inputFields.keys():
             thisVal = self.inputFields[thisFieldName].GetValue()
             
@@ -904,7 +909,6 @@ class DlgLoopProperties(_BaseParamsDlg):
         if hasattr(loop,'type') and loop.type in ['TrialHandler','StairHandler']:
             paramsInit=loop.params; hintsInit=loop.hints
         else:
-            print type(loop)
             paramsInit={'name':''}; hintsInit={'name':'e.g. trials, epochs, trialLoop'}
             
         _BaseParamsDlg.__init__(self, frame,title,
@@ -914,30 +918,22 @@ class DlgLoopProperties(_BaseParamsDlg):
         self.sizer = wx.BoxSizer(wx.VERTICAL)#needs to be done before any addField calls
         
         self.maxFieldLength = 10 #max( len(str(self.params[x])) for x in keys )
-        self.nameField, label = self.addField(label='name',initial=paramsInit['name'],
-                    allowed=[],hint=hintsInit['name'])
         
+        self.initLoop=loop
         #create instances of the two loop types
         if hasattr(loop,'type') and loop.type=='TrialHandler':
             self.trialHandler = loop
+            print 'loop', loop.params
         else:
             self.trialHandler=experiment.TrialHandler(name=paramsInit['name'],loopType='random',nReps=5,trialList=[]) #for 'random','sequential'
         if hasattr(loop,'type') and loop.type=='StairHandler':
-            self.trialHandler = loop
+            self.stairHandler = loop
         else:
             self.stairHandler=experiment.StairHandler(name=paramsInit['name'], 
-            nReps=50, nReversals=12,
-            stepSizes=[0.8,0.8,0.4,0.4,0.2], stepType='log') #for staircases
-        #setup the chooser to set which type we need
-        self.loopTypes=['random','sequential','staircase']
-        self.currentType=self.loopTypes[0]
-        self.choiceLoop, label = self.addField(label='loop type',initial=self.currentType, allowed=self.loopTypes,
-            hint='How does the next trial get chosen?')
-        self.endpointField, label2 = self.addField(label='endpoints',initial=[0,1], 
-            hint='Where to loop from and to (see values currently shown in the flow view)')
-        self.Bind(wx.EVT_CHOICE, self.onTypeChanged, self.choiceLoop)
-        
-        #self.makeGlobalCtrls()
+                nReps=50, nReversals=12,
+                stepSizes=[0.8,0.8,0.4,0.4,0.2], stepType='log') #for staircases
+                
+        self.makeGlobalCtrls()
         self.makeStaircaseCtrls()
         self.makeRandAndSeqCtrls()
         self.setCtrls(self.currentType)
@@ -947,7 +943,12 @@ class DlgLoopProperties(_BaseParamsDlg):
         #show dialog and get most of the data
         self.show()
         if self.OK:
+            if self.currentType in ['random','sequential']:
+                self.inputFields.extend(self.randFields)
+            else:
+                self.inputFields.extend(self.stairFields)
             self.getData()#standard data (from self.inputFields)
+            
             #need to get additional data from non-standard fields
             self.params['name']=self.nameField.GetValue()
             exec("self.params['endPoints']= %s" %(self.endpointField.GetValue()))
@@ -956,7 +957,32 @@ class DlgLoopProperties(_BaseParamsDlg):
                 self.params['nReps']= int(self.randFields['nReps'].GetValue())
             else:
                 self.params['nReversals']= int(self.stairFields['nReversals'].GetValue())
-                self.params['nReps']= int(self.stairFields['nReps'].GetValue())                
+                self.params['nReps']= int(self.stairFields['nReps'].GetValue())   
+                             
+    def makeGlobalCtrls(self):
+        self.inputFields={}
+        self.inputFieldLabels={}
+        self.inputFieldTypes={} #setup the chooser to set which type we need
+        
+        for fieldName in ['name','endPoints']:            
+            field, label, fieldType = self.addField(label=fieldName,initial=paramsInit[fieldName],
+                        allowed=[],hint=hintsInit[fieldName])
+            self.inputFields[fieldName]=field
+            self.inputFieldLabels[fieldName]=label
+            self.inputFieldTypes[fieldName]=fieldType
+            
+        self.loopTypes=['random','sequential','staircase']
+        if self.initLoop:
+            self.currentType=self.initLoop.params['loopType']
+            initEnds = self.initLoop.params['endPoints']
+        else: 
+            self.currentType=self.loopTypes[0]
+            initEnds = [0,1]
+        self.choiceLoop, label = self.addField(label='loop type',initial=self.currentType, allowed=self.loopTypes,
+            hint='How does the next trial get chosen?')
+        self.endpointField, label2 = self.addField(label='endPoints',initial=initEnds, 
+            hint='Where to loop from and to (see values currently shown in the flow view)')
+        self.Bind(wx.EVT_CHOICE, self.onTypeChanged, self.choiceLoop)
         
     def makeRandAndSeqCtrls(self):
         #a list of controls for the random/sequential versions
@@ -977,12 +1003,13 @@ class DlgLoopProperties(_BaseParamsDlg):
             keys.insert(-1,'trialList')
         #then step through them    
         for thisFieldName in keys:
-            if thisFieldName in ['name','loopType']: continue
+            if thisFieldName in ['name','loopType','endPoints']: continue
             elif thisFieldName=='trialListFile':                
                 container=wx.BoxSizer(wx.HORIZONTAL)
-                if self.params.has_key('trialListFile'):
-                    initPth=self.params['trialListFile']
-                else: initPth='Need a .csv file'
+                if handler.params.has_key('trialListFile'):
+                    initPth=handler.params['trialListFile']
+                else: 
+                    initPth='Need a .csv file'
                 fieldCtrl = wx.StaticText(self,-1,self.getAbbriev(initPth),
                     style=wx.ALIGN_RIGHT,
                     size=wx.Size(30*self.maxFieldLength,-1))          
@@ -993,7 +1020,11 @@ class DlgLoopProperties(_BaseParamsDlg):
                 container.Add(fieldLabelCtrl)
                 self.sizer.Add(container)
             elif thisFieldName=='trialList':
-                text = """No parameters set  """
+                if handler.params.has_key('trialList'):
+                    text=self.getTrialsSummary(handler.params['trialList'])
+                    print text, type(text)
+                else: 
+                    text = """No parameters set  """
                 size = wx.Size(200, 50)
                 fieldCtrl = self.trialListCtrl = self.addText(text, size)
                 fieldLabelCtrl=fieldCtrl #we don't need a label for this   
@@ -1016,6 +1047,12 @@ class DlgLoopProperties(_BaseParamsDlg):
         if len(longStr)>20:
             return longStr[0:10]+'...'+longStr[(-n+10):]
         else: return longStr
+    def getTrialsSummary(self, trialList):
+        if type(trialList)==list and len(trialList)>0:
+            return '%i trial types, with %i parameters\n%s' \
+                %(len(trialList),len(trialList[0]), trialList[0].keys())
+        else:
+            return "No parameters set"
     def importTrialTypes(self, fileName):
         """Import the trial data from fileName to generate a list of dicts.
         Insert this immediately into self.params['trialList']
@@ -1045,20 +1082,17 @@ class DlgLoopProperties(_BaseParamsDlg):
         handler=self.stairHandler
         #loop through the params
         for thisFieldName in handler.params.keys():
-            if thisFieldName in ['name','loopType']: continue
+            if thisFieldName in ['name','loopType','endPoints']: continue
             #check if it has limited set of options
             if thisFieldName in handler.allowed.keys(): allowed=handler.allowed[thisFieldName]
             else: allowed=[]
             #create the field (with a label)
-            if thisFieldName=='loopType': 
-                continue
-            else:
-                fieldCtrl, fieldLabelCtrl= self.addField(thisFieldName,
-                    handler.params[thisFieldName], handler.allowed, handler.hints[thisFieldName])
-                #store info about the field
-                self.stairFields[thisFieldName] = fieldCtrl
-                self.stairFieldLabels[thisFieldName] =fieldLabelCtrl
-                self.stairFieldTypes[thisFieldName] = type(handler.params[thisFieldName])
+            fieldCtrl, fieldLabelCtrl= self.addField(thisFieldName,
+                handler.params[thisFieldName], handler.allowed, handler.hints[thisFieldName])
+            #store info about the field
+            self.stairFields[thisFieldName] = fieldCtrl
+            self.stairFieldLabels[thisFieldName] =fieldLabelCtrl
+            self.stairFieldTypes[thisFieldName] = type(handler.params[thisFieldName])
             
             
     def setCtrls(self, ctrlType):
@@ -1096,11 +1130,8 @@ class DlgLoopProperties(_BaseParamsDlg):
             self.params['trialListFile'] = newPath
             self.importTrialTypes(newPath)
             self.randFields['trialListFile'].SetLabel(self.getAbbriev(newPath))
-            self.randFields['trialList'].SetLabel(
-                '%i trial types, with %i parameters\n%s' \
-                    %(len(self.params['trialList']), \
-                        len(self.params['trialList'][0]), \
-                            self.params['trialList'][0].keys()))
+            self.randFields['trialList'].SetLabel(self.getTrialsSummary(self.params['trialList']))
+            
 class DlgComponentProperties(_BaseParamsDlg):    
     def __init__(self,frame,title,params,hints,fixed=[],allowed={},
             pos=wx.DefaultPosition, size=wx.DefaultSize,
@@ -1297,7 +1328,8 @@ class BuilderFrame(wx.Frame):
         """
         #todo: check whether current file has been modified and recommend save
         dlg = wx.FileDialog(
-            self, message="Open file ...", style=wx.OPEN
+            self, message="Open file ...", style=wx.OPEN,
+            wildcard="PsychoPy experiments (*.psyexp)|*.psyexp|Any file (*.*)|*",
             )
         
         if dlg.ShowModal() != wx.ID_OK: 
