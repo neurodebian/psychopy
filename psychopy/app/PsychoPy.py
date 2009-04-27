@@ -1,47 +1,8 @@
-import wx, sys, os, cPickle
+import wx, sys, os
 from keybindings import *
 import psychopy, coder, builder
+from preferences import *
 
-## global variables
-homeDir = os.getcwd()
-#on mac __file__ might be a local path
-fullAppPath= os.path.abspath(__file__)
-dirApp, appName = os.path.split(fullAppPath)
-#get path to settings
-join = os.path.join
-if sys.platform=='win32':
-    dirSettings = join(os.environ['APPDATA'],'PsychoPy') #this is the folder that this file is stored in
-else:
-    dirSettings = join(os.environ['HOME'], '.PsychoPy')
-    
-if not os.path.isdir(dirSettings):
-    os.makedirs(dirSettings)
-optionsPath = join(dirSettings, 'PsychoPyAppOptions.pickle')
-#path to Resources (icons etc)
-if os.path.isdir(join(dirApp, 'Resources')):
-    dirRes = join(dirApp, 'Resources')
-else:dirRes = dirApp
-#path to PsychoPy's root folder
-dirPsychopy = os.path.split(dirApp)[0]
-
-def toPickle(filename, data):
-    """save data (of any sort) as a pickle file
-    
-    simple wrapper of the cPickle module in core python
-    """
-    f = open(filename, 'w')
-    cPickle.dump(data,f)
-    f.close()
-
-def fromPickle(filename):
-    """load data (of any sort) from a pickle file
-    
-    simple wrapper of the cPickle module in core python
-    """
-    f = open(filename)
-    contents = cPickle.load(f)
-    f.close()
-    return contents
 class PsychoSplashScreen(wx.SplashScreen):
     """
     Create a splash screen widget.
@@ -90,7 +51,7 @@ class PsychoPyApp(wx.App):
             args=[]
         
         #set default paths and import options
-        self.dirApp = dirApp
+        self.dirApp = dirApp#defined in the prefs
         self.dirRes = dirRes
         self.dirPsychopy = dirPsychopy
         try:
