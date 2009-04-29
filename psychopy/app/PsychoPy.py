@@ -52,8 +52,9 @@ class PsychoPyApp(wx.App):
         
         #set default paths and import options
         self.dirApp = dirApp#defined in the prefs
-        self.dirRes = dirRes
+        self.dirResources = dirResources
         self.dirPsychopy = dirPsychopy
+        self.pathPrefs=pathPrefs
         try:
             self.options = fromPickle(optionsPath)
         except: 

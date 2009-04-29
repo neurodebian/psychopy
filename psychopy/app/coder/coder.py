@@ -1,11 +1,5 @@
-import wx, sys, time, types, re
-#check wx version - wx.aui was only introduced in wx2.8
-if wx.__version__<'2.8':
-    print   'PsychoPyIDE requires wxPython v2.8. Please install that before running'
-    time.sleep(1.5)
-    sys.exit()
-
-import  wx.stc, wx.aui, wx.richtext
+import sys, time, types, re
+import wx, wx.stc, wx.aui, wx.richtext
 import keyword, os, sys, string, StringIO, glob
 import threading, traceback, bdb, cPickle
 import psychopy
@@ -13,14 +7,8 @@ import psychoParser
 import introspect, py_compile
 from keybindings import *
 
-RUN_SCRIPTS = 'process' #'process', or 'thread' or 'dbg'
-IMPORT_LIBS='none'# should be 'thread' or 'inline' or 'none'
-USE_NOTEBOOK_PANEL=True
-ANALYSIS_LEVEL=1
-if sys.platform=='darwin':
-    ALLOW_MODULE_IMPORTS=False
-else:
-    ALLOW_MODULE_IMPORTS=True
+from preferences import *
+
 #create IDs for the events
 ID_EXIT=wx.NewId()
 
@@ -823,11 +811,8 @@ class CodeEditor(wx.stc.StyledTextCtrl):
                 
     def onModified(self, event):
         #update the UNSAVED flag and the save icons
-        if USE_NOTEBOOK_PANEL:
-            panel = self.GetParent()
-            notebook = panel.GetParent()
-        else:
-            notebook = self.GetParent()
+        panel = self.GetParent()
+        notebook = panel.GetParent()
         mainFrame = notebook.GetParent()
         mainFrame.setFileModified(True)
     def DoFindNext(self, findData, findDlg=None):
@@ -1390,19 +1375,15 @@ class CoderFrame(wx.Frame):
                 self.fileClose(self.currentDoc)            
             
             #create an editor window to put the text in
-            if USE_NOTEBOOK_PANEL: #use a panel
-                p = wx.Panel(self.notebook, -1, style = wx.NO_FULL_REPAINT_ON_RESIZE)
-                self.currentDoc = CodeEditor(p, -1, frame=self)
-                self.allDocs.append(self.currentDoc)
-                
-                #arrange in window
-                s = wx.BoxSizer()
-                s.Add(self.currentDoc, 1, wx.EXPAND)
-                p.SetSizer(s)
-                p.SetAutoLayout(True)
-            else:
-                p = self.currentDoc = CodeEditor(self.notebook,-1, frame=self)
-                self.allDocs.append(self.currentDoc)
+            p = wx.Panel(self.notebook, -1, style = wx.NO_FULL_REPAINT_ON_RESIZE)
+            self.currentDoc = CodeEditor(p, -1, frame=self)
+            self.allDocs.append(self.currentDoc)
+            
+            #arrange in window
+            s = wx.BoxSizer()
+            s.Add(self.currentDoc, 1, wx.EXPAND)
+            p.SetSizer(s)
+            p.SetAutoLayout(True)
                 
             #load text from document
             if os.path.isfile(filename):

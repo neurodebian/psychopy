@@ -1,50 +1,16 @@
 import wx, sys, os, cPickle, urllib
 
-## global variables
-homeDir = os.getcwd()
-#on mac __file__ might be a local path
-fullAppPath= os.path.abspath(__file__)
-dirApp, appName = os.path.split(fullAppPath)
-#get path to settings
-join = os.path.join
-if sys.platform=='win32':
-    dirSettings = join(os.environ['APPDATA'],'PsychoPy') #this is the folder that this file is stored in
+RUN_SCRIPTS = 'process' #'process', or 'thread' or 'dbg'
+IMPORT_LIBS='none'# should be 'thread' or 'inline' or 'none'
+ANALYSIS_LEVEL=1
+if sys.platform=='darwin':
+    ALLOW_MODULE_IMPORTS=False
 else:
-    dirSettings = join(os.environ['HOME'], '.PsychoPy')
-    
-if not os.path.isdir(dirSettings):
-    os.makedirs(dirSettings)
-prefsPath = join(dirSettings, 'PsychoPy2.0.prefs')
-#path to Resources (icons etc)
-if os.path.isdir(join(dirApp, 'Resources')):
-    dirRes = join(dirApp, 'Resources')
-else:dirRes = dirApp
-#path to PsychoPy's root folder
-dirPsychopy = os.path.split(dirApp)[0]
-
-def toPickle(filename, data):
-    """save data (of any sort) as a pickle file
-    
-    simple wrapper of the cPickle module in core python
-    """
-    f = open(filename, 'w')
-    cPickle.dump(data,f)
-    f.close()
-
-def fromPickle(filename):
-    """load data (of any sort) from a pickle file
-    
-    simple wrapper of the cPickle module in core python
-    """
-    f = open(filename)
-    contents = cPickle.load(f)
-    f.close()
-    return contents
-
-
+    ALLOW_MODULE_IMPORTS=True
 
 #set default values
 generalDefaults = dict(loadPrevFiles=True,
+            defaultView='builder',
             )
 coderDefaults=dict(codeFont="",
             codeFontSize="",
@@ -57,6 +23,28 @@ connectionDefaults = dict(sendStats=True,
             proxy="",#but will be updated by autoproxy setting
             autoProxy=True)
 
+#SETUP PATHS------------------
+homeDir = os.getcwd()
+#on mac __file__ might be a local path
+fullAppPath= os.path.abspath(__file__)
+dirApp, appName = os.path.split(fullAppPath)
+#get path to settings
+join = os.path.join
+if sys.platform=='win32':
+    dirPrefs = join(os.environ['APPDATA'],'PsychoPy') #this is the folder that this file is stored in
+else:
+    dirPrefs = join(os.environ['HOME'], '.PsychoPy')
+#from the directory for preferences wor out the path for preferences (incl filename)
+if not os.path.isdir(dirPrefs):
+    os.makedirs(dirPrefs)
+pathPrefs = join(dirPrefs, 'PsychoPy2.0.prefs')
+#path to Resources (icons etc)
+if os.path.isdir(join(dirApp, 'Resources')):
+    dirResources = join(dirApp, 'Resources')
+else:dirResources = dirApp
+#path to PsychoPy's root folder
+dirPsychopy = os.path.split(dirApp)[0]
+ 
 class Preferences:
     def __init__(self, prefsPath):
         self.general=generalDefaultsdict(loadPrevFiles=True,
@@ -97,3 +85,22 @@ class Preferences:
 class PreferencesDlg(wx.Frame):
     def __init__(self, parent, ID, title, files=[]):
         pass
+def toPickle(filename, data):
+    """save data (of any sort) as a pickle file
+    
+    simple wrapper of the cPickle module in core python
+    """
+    f = open(filename, 'w')
+    cPickle.dump(data,f)
+    f.close()
+
+def fromPickle(filename):
+    """load data (of any sort) from a pickle file
+    
+    simple wrapper of the cPickle module in core python
+    """
+    f = open(filename)
+    contents = cPickle.load(f)
+    f.close()
+    return contents
+

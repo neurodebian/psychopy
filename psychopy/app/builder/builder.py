@@ -7,38 +7,7 @@ import experiment, numpy
 #import psychopy
 from keybindings import *
 
-## global variables
-homeDir = os.getcwd()
-#on mac __file__ might be a local path
-fullAppPath= os.path.abspath(__file__)
-appDir, appName = os.path.split(fullAppPath)
-#psychopyDir, junk = os.path.split(psychopy.__file__)
-#get path to settings
-join = os.path.join
-if sys.platform=='win32':
-    settingsFolder = join(os.environ['APPDATA'],'PsychoPy', 'Builder') #this is the folder that this file is stored in
-else:
-    settingsFolder = join(os.environ['HOME'], '.PsychoPy' , 'Builder')
-    
-if not os.path.isdir(settingsFolder):
-    os.makedirs(settingsFolder)
-optionsPath = join(settingsFolder, 'options.pickle')
-#path to Resources (icons etc)
-if os.path.isdir(join(appDir, '..','Resources')):
-    iconDir = join(appDir, '..','Resources')
-else:iconDir = appDir
-
 eventTypes=['Patch','Text','Movie','Sound','Mouse','Keyboard']
-
-#for demos we need a dict where the event ID will correspond to a filename
-demoList = glob.glob(os.path.join(appDir,'demos','*.py'))
-if '__init__.py' in demoList: demoList.remove('__init__.py')    
-#demoList = glob.glob(os.path.join(appDir,'..','demos','*.py'))
-ID_DEMOS = \
-    map(lambda _makeID: wx.NewId(), range(len(demoList)))
-demos={}
-for n in range(len(demoList)):
-    demos[ID_DEMOS[n]] = demoList[n]
     
 #create wx event/object IDs
 ID_EXIT=wx.NewId()
@@ -74,9 +43,6 @@ TB_REDO= 80
 TB_RUN = 100
 TB_STOP = 110
 
-
-global hitradius
-hitradius=5
 class FlowPanel(wx.ScrolledWindow):
     def __init__(self, frame, id=-1,size = (600,100)):
         """A panel that shows how the routines will fit together
@@ -84,6 +50,7 @@ class FlowPanel(wx.ScrolledWindow):
         wx.ScrolledWindow.__init__(self, frame, id, (0, 0), size=size)
         self.panel = wx.Panel(self,-1,size=(600,200))
         self.frame=frame   
+        self.app=frame.app
         self.needUpdate=True
         self.maxWidth  = 1000
         self.maxHeight = 200
@@ -98,6 +65,7 @@ class FlowPanel(wx.ScrolledWindow):
         self.pen_cache = {}
         self.brush_cache = {}
         # vars for handling mouse clicks
+        self.hitradius=5
         self.dragid = -1
         self.lastpos = (0,0)
         self.loopFromID={}#use the ID of the drawn icon to retrieve loop object
@@ -214,7 +182,6 @@ class FlowPanel(wx.ScrolledWindow):
         print 'removing loops not implemented yet'
     
     def OnMouse(self, event):
-        global hitradius
         if event.LeftDown():
             x,y = self.ConvertEventCoords(event)
             #l = self.pdc.FindObjectsByBBox(x, y)
@@ -224,7 +191,7 @@ class FlowPanel(wx.ScrolledWindow):
         elif event.RightDown():
             x,y = self.ConvertEventCoords(event)
             #l = self.pdc.FindObjectsByBBox(x, y)
-            l = self.pdc.FindObjects(x, y, hitradius)
+            l = self.pdc.FindObjects(x, y, self.hitradius)
             if l:
                 self.pdc.SetIdGreyedOut(l[0], not self.pdc.GetIdGreyedOut(l[0]))
                 r = self.pdc.GetIdBounds(l[0])
@@ -481,6 +448,7 @@ class RoutineCanvas(wx.ScrolledWindow):
         
         self.notebook=notebook
         self.frame=notebook.frame
+        self.app=self.frame.app
         self.lines = []
         self.maxWidth  = 200
         self.maxHeight = 100
@@ -490,6 +458,7 @@ class RoutineCanvas(wx.ScrolledWindow):
 
         self.SetVirtualSize((self.maxWidth, self.maxHeight))
         self.SetScrollRate(20,20)
+        self.hitradius=5
         
         self.routine=routine
         self.yPositions=None        
@@ -529,7 +498,7 @@ class RoutineCanvas(wx.ScrolledWindow):
         r.OffsetXY(-(xView*xDelta),-(yView*yDelta))
 
     def OnMouse(self, event):
-        global hitradius
+        
         if event.LeftDown():
             x,y = self.ConvertEventCoords(event)
             #l = self.pdc.FindObjectsByBBox(x, y)
@@ -539,7 +508,7 @@ class RoutineCanvas(wx.ScrolledWindow):
         elif event.RightDown():
             x,y = self.ConvertEventCoords(event)
             #l = self.pdc.FindObjectsByBBox(x, y)
-            l = self.pdc.FindObjects(x, y, hitradius)
+            l = self.pdc.FindObjects(x, y, self.hitradius)
             if l:
                 self.pdc.SetIdGreyedOut(l[0], not self.pdc.GetIdGreyedOut(l[0]))
                 r = self.pdc.GetIdBounds(l[0])
@@ -690,6 +659,7 @@ class RoutinesNotebook(wx.aui.AuiNotebook):
     """
     def __init__(self, frame, id=-1):
         self.frame=frame
+        self.app=frame.app
         wx.aui.AuiNotebook.__init__(self, frame, id)
         
         for routineName in self.frame.exp.routines:         
@@ -735,14 +705,15 @@ class ComponentsPanel(scrolled.ScrolledPanel):
         """A panel that shows how the routines will fit together
         """
         scrolled.ScrolledPanel.__init__(self,frame,id,size=(80,800))
-        self.frame=frame    
+        self.frame=frame  
+        self.app=frame.app  
         self.sizer=wx.BoxSizer(wx.VERTICAL)        
         
         # add a button for each type of event that can be added
         self.componentButtons={}; self.componentFromID={}
         for eventType in eventTypes:
             img =wx.Bitmap(
-                os.path.join(iconDir,"%sAdd.png" %eventType.lower()))    
+                os.path.join(self.app.dirRes,"%sAdd.png" %eventType.lower()))    
             btn = wx.BitmapButton(self, -1, img, (20, 20),
                            (img.GetWidth()+10, img.GetHeight()+10),
                            name=eventType)  
@@ -777,6 +748,7 @@ class _BaseParamsDlg(wx.Dialog):
         
         wx.Dialog.__init__(self, frame,-1,title,pos,size,style)
         self.frame=frame
+        self.app=frame.app
         self.Center()
         
         self.params=params   #dict
@@ -914,6 +886,7 @@ class DlgLoopProperties(_BaseParamsDlg):
         _BaseParamsDlg.__init__(self, frame,title,
                     params={},hints={})
         self.frame=frame
+        self.app=frame.app
         self.Center()
         self.sizer = wx.BoxSizer(wx.VERTICAL)#needs to be done before any addField calls
         
@@ -1140,7 +1113,8 @@ class DlgComponentProperties(_BaseParamsDlg):
         
         _BaseParamsDlg.__init__(self,frame,title,params,hints,fixed,allowed,
             pos,size,style)
-        
+        self.frame=frame        
+        self.app=frame.app
         self.show()
         if self.OK:
             self.getData()
@@ -1290,7 +1264,15 @@ class BuilderFrame(wx.Frame):
         wx.EVT_MENU(self, ID_REM_LOOP_FROM_FLOW,  self.flowPanel.onRemLoop)
         
         #---_demos---#000000#FFFFFF--------------------------------------------------
-        self.demosMenu = wx.Menu()
+        #for demos we need a dict where the event ID will correspond to a filename
+        demoList = glob.glob(os.path.join(appDir,'demos','*.psyexp'))   
+        #demoList = glob.glob(os.path.join(appDir,'..','demos','*.py'))
+        ID_DEMOS = \
+            map(lambda _makeID: wx.NewId(), range(len(demoList)))
+        self.demos={}
+        for n in range(len(demoList)):
+            self.demos[ID_DEMOS[n]] = demoList[n]
+                self.demosMenu = wx.Menu()
         #menuBar.Append(self.demosMenu, '&Demos') 
         for thisID in ID_DEMOS:
             junk, shortname = os.path.split(demos[thisID])
@@ -1464,26 +1446,3 @@ class BuilderFrame(wx.Frame):
         pass
     def addRoutine(self, event=None):
         self.routinePanel.createNewRoutine()
-
-class BuilderApp(wx.App):
-    def OnInit(self):
-        if len(sys.argv)>1:
-            if sys.argv[1]==__name__:
-                args = sys.argv[2:] # program was excecuted as "python.exe PsychoPyIDE.py %1'
-            else:
-                args = sys.argv[1:] # program was excecuted as "PsychoPyIDE.py %1'
-        else:
-            args=[]
-        self.frame = BuilderFrame(None, -1, 
-                                      title="PsychoPy (Experiment Builder)",
-                                      files = args)
-                                     
-        self.frame.Show(True)
-        self.SetTopWindow(self.frame)
-        return True
-    def MacOpenFile(self,fileName):
-        self.frame.setCurrentDoc(fileName) 
-
-if __name__=='__main__':
-    app = BuilderApp(0)
-    app.MainLoop()
