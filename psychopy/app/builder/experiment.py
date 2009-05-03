@@ -47,8 +47,8 @@ class Experiment:
         else:
             self.routines[routineName]=routine
         
-    def generateScript(self):
-        """Generate a PsychoPy script for the experiment
+    def writeScript(self):
+        """Write a PsychoPy script for the experiment
         """
         s=IndentingBuffer(u'') #a string buffer object
         s.writeIndented('"""This experiment was created using PsychoPy2 (Experiment Builder) and will\n \
@@ -56,7 +56,7 @@ run on any platform on which PsychoPy (www.psychopy.org) can be installed\n \
 \nIf you publish work using this script please cite the relevant papers (e.g. Peirce, 2007;2009)"""\n\n')
         
         #delegate most of the code-writing to Flow
-        self.flow.generateCode(s)
+        self.flow.writeCode(s)
         
         return s
     def getAllObjectNames(self):
@@ -76,6 +76,20 @@ run on any platform on which PsychoPy (www.psychopy.org) can be installed\n \
 
 class Param():
     """Defines parameters for Experiment Components
+    A string representation of the parameter will depend on the valType:
+    
+    >>> sizeParam = Param(val=[3,4], valType='num')
+    >>> print sizeParam
+    numpy.asarray([3,4])
+    
+    >>> sizeParam = Param(val=[3,4], valType='str')
+    >>> print sizeParam
+    "[3,4]"
+    
+    >>> sizeParam = Param(val=[3,4], valType='code')
+    >>> print sizeParam
+    [3,4]
+    
     """
     def __init__(self, val, valType, allowedVals=[],allowedTypes=[], hint="", updates=None, allowedUpdates=None):
         """
@@ -100,7 +114,14 @@ class Param():
         self.hint=hint
         self.updates=updates
         self.allowedUpdates
-
+    def __str__(self):
+        if valType == 'num':
+            return "numpy.asarray(%s)" %(self.val)
+        if valType == 'str':
+            return "\"%s\"" %(self.val)
+        if valType == 'code':
+            return "%s" %(self.val)
+    
 class TrialHandler():    
     """A looping experimental control object
             (e.g. generating a psychopy TrialHandler or StairHandler).
@@ -146,10 +167,10 @@ class TrialHandler():
         self.hints['trialListFile']='A comma-separated-value (.csv) file specifying the parameters for each trial'
         self.hints['endPoints']='The start and end of the loop (see flow timeline)'
         self.allowed={}
-    def generateInitCode(self,buff):
+    def writeInitCode(self,buff):
         buff.writeIndented("%s=data.TrialHandler(trialList=%s,nReps=%i,\n)" \
             %(self.params['name'], self.params['trialList'], self.params['nReps']))
-    def generateLoopStartCode(self,buff):
+    def writeLoopStartCode(self,buff):
         #work out a name for e.g. thisTrial in trials:
         thisName = ("this"+self.params['name'].capitalize()[:-1])
         buff.writeIndented("\n")
@@ -197,11 +218,11 @@ class StairHandler():
         self.hints['endPoints']='The start and end of the loop (see flow timeline)'
         self.allowed={}
         self.allowed['step types']=['linear','log','db']
-    def generateInitCode(self,buff):
+    def writeInitCode(self,buff):
         buff.writeIndented("init loop '%s' (%s)\n" %(self.params['name'], self.loopType))
         buff.writeIndented("%s=data.StairHandler(nReps=%i,\n)" \
             %(self.name, self.nReps))
-    def generateLoopStartCode(self,buff):
+    def writeLoopStartCode(self,buff):
         #work out a name for e.g. thisTrial in trials:
         thisName = ("this"+self.params['name'].capitalize()[:-1])
         buff.writeIndented("for %s in %s:\n" %(thisName, self.params['name']))
@@ -212,10 +233,10 @@ class LoopInitiator:
     This is created automatically when the loop is created"""
     def __init__(self, loop):
         self.loop=loop        
-    def generateInitCode(self,buff):
-        self.loop.generateInitCode(buff)
-    def generateMainCode(self,buff):
-        self.loop.generateLoopStartCode(buff)
+    def writeInitCode(self,buff):
+        self.loop.writeInitCode(buff)
+    def writeMainCode(self,buff):
+        self.loop.writeLoopStartCode(buff)
         buff.setIndentLevel(1, relative=True)#we started a loop so increment indent        
     def getType(self):
         return 'LoopInitiator'
@@ -224,9 +245,9 @@ class LoopTerminator:
     This is created automatically when the loop is created"""
     def __init__(self, loop):
         self.loop=loop
-    def generateInitCode(self,buff):
+    def writeInitCode(self,buff):
         pass
-    def generateMainCode(self,buff):
+    def writeMainCode(self,buff):
         buff.setIndentLevel(-1, relative=True)
         buff.writeIndented("# end of '%s' after %i repeats (of each entry in trialList)\n" %(self.loop.params['name'], self.loop.params['nReps']))
     def getType(self):
@@ -244,17 +265,17 @@ class Flow(list):
         """Adds the routine to the Flow list"""
         self.insert(int(pos), newRoutine)
         
-    def generateCode(self, s):
+    def writeCode(self, s):
         s.writeIndented("from PsychoPy import visual, core, event, sound\n")
         s.writeIndented("win = visual.Window([400,400])\n")
         
         #initialise components
         for entry in self:
-            entry.generateInitCode(s)
+            entry.writeInitCode(s)
         
         #run-time code  
         for entry in self:
-            entry.generateMainCode(s)
+            entry.writeMainCode(s)
         
 class Routine(list):
     """
@@ -269,13 +290,13 @@ class Routine(list):
     def __init__(self, name):
         self.name=name
         list.__init__(self)
-    def generateInitCode(self,buff):
+    def writeInitCode(self,buff):
         buff.writeIndented('\n')
         buff.writeIndented('#Initialise components for %s routine\n' %self.name)
         for thisEvt in self:
-            thisEvt.generateInitCode(buff)
+            thisEvt.writeInitCode(buff)
         
-    def generateMainCode(self,buff):
+    def writeMainCode(self,buff):
         """This defines the code for the frames of a single routine
         """
         clockName=self.name+"Clock"
@@ -291,7 +312,7 @@ class Routine(list):
         
         #write the code for each component during frame
         for event in self:
-            event.generateFrameCode(buff)
+            event.writeFrameCode(buff)
             
         #update screen
         buff.writeIndented('\n')
@@ -315,28 +336,30 @@ class BaseComponent:
         self.params={}
         self.params['name']=Param(name, valType='str', 
             hint="Name of this loop")
-        self.params['name']=name
-        self.hints['name']= 'A name for the component'
-        #for choiceboxes what are the allowed options?
-        self.allowed={}
-    def generateInitCode(self,buff):
+
+    def writeInitCode(self,buff):
         pass
-    def generateRoutineCode(self,buff):
-        """Generate the code that will be called at the beginning of 
+    def writeFrameCode(self,buff):
+        """Write the code that will be called every frame
+        """
+        pass
+    def writeRoutineStartCode(self,buff):
+        """Write the code that will be called at the beginning of 
         a routine (e.g. to update stimulus parameters)
         """
-        pass
-    def generateFrameCode(self,buff):
-        """Generate the code that will be called every frame
+        self.writeParamUpdates(buff, 'routine')
+    def writeRoutineEndCode(self,buff):
+        """Write the code that will be called at the end of 
+        a routine (e.g. to save data)
         """
         pass
-    def generateTimeTestCode(self, buff):
-        """Generate the code for each frame that tests whether the component is being
+    def writeTimeTestCode(self, buff):
+        """Write the code for each frame that tests whether the component is being
         drawn/used.
         """
         times=self.params['times']
-        if type(times[0]) in [int, float]:
-            times=[times]#make a list of lists
+        if type(times[0].val) in [int, float]:
+            times.val=[times.val]#make a list of lists
         
         #write the code for the first repeat of the stimulus
         buff.writeIndented("if (%.f <= t < %.f)" %(times[0][0], times[0][1]))
@@ -345,181 +368,153 @@ class BaseComponent:
                 buff.write("\n")
                 buff.writeIndented("    or (%.f <= t < %.f)" %(epoch[0], epoch[1]))
         buff.write(':\n')#the condition is done add the : and new line to finish        
-        
+    def writeParamUpdates(buff, updateType):
+        """write updates to the buffer for each parameter that needs it
+        updateType can be 'experiment', 'routine' or 'frame'
+        """
+        for thisParamName in self.params.keys():
+            thisParam=self.params[thisParamName]
+            if thisParam.updates=='frame':
+                buff.writeIndented"%s.set%s(%s)" %(self.params['name'], thisParamName.capitalize(), thisParam)
+    
+
 class VisualComponent(BaseComponent):
     """Base class for most visual stimuli
     """
-    def __init__(self, name='', units='window units', rgb=[1,1,1],
-        pos=[0,0], size=[0,0], ori=0, times=[0,1]):
+    def __init__(self, name='', units='window units', colour=[1,1,1],
+        pos=[0,0], size=[0,0], ori=0, times=[0,1], colourSpace='rgb'):
         self.params={}
         self.params['name']=Param(name, valType='str', 
             hint="Name of this stimulus")
         self.params['units']=Param(units, valType='str', allowedVals=['window units', 'deg', 'cm', 'pix', 'norm'],
+        
             hint="Units of dimensions for this stimulus")
-        self.params['rgb']=Param(rgb, valType='num', allowedTypes=['num','str','code'],
+        self.params['colour']=Param(rgb, valType='num', allowedTypes=['num','str','code'],
+            updates="never", allowedUpdates=["never","routine","frame"],
             hint="Colour of this stimulus (e.g. [1,1,0], 'red' )")
+        self.params['colourSpace']=Param(colourSpace, valType='str', allowedVals=['rgb','dkl','lms'],
+            hint="Choice of colour space for the colour (rgb, dkl, lms)")
         self.params['pos']=Param(pos, valType='num', allowedTypes=['num','code'],
+            updates="never", allowedUpdates=["never","routine","frame"],
             hint="Position of this stimulus (e.g. [1,2] ")
         self.params['size']=Param(size, valType='num', allowedTypes=['num','code'],
+            updates="never", allowedUpdates=["never","routine","frame"],
             hint="Size of this stimulus (either a single value or x,y pair, e.g. 2.5, [1,2] ")
         self.params['ori']=Param(ori, valType='num', allowedTypes=['num','code'],
+            updates="never", allowedUpdates=["never","routine","frame"],
             hint="Orientation of this stimulus (in deg)")
         self.params['times']=Param(times, valType='num', allowedTypes=['num','code'],
             hint="Start and end times for this stimulus (e.g. [0,1] or [[0,1],[2,3]] for a repeated appearance")
             
-    def generateFrameCode(self,buff):
-        """Generate the code that will be called every frame
+    def writeFrameCode(self,buff):
+        """Write the code that will be called every frame
         """    
-        self.generateTimeTestCode(buff)#writes an if statement to determine whether to draw etc
-        buff.writeIndented("    %s.draw()\n" %(self.params['name']))
-        
+        self.writeTimeTestCode(buff)#writes an if statement to determine whether to draw etc
+        buff.setIndentLevel(1, relative=True)#because of the 'if' statement of the times test
+        #set parameters that need updating every frame
+        self.writeParamUpdates(buff, 'frame')
+        #draw the stimulus
+        buff.writeIndented("%(name)s.draw()\n" %(self.params))
+        buff.setIndentLevel(-1, relative=True)
+
 class TextComponent(VisualComponent):
     """An event class for presenting image-based stimuli"""
-    def __init__(self, name='', text='', font='arial', rgb=[1,1,1],
+    def __init__(self, name='', text='', font='arial',
+        units='window units', colour=[1,1,1], colourSpace='rgb',
         pos=[0,0], size=[0,0], ori=0, times=[0,1]):
         #initialise main parameters from base stimulus
-        VisualComponent.__init__(self,name=name, rgb=rgb, 
-                        pos=pos,size=size,ori=ori,
-                        times=times)
+        VisualComponent.__init__(self,name=name, units=units, 
+                    colour=colour, colourSpace=colourSpace,
+                    pos=pos, size=size, ori=ori, times=times)
         self.type='Text'
-        self.params['text']=Param(text, valType='str', 
+        self.params['text']=Param(text, valType='str', allowedTypes=['str','code'],
+            updates="never", allowedUpdates=["never","routine","frame"],
             hint="The text to be displayed")
-        self.params['name']=name
-        self.params['text']= text
-        self.params['font']= font
-        self.params['pos']=pos
-        self.params['size']=size
-        self.params['ori']=ori
-        self.params['times']=times
-        
-        self.hints={}
-        self.hints['name']="A name for the component e.g. 'thanksMsg'"
-        self.hints['text']="The text to be displayed"
-        self.hints['font']= "The font name, or a list of names, e.g. ['arial','verdana']"
-        self.hints['pos']= "Position of the text as [X,Y], e.g. [-2.5,3]"
-        self.hints['size']= "Specifies the height of the letter (the width is then determined by the font)"
-        self.hints['ori']= "The orientation of the text in degrees"
-        self.hints['times']="A series of one or more onset/offset times, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]"
-        
-        #for choiceboxes what are the allowed options?
-        self.allowed={}
-        self.allowed['units']=['as window','deg','pix','cm']        
-        
-        #params that can change in time
-        self.changeable=['ori','pos','rgb','size']
-        
-    def generateInitCode(self,buff):
+        self.params['font']=Param(ori, valType='str', allowedTypes=['str','code'],
+            updates="never", allowedUpdates=["never","routine","frame"],
+            hint="The font name, or a list of names, e.g. ['arial','verdana']")
+        #change the hint for size
+        self.params['size'].hint="Specifies the height of the letter (the width is then determined by the font)"
+    def writeInitCode(self,buff):
         s = "%s=TextStim(win=win, pos=%s, size=%s" %(self.params['name'], self.params['pos'],self.params['size'])
         buff.writeIndented(s)   
         
         buff.writeIndented(")\n")
-    def generateRoutineCode(self,buff):
-        """Generate the code that will be called at the beginning of 
-        a routine (e.g. to update stimulus parameters)
-        """
-        pass
         
 class PatchComponent(VisualComponent):
     """An event class for presenting image-based stimuli"""
-    def __init__(self, name='', image='sin', mask='none', pos=[0,0], 
-            sf=1, size=1, ori=0, times=[0,1]):
+    def __init__(self, name='', image='sin', mask='none', sf=1, interpolate='linear',
+        units='window units', colour=[1,1,1], colourSpace='rgb',
+        pos=[0,0], size=[0,0], ori=0, times=[0,1]):
+        #initialise main parameters from base stimulus
+        VisualComponent.__init__(self,name=name, units=units, 
+                    colour=colour, colourSpace=colourSpace,
+                    pos=pos, size=size, ori=ori, times=times)
+                        
         self.type='Patch'
-        self.params={}
-        self.hints={}
-        self.params['name']=name
-        self.params['mask']=mask
-        self.params['image']= image
-        self.params['pos']=pos
-        self.params['size']=size
-        self.params['sf']=sf
-        self.params['ori']=ori
-        self.params['times']=times
-        self.params['interpolate']=False
-        
-        self.hints['name']="A name for the component e.g. 'fixationPt'"
-        self.hints['image']="The image to use (a filename or 'sin', 'sqr'...)"
-        self.hints['mask']= "The image that defines the mask (a filename or 'gauss', 'circle'...)"
-        self.hints['pos']= "Position of the image centre as [X,Y], e.g. [-2.5,3]"
-        self.hints['size']= "Specifies the size of the stimulus (a single value or [w,h] )"
-        self.hints['ori']= "The orientation of the stimulus in degrees"
-        self.hints['sf']= "The spatial frequency of cycles of the image on the stimulus"
-        self.hints['times']="A series of one or more onset/offset times, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]"
-        self.hints['interpolate']="If checked then, if the image is scaled up and down, linear interpolation will be used instead of nearest neighbour" 
-        
-        #for choiceboxes what are the allowed options?
-        self.allowed={}
-        self.allowed['units']=['as window','deg','pix','cm'] 
-        self.allowed['interpolate']=[False,True]
-        
-    def generateInitCode(self,buff):
-        s = "%s=PatchStim(win=win, pos=%s, size=%s" %(self.params['name'], self.params['pos'],self.params['size'])
-        buff.writeIndented(s)   
-        
-        buff.writeIndented(")\n")
+        self.params['image']=Param(image, valType='str', allowedTypes=['str','code'],
+            updates="never", allowedUpdates=["never","routine","frame"],
+            hint="The image to be displayed - 'sin','sqr'... or a filename (including path)")        
+        self.params['mask']=Param(mask, valType='str', allowedTypes=['str','code'],
+            updates="never", allowedUpdates=["never","routine","frame"],
+            hint="An image to define the alpha mask (ie shape)- 'gauss','circle'... or a filename (including path)")        
+        self.params['sf']=Param(sf, valType='num', allowedTypes=['num','code'],
+            updates="never", allowedUpdates=["never","routine","frame"],
+            "Spatial frequency of image repeats across the patch, e.g. 4 or [2,3]")        
+        self.params['interpolate']=Param(mask, valType='str', allowedVals=['linear','nearest'],
+            hint="How should the image be interpolated if/when rescaled")
+                
+    def writeInitCode(self,buff):
+        buff.writeIndented("%(name)s=PatchStim(win=win, tex=%(image)s, mask=%(mask)s,\n" %(self.params))
+        buff.writeIndented("    pos=%(pos)s, size=%(size)s)\n" %(self.params)
 
 class MovieComponent(VisualComponent):
     """An event class for presenting image-based stimuli"""
-    def __init__(self, name='', movie='', pos=[0,0], 
-            size=1, ori=0, times=[0,1]):
-        
+    def __init__(self, name='', movie='', 
+        units='window units', 
+        pos=[0,0], size=[0,0], ori=0, times=[0,1]):
+        #initialise main parameters from base stimulus
+        VisualComponent.__init__(self,name=name, units=units, 
+                    pos=pos, size=size, ori=ori, times=times)
+        #these are normally added but we don't want them for a movie            
+        junk = self.params.pop('colour')
+        junk = self.params.pop('colourSpace')
         self.type='Movie'
-        self.params={}
-        self.hints={}
-        self.params['name']=name
-        self.params['movie']= movie
-        self.params['pos']=pos
-        self.params['size']=size
-        self.params['ori']=ori
-        self.params['times']=times
-        
-        self.hints['name']="A name for the component e.g. 'mainMovie'"
-        self.hints['movie']="The filename/path for the movie)"
-        self.hints['pos']= "Position of the image centre as [X,Y], e.g. [-2.5,3]"
-        self.hints['size']= "Specifies the size of the stimulus (a single value or [w,h] )"
-        self.hints['ori']= "The orientation of the stimulus in degrees"
-        self.hints['times']="A series of one or more onset/offset times, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]"
+        self.params['movie']=Param(image, valType='str', allowedTypes=['str','code'],
+            updates="never", allowedUpdates=["never","routine"],
+            hint="A filename for the movie (including path)")        
                 
-        #for choiceboxes what are the allowed options?
-        self.allowed={}
-        self.allowed['units']=['window','deg','pix','cm'] 
-    def generateInitCode(self,buff):
-        s = "%s=MovieStim(win=win, pos=%s, movie=%s, size=%s" %(self.params['name'], self.params['movie'],self.params['pos'],self.params['size'])
-        buff.writeIndented(s)   
+    def writeInitCode(self,buff):
+        buff.writeIndented("%(name)s=MovieStim(win=win, movie=%(movie)s,\n" %(self.params))
+        buff.writeIndented("    ori=%(ori)s, pos=%(pos)s, size=%(size)s)\n" %(self.params)
         
-        buff.writeIndented(")\n")
-
 class SoundComponent(BaseComponent):
     """An event class for presenting image-based stimuli"""
-    def __init__(self, name='', sound='', 
+    def __init__(self, name='', sound='A', 
             size=1, ori=0, times=[0,1]):
         
         self.type='Sound'
         self.params={}
-        self.hints={}
-        self.params['name']=name
-        self.params['sound']= ''
-        self.params['times']=times
-        
-        self.hints['name']="A name for the component e.g. 'ping'"
-        self.hints['sound']="A sound can be a string (e.g. 'A' or 'Bf') or a number to specify Hz, or a filename"
-        self.hints['times']="A series of one or more onset/offset times, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]"
-                
-        #for choiceboxes what are the allowed options?
-        self.allowed={}
-    def generateInitCode(self,buff):
-        s = "%s=Sound(%s, secs=%s" %(self.params['name'], self.params['sound'],self.params['times'][1]-self.params['times'][0])
-        buff.writeIndented(s)   
-        
-        buff.writeIndented(")\n")
-    def generateRoutineCode(self,buff):
-        """Generate the code that will be called at the beginning of 
-        a routine (e.g. to update stimulus parameters)
+        self.params['name']=Param(name, valType='str', allowedTypes=['str','code'],
+            hint="A filename for the movie (including path)")  
+        self.params['sound']=Param(sound, valType='str', allowedTypes=['str','num','code'],
+            updates="never", allowedUpdates=["never","routine"],
+            hint="A sound can be a string (e.g. 'A' or 'Bf') or a number to specify Hz, or a filename")  
+        self.params['times']=Param(times, valType='num', allowedTypes=['num','code'],
+            hint="A series of one or more onset/offset times, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]")  
+
+    def writeInitCode(self,buff):
+        s = "%(name)s=Sound(%(sound)s, secs=%s\n" %(self.params,self.params['times'][1]-self.params['times'][0])
+        buff.writeIndented(s)  
+    def writeFrameCode(self,buff):
+        """Write the code that will be called every frame
         """
-        pass
-    def generateFrameCode(self,buff):
-        """Generate the code that will be called every frame
-        """
-        buff.writeIndented("playing Sound '%s'\n" %(self.params['name'])) 
+        self.writeTimeTestCode(buff)#writes an if statement to determine whether to draw etc
+        buff.setIndentLevel(1, relative=True)#because of the 'if' statement of the times test
+        #set parameters that need updating every frame
+        self.writeParamUpdates(buff, 'frame')
+        buff.writeIndented("%s.play()\n" %(self.params['name'])) 
+        buff.setIndentLevel(-1, relative=True)#because of the 'if' statement of the times test
             
 class KeyboardComponent(BaseComponent):
     """An event class for checking the keyboard at given times"""
@@ -527,42 +522,44 @@ class KeyboardComponent(BaseComponent):
         self.type='Keyboard'
                 
         self.params={}
-        self.params['name']=name
-        self.params['allowedKeys']=allowedKeys
-        self.params['times']=times
-        
-        self.hints={}
-        self.hints['name']=""
-        self.hints['allowedKeys']="The keys the user may press, e.g. a,b,q,left,right"
-        self.hints['times']="A series of one or more periods to read the keyboard, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]"
-        #for choiceboxes what are the allowed options?
-        self.allowed={}
-    def generateInitCode(self,buff):
+        self.params['name']=Param(name, valType='str', allowedTypes=['str','code'],
+            hint="A name for this keyboard object (e.g. response)")  
+        self.params['allowedKeys']=Param(sound, valType='str', allowedTypes=['str','code'],
+            updates="never", allowedUpdates=["never","routine"],
+            hint="The keys the user may press, e.g. a,b,q,left,right")  
+        self.params['times']=Param(times, valType='num', allowedTypes=['num','code'],
+            hint="A series of one or more periods to read the keyboard, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]")
+            
+    def writeInitCode(self,buff):
         pass#no need to initialise keyboards?
-    def generateFrameCode(self,buff):
-        """Generate the code that will be called every frame
+    def writeFrameCode(self,buff):
+        """Write the code that will be called every frame
         """
-        buff.writeIndented("Checking keys")
-        
+        self.writeTimeTestCode(buff)#writes an if statement to determine whether to draw etc
+        buff.setIndentLevel(1, relative=True)#because of the 'if' statement of the times test
+        #draw the stimulus
+        buff.writeIndented("%(name)s.getKeys(allowed=%(allowedKeys)s)\n" %(self.params))
+        buff.setIndentLevel(-1, relative=True)        
 
 class MouseComponent(BaseComponent):
     """An event class for checking the mouse location and buttons at given times"""
-    def __init__(self, name='mouse', times=[0,1]):
+    def __init__(self, name='mouse', times=[0,1], save='final'):
         self.type='Mouse'
         self.params={}
-        self.params['name']=name
-        self.params['times']=times
-        
-        self.hints={}
-        self.hints['name']="Even mice have names"
-        self.hints['times']="A series of one or more periods to read the mouse, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]"
-        #for choiceboxes what are the allowed options?
-        self.allowed={}
-    def generateInitCode(self,buff):
+        self.params['name']=Param(name, valType='str', allowedTypes=['str','code'],
+            hint="Even mice have names!") 
+        self.params['times']=Param(times, valType='num', allowedTypes=['num','code'],
+            hint="A series of one or more periods to read the mouse, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]")
+        self.params['save']=Param(save, valType='str', allowedVals=['final values','every frame']
+    def writeInitCode(self,buff):
         pass#no need to initialise?
-    def generateFrameCode(self,buff):
-        """Generate the code that will be called every frame
+    def writeFrameCode(self,buff):
+        """Write the code that will be called every frame
         """
-        buff.writeIndented("Checking keys")
+        self.writeTimeTestCode(buff)#writes an if statement to determine whether to draw etc
+        buff.setIndentLevel(1, relative=True)#because of the 'if' statement of the times test
+        self.writeParamUpdates(buff, 'frame')
+        buff.writeIndented("TODO: check mouse")
+        buff.setIndentLevel(-1, relative=True)#because of the 'if' statement of the times test
         
                 
