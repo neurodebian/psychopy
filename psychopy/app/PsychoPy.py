@@ -7,17 +7,17 @@ class PsychoSplashScreen(wx.SplashScreen):
     """
     Create a splash screen widget.
     """
-    def __init__(self, parent=None):
+    def __init__(self, app):
         # This is a recipe to a the screen.
         # Modify the following variables as necessary.
-        self.parent=parent
-        splashFile = os.path.join(dirRes, 'psychopySplash.png')
+        self.app=app
+        splashFile = os.path.join(self.app.dirResources, 'psychopySplash.png')
         aBitmap = wx.Image(name = splashFile).ConvertToBitmap()
         splashStyle = wx.SPLASH_CENTRE_ON_SCREEN | wx.NO_BORDER
         # Call the constructor with the above arguments in exactly the
         # following order.
         wx.SplashScreen.__init__(self, aBitmap, splashStyle,
-                                 0, parent)
+                                 0, None)
         #setup statusbar  
         self.SetBackgroundColour('WHITE')
         self.status = wx.StaticText(self, -1, "Initialising PsychoPy and Libs", 
@@ -29,7 +29,7 @@ class PsychoSplashScreen(wx.SplashScreen):
         
 class PsychoPyApp(wx.App):
     def OnInit(self):
-        mainFrame = 'coder'
+        mainFrame = 'builder'
         if len(sys.argv)>1:
             if sys.argv[1]==__name__:
                 args = sys.argv[2:] # program was excecuted as "python.exe PsychoPyIDE.py %1'
@@ -95,9 +95,27 @@ class PsychoPyApp(wx.App):
             self.frame = builder.BuilderFrame(None, -1, 
                                       title="PsychoPy Experiment Builder",
                                       files = args, app=self)
-        splash = PsychoSplashScreen(self.frame)
+        splash = PsychoSplashScreen(self)
         if splash:
             splash.Show()
+        
+            """This is in wx demo. Probably useful one day.
+            #---------------------------------------------
+            def ShowTip(self):
+                config = GetConfig()
+                showTipText = config.Read("tips")
+                if showTipText:
+                    showTip, index = eval(showTipText)
+                else:
+                    showTip, index = (1, 0)
+                    
+                if showTip:
+                    tp = wx.CreateFileTipProvider(opj("data/tips.txt"), index)
+                    ##tp = MyTP(0)
+                    showTip = wx.ShowTip(self, tp)
+                    index = tp.GetCurrentTip()
+                    config.Write("tips", str( (showTip, index) ))
+                    config.Flush()"""
         
         self.frame.Show(True)
         self.SetTopWindow(self.frame)
@@ -109,8 +127,6 @@ class PsychoPyApp(wx.App):
         print 'prevFiles', self.options['prevFiles']
         toPickle(optionsPath, self.options)
         self.frame.Destroy()
-#        self.Destroy()
-#        sys.exit(0)
         
 if __name__=='__main__':
     app = PsychoPyApp(0)

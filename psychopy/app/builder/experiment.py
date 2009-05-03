@@ -74,7 +74,7 @@ run on any platform on which PsychoPy (www.psychopy.org) can be installed\n \
                     print 'found component: %s' %names[-1]
                     
 
-class Param():
+class Param:
     """Defines parameters for Experiment Components
     A string representation of the parameter will depend on the valType:
     
@@ -113,13 +113,14 @@ class Param():
         self.allowedTypes=allowedTypes
         self.hint=hint
         self.updates=updates
-        self.allowedUpdates
+        self.allowedUpdates=allowedUpdates
+        self.allowedVals=allowedVals
     def __str__(self):
-        if valType == 'num':
+        if self.valType == 'num':
             return "numpy.asarray(%s)" %(self.val)
-        if valType == 'str':
+        if self.valType == 'str':
             return "\"%s\"" %(self.val)
-        if valType == 'code':
+        if self.valType == 'code':
             return "%s" %(self.val)
     
 class TrialHandler():    
@@ -127,7 +128,7 @@ class TrialHandler():
             (e.g. generating a psychopy TrialHandler or StairHandler).
             """
     def __init__(self, name, loopType, nReps, 
-        trialList=[], trialListFile=''):
+        trialList=[], trialListFile='',endPoints=[0,1]):
         """
         @param name: name of the loop e.g. trials
         @type name: string
@@ -142,31 +143,21 @@ class TrialHandler():
         """
         self.type='TrialHandler'
         self.params={}
-        self.params['loopType']=Param(loopType, valType='str', 
-            hint="'random','sequential'")
-        self.params['name']=Param(name, valType='str', allowedTypes=None, updates=None, allowedUpdates=None,
+        self.params['name']=Param(name, valType='str', updates=None, allowedUpdates=None,
             hint="Name of this loop")
-        self.params['nReps']=Param(nReps, valType='num', allowedTypes=None, updates=None, allowedUpdates=None,
+        self.params['nReps']=Param(nReps, valType='num', updates=None, allowedUpdates=None,
             hint="Number of repeats (for each type of trial)")
-        self.params['trialList']=Param(trialList, valType='str', allowedTypes=None, updates=None, allowedUpdates=None,
+        self.params['trialList']=Param(trialList, valType='str', updates=None, allowedUpdates=None,
             hint="A list of dictionaries describing the differences between each trial type")
-        self.params['trialListFile']=Param(trialListFile, valType='str', allowedTypes=None, updates=None, allowedUpdates=None,
+        self.params['trialListFile']=Param(trialListFile, valType='str', updates=None, allowedUpdates=None,
             hint="A comma-separated-value (.csv) file specifying the parameters for each trial")
-        self.params['endPoints']=Param(endPoints, valType='num', allowedTypes=None, updates=None, allowedUpdates=None,
-            hint="The start and end of the loop (see flow timeline)")
-        self.params['name']=name
-        self.params['loopType']=loopType
-        self.params['nReps']=nReps
-        self.params['trialList']=trialList
-        self.params['trialListFile']=trialListFile
-        self.hints={}
-        self.hints['loopType']="'random','sequential'"
-        self.hints['name'] = 'Name of this loop'
-        self.hints['nReps']='Number of repeats (for each type of trial)'
-        self.hints['trialList']="A list of dictionaries describing the differences between each trial type"
-        self.hints['trialListFile']='A comma-separated-value (.csv) file specifying the parameters for each trial'
-        self.hints['endPoints']='The start and end of the loop (see flow timeline)'
-        self.allowed={}
+        self.params['endPoints']=Param(endPoints, valType='num', updates=None, allowedUpdates=None,
+            hint="The start and end of the loop (see flow timeline)")      
+        self.params['loopType']=Param(loopType, valType='str', allowedVals=['random','sequential','staircase'],
+            hint="How should the next trial value(s) be chosen?")#NB staircase is added for the sake of the loop properties dialog
+        #these two are really just for making the dialog easier (they won't be used to generate code)
+        self.params['endPoints']=Param(endPoints,valType='num',
+            hint='Where to loop from and to (see values currently shown in the flow view)')
     def writeInitCode(self,buff):
         buff.writeIndented("%s=data.TrialHandler(trialList=%s,nReps=%i,\n)" \
             %(self.params['name'], self.params['trialList'], self.params['nReps']))
@@ -180,7 +171,7 @@ class TrialHandler():
 class StairHandler():    
     """A staircase experimental control object.
     """
-    def __init__(self, name, nReps, nReversals, stepSizes, stepType, startVal):
+    def __init__(self, name, nReps, nReversals, stepSizes, stepType, startVal, endPoints=[0,1]):
         """
         @param name: name of the loop e.g. trials
         @type name: string
@@ -189,8 +180,6 @@ class StairHandler():
         """
         self.type='StairHandler'
         self.params={}
-        self.params['loopType']=Param(loopType, valType='str', 
-            hint="Name of this loop")
         self.params['name']=Param(name, valType='str', 
             hint="Name of this loop")
         self.params['nReps']=Param(nReps, valType='num', 
@@ -203,21 +192,11 @@ class StairHandler():
             hint="The units of the step size (e.g. 'linear' will add/subtract that value each step, whereas 'log' will ad that many log units)")
         self.params['nReversals']=Param(nReversals, valType='num', 
             hint="Minimum number of times the staircase must change direction before ending")
-        self.params['loopType']='staircase'
-        self.params['name'] = name
-        self.params['nReps']=nReps
-        self.params['step sizes']=stepSizes
-        self.params['step type']=stepType
-        self.params['nReversals']=nReversals
-        self.hints={}
-        self.hints['name'] = 'Name of this loop'
-        self.hints['nReps']='Minimum number of trials in the staircase'
-        self.hints['nReversals']='Minimum number of times the staircase must change direction before ending'
-        self.hints['step type']="The units of the step size (e.g. 'linear' will add/subtract that value each step, whereas 'log' will ad that many log units)"
-        self.hints['step sizes']="The size of the jump at each step (can change on each 'reversal')"
-        self.hints['endPoints']='The start and end of the loop (see flow timeline)'
-        self.allowed={}
-        self.allowed['step types']=['linear','log','db']
+        #these two are really just for making the dialog easier (they won't be used to generate code)
+        self.params['loopType']=Param('staircase', valType='str', allowedVals=['random','sequential','staircase'],
+            hint="How should the next trial value(s) be chosen?")#NB this is added for the sake of the loop properties dialog
+        self.params['endPoints']=Param(endPoints,valType='num',
+            hint='Where to loop from and to (see values currently shown in the flow view)')
     def writeInitCode(self,buff):
         buff.writeIndented("init loop '%s' (%s)\n" %(self.params['name'], self.loopType))
         buff.writeIndented("%s=data.StairHandler(nReps=%i,\n)" \
@@ -375,7 +354,7 @@ class BaseComponent:
         for thisParamName in self.params.keys():
             thisParam=self.params[thisParamName]
             if thisParam.updates=='frame':
-                buff.writeIndented"%s.set%s(%s)" %(self.params['name'], thisParamName.capitalize(), thisParam)
+                buff.writeIndented("%s.set%s(%s)" %(self.params['name'], thisParamName.capitalize(), thisParam) )
     
 
 class VisualComponent(BaseComponent):
@@ -384,12 +363,12 @@ class VisualComponent(BaseComponent):
     def __init__(self, name='', units='window units', colour=[1,1,1],
         pos=[0,0], size=[0,0], ori=0, times=[0,1], colourSpace='rgb'):
         self.params={}
-        self.params['name']=Param(name, valType='str', 
+        self.params['name']=Param(name, valType='str', allowedTypes=['str'],
+            updates="never", allowedUpdates=["never"],
             hint="Name of this stimulus")
         self.params['units']=Param(units, valType='str', allowedVals=['window units', 'deg', 'cm', 'pix', 'norm'],
-        
             hint="Units of dimensions for this stimulus")
-        self.params['colour']=Param(rgb, valType='num', allowedTypes=['num','str','code'],
+        self.params['colour']=Param(colour, valType='num', allowedTypes=['num','str','code'],
             updates="never", allowedUpdates=["never","routine","frame"],
             hint="Colour of this stimulus (e.g. [1,1,0], 'red' )")
         self.params['colourSpace']=Param(colourSpace, valType='str', allowedVals=['rgb','dkl','lms'],
@@ -404,6 +383,7 @@ class VisualComponent(BaseComponent):
             updates="never", allowedUpdates=["never","routine","frame"],
             hint="Orientation of this stimulus (in deg)")
         self.params['times']=Param(times, valType='num', allowedTypes=['num','code'],
+            updates="never", allowedUpdates=["never"],
             hint="Start and end times for this stimulus (e.g. [0,1] or [[0,1],[2,3]] for a repeated appearance")
             
     def writeFrameCode(self,buff):
@@ -430,7 +410,7 @@ class TextComponent(VisualComponent):
         self.params['text']=Param(text, valType='str', allowedTypes=['str','code'],
             updates="never", allowedUpdates=["never","routine","frame"],
             hint="The text to be displayed")
-        self.params['font']=Param(ori, valType='str', allowedTypes=['str','code'],
+        self.params['font']=Param(font, valType='str', allowedTypes=['str','code'],
             updates="never", allowedUpdates=["never","routine","frame"],
             hint="The font name, or a list of names, e.g. ['arial','verdana']")
         #change the hint for size
@@ -460,13 +440,14 @@ class PatchComponent(VisualComponent):
             hint="An image to define the alpha mask (ie shape)- 'gauss','circle'... or a filename (including path)")        
         self.params['sf']=Param(sf, valType='num', allowedTypes=['num','code'],
             updates="never", allowedUpdates=["never","routine","frame"],
-            "Spatial frequency of image repeats across the patch, e.g. 4 or [2,3]")        
+            hint="Spatial frequency of image repeats across the patch, e.g. 4 or [2,3]")        
         self.params['interpolate']=Param(mask, valType='str', allowedVals=['linear','nearest'],
+            updates="never", allowedUpdates=["never"],
             hint="How should the image be interpolated if/when rescaled")
                 
     def writeInitCode(self,buff):
         buff.writeIndented("%(name)s=PatchStim(win=win, tex=%(image)s, mask=%(mask)s,\n" %(self.params))
-        buff.writeIndented("    pos=%(pos)s, size=%(size)s)\n" %(self.params)
+        buff.writeIndented("    pos=%(pos)s, size=%(size)s)\n" %(self.params) )
 
 class MovieComponent(VisualComponent):
     """An event class for presenting image-based stimuli"""
@@ -480,13 +461,13 @@ class MovieComponent(VisualComponent):
         junk = self.params.pop('colour')
         junk = self.params.pop('colourSpace')
         self.type='Movie'
-        self.params['movie']=Param(image, valType='str', allowedTypes=['str','code'],
+        self.params['movie']=Param(movie, valType='str', allowedTypes=['str','code'],
             updates="never", allowedUpdates=["never","routine"],
             hint="A filename for the movie (including path)")        
                 
     def writeInitCode(self,buff):
         buff.writeIndented("%(name)s=MovieStim(win=win, movie=%(movie)s,\n" %(self.params))
-        buff.writeIndented("    ori=%(ori)s, pos=%(pos)s, size=%(size)s)\n" %(self.params)
+        buff.writeIndented("    ori=%(ori)s, pos=%(pos)s, size=%(size)s)\n" %(self.params))
         
 class SoundComponent(BaseComponent):
     """An event class for presenting image-based stimuli"""
@@ -501,6 +482,7 @@ class SoundComponent(BaseComponent):
             updates="never", allowedUpdates=["never","routine"],
             hint="A sound can be a string (e.g. 'A' or 'Bf') or a number to specify Hz, or a filename")  
         self.params['times']=Param(times, valType='num', allowedTypes=['num','code'],
+            updates="never", allowedUpdates=["never"],
             hint="A series of one or more onset/offset times, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]")  
 
     def writeInitCode(self,buff):
@@ -528,6 +510,7 @@ class KeyboardComponent(BaseComponent):
             updates="never", allowedUpdates=["never","routine"],
             hint="The keys the user may press, e.g. a,b,q,left,right")  
         self.params['times']=Param(times, valType='num', allowedTypes=['num','code'],
+            updates="never", allowedUpdates=["never"],
             hint="A series of one or more periods to read the keyboard, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]")
             
     def writeInitCode(self,buff):
@@ -549,8 +532,9 @@ class MouseComponent(BaseComponent):
         self.params['name']=Param(name, valType='str', allowedTypes=['str','code'],
             hint="Even mice have names!") 
         self.params['times']=Param(times, valType='num', allowedTypes=['num','code'],
+            updates="never", allowedUpdates=["never"],
             hint="A series of one or more periods to read the mouse, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]")
-        self.params['save']=Param(save, valType='str', allowedVals=['final values','every frame']
+        self.params['save']=Param(save, valType='str', allowedVals=['final values','every frame'])
     def writeInitCode(self,buff):
         pass#no need to initialise?
     def writeFrameCode(self,buff):

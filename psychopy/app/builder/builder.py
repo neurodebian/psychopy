@@ -139,12 +139,9 @@ class FlowPanel(wx.ScrolledWindow):
         #bring up listbox to choose the routine to add and/or create a new one
         loopDlg = DlgLoopProperties(frame=self.frame)
         if loopDlg.OK:
-            if loopDlg.params['loopType']=='staircase': #['random','sequential','staircase']
-                handler= loopDlg.stairHandler
-            else:
-                handler=loopDlg.trialHandler
-            handler.params=loopDlg.params
-            self.frame.exp.flow.addLoop(handler, startPos=loopDlg.params['endPoints'][0], endPos=loopDlg.params['endPoints'][1])
+            handler=loopDlg.currentHandler
+            exec("ends=%s" %handler.params['endPoints'])#creates a copy of endPoints as an array
+            self.frame.exp.flow.addLoop(handler, startPos=ends[0], endPos=ends[1])
             self.frame.setIsModified(True)
             print 'final type',handler.type, 
             print 'final loop params',handler.params
@@ -163,9 +160,9 @@ class FlowPanel(wx.ScrolledWindow):
         self.redrawFlow()
         
         loopDlg = DlgLoopProperties(frame=self.frame,
-            title=loop.params['name']+' Properties', loop=loop)
+            title=loop.params['name'].val+' Properties', loop=loop)
         if loopDlg.OK:
-            if loopDlg.params['loopType']=='staircase': #['random','sequential','staircase']
+            if loopDlg.params['loopType'].val=='staircase': #['random','sequential','staircase']
                 loop= loopDlg.stairHandler
             else:
                 loop=loopDlg.trialHandler
@@ -185,7 +182,7 @@ class FlowPanel(wx.ScrolledWindow):
         if event.LeftDown():
             x,y = self.ConvertEventCoords(event)
             #l = self.pdc.FindObjectsByBBox(x, y)
-            icons = self.pdc.FindObjects(x, y, hitradius)
+            icons = self.pdc.FindObjects(x, y, self.hitradius)
             if len(icons): 
                 self.editLoopProperties(loop=self.loopFromID[icons[0]])
         elif event.RightDown():
@@ -271,7 +268,7 @@ class FlowPanel(wx.ScrolledWindow):
         #draw the loops second    
         self.loopInits.reverse()#start with last initiator (paired with first terminator)   
         for n, loopInit in enumerate(self.loopInits):
-            name = self.loops[n].params['name']#name of the trialHandler/StairHandler
+            name = self.loops[n].params['name'].val#name of the trialHandler/StairHandler
             self.drawLoop(pdc,name,self.loops[n], 
                         startX=self.loopInits[n], endX=self.loopTerms[n],
                         base=linePos,height=linePos-60-n*15)
@@ -502,7 +499,7 @@ class RoutineCanvas(wx.ScrolledWindow):
         if event.LeftDown():
             x,y = self.ConvertEventCoords(event)
             #l = self.pdc.FindObjectsByBBox(x, y)
-            icons = self.pdc.FindObjects(x, y, hitradius)
+            icons = self.pdc.FindObjects(x, y, self.hitradius)
             if len(icons): 
                 self.editComponentProperties(component=self.componentFromID[icons[0]])
         elif event.RightDown():
@@ -713,7 +710,7 @@ class ComponentsPanel(scrolled.ScrolledPanel):
         self.componentButtons={}; self.componentFromID={}
         for eventType in eventTypes:
             img =wx.Bitmap(
-                os.path.join(self.app.dirRes,"%sAdd.png" %eventType.lower()))    
+                os.path.join(self.app.dirResources,"%sAdd.png" %eventType.lower()))    
             btn = wx.BitmapButton(self, -1, img, (20, 20),
                            (img.GetWidth()+10, img.GetHeight()+10),
                            name=eventType)  
@@ -732,7 +729,7 @@ class ComponentsPanel(scrolled.ScrolledPanel):
         exec('newComp = experiment.%s()' %newClassStr)
         dlg = DlgComponentProperties(frame=self.frame,
             title=componentName+' Properties',
-            params = newComp.params, hints=newComp.hints)
+            params = newComp.params)
         if dlg.OK:
             currRoutinePage = self.frame.routinePanel.getCurrentPage()
             currRoutine = self.frame.routinePanel.getCurrentRoutine()
@@ -740,25 +737,97 @@ class ComponentsPanel(scrolled.ScrolledPanel):
             currRoutinePage.redrawRoutine()#update the routine's view with the new component too
 #            currRoutinePage.Refresh()#done at the end of redrawRoutine
             self.frame.setIsModified(True)
-class _BaseParamsDlg(wx.Dialog):   
-    def __init__(self,frame,title,params,hints,fixed=[],allowed={},
-            pos=wx.DefaultPosition, size=wx.DefaultSize,
-            style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
-        style=style|wx.RESIZE_BORDER
+            
+class ParamCtrls:
+    def __init__(self, dlg, label, param, browse=False, noCtrls=False):
+        """Create a set of ctrls for a particular Component Parameter, to be
+        used in Component Properties dialogs. These need to be positioned 
+        by the calling dlg.
         
+        e.g.::
+            param = experiment.Param(val='boo', valType='str')
+            ctrls=ParamCtrls(dlg=self, label=fieldName,param=param)
+            self.paramCtrls[fieldName] = ctrls #keep track of them in the dlg
+            self.sizer.Add(ctrls.nameCtrl, (self.currRow,0), (1,1),wx.ALIGN_RIGHT )
+            self.sizer.Add(ctrls.valueCtrl, (self.currRow,1) )
+            #these are optional (the parameter might be None)
+            if ctrls.typeCtrl: self.sizer.Add(ctrls.typeCtrl, (self.currRow,2) )
+            if ctrls.updateCtrl: self.sizer.Add(ctrls.updateCtrl, (self.currRow,3))  
+            
+        If browse is True then a browseCtrl will be added (you need to bind events yourself)
+        If noCtrls is True then no actual wx widgets are made, but attribute names are created
+        """
+        self.param = param
+        self.dlg = dlg
+        self.valueWidth = 150
+        #param has the fields:
+        #val, valType, allowedVals=[],allowedTypes=[], hint="", updates=None, allowedUpdates=None
+        # we need the following
+        self.nameCtrl = self.valueCtrl = self.typeCtrl = self.updateCtrl = None
+        self.browseCtrl = None
+        if noCtrls: return#we don't need to do any more
+        
+        if type(param.val)==numpy.ndarray:
+            initial=initial.tolist() #convert numpy arrays to lists
+        labelLength = wx.Size(self.valueWidth,25)#was 8*until v0.91.4
+        self.nameCtrl = wx.StaticText(self.dlg,-1,label,size=labelLength,
+                                        style=wx.ALIGN_RIGHT)
+                                        
+        if label=='text':
+            #for text input we need a bigger (multiline) box
+            self.valueCtrl = wx.TextCtrl(self.dlg,-1,str(param.val),
+                style=wx.TE_MULTILINE,
+                size=wx.Size(self.valueWidth,-1))     
+        elif param.valType=='bool': 
+            #only True or False - use a checkbox   
+             self.valueCtrl = wx.CheckBox(self.dlg, size = wx.Size(self.valueWidth,-1))
+             self.valueCtrl.SetValue(param.val)             
+        elif len(param.allowedVals)>1:
+            #there are limitted options - use a Choice control
+            self.valueCtrl = wx.Choice(self.dlg, choices=param.allowedVals, size=wx.Size(self.valueWidth,-1))
+            self.valueCtrl.SetStringSelection(unicode(param.val))
+        else:
+            #create the full set of ctrls
+            self.valueCtrl = wx.TextCtrl(self.dlg,-1,str(param.val),
+                        size=wx.Size(self.valueWidth,-1))
+
+        self.valueCtrl.SetToolTipString(param.hint)
+        
+        #create the type control
+        if len(param.allowedTypes)==0: 
+            pass
+        else: 
+            self.typeCtrl = wx.Choice(self.dlg, choices=param.allowedTypes)
+            self.typeCtrl.SetStringSelection(param.valType)
+        if len(param.allowedTypes)==1: 
+            self.typeCtrl.Disable()#visible but can't be changed
+            
+        #create update control
+        if param.allowedUpdates==None or len(param.allowedUpdates)==0:
+            pass
+        else:
+            self.updateCtrl = wx.Choice(self.dlg, choices=param.allowedUpdates)
+            self.updateCtrl.SetStringSelection(param.updates)
+        if param.allowedUpdates!=None and len(param.allowedUpdates)==1: 
+            self.updateCtrl.Disable()#visible but can't be changed
+        #create browse control
+        if browse:
+            self.browseCtrl = wx.Button(self.dlg, -1, "Browse...") #we don't need a label for this  
+        
+class _BaseParamsDlg(wx.Dialog):   
+    def __init__(self,frame,title,params,
+            pos=wx.DefaultPosition, size=wx.DefaultSize,
+            style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT|wx.RESIZE_BORDER):        
         wx.Dialog.__init__(self, frame,-1,title,pos,size,style)
         self.frame=frame
         self.app=frame.app
         self.Center()
-        
+        self.panel = wx.Panel(self, -1)
         self.params=params   #dict
-        self.fixed=fixed     #list
-        self.allowed=allowed # dict
-        self.hints=hints     # dict
-        self.inputFields = {}
-        self.inputFieldTypes= {}
+        self.paramCtrls={}
         self.data = []
-        self.sizer = wx.BoxSizer(wx.VERTICAL)
+        self.sizer= wx.GridBagSizer(vgap=2,hgap=2)
+        self.currRow = 0
         
         keys = sorted(self.params.keys())
         
@@ -769,21 +838,30 @@ class _BaseParamsDlg(wx.Dialog):
         if 'name' in keys:
             keys.remove('name')
             keys.insert(0,'name')
-        #loop through the params    
+        #create a header row of titles        
+        size=wx.Size(100,-1)
+        self.sizer.Add(wx.StaticText(self,-1,'Parameter',size=size, style=wx.ALIGN_CENTER),(self.currRow,0))
+        self.sizer.Add(wx.StaticText(self,-1,'Value',size=size, style=wx.ALIGN_CENTER),(self.currRow,1))
+        self.sizer.Add(wx.StaticText(self,-1,'Value Type',size=size, style=wx.ALIGN_CENTER),(self.currRow,2))
+        self.sizer.Add(wx.StaticText(self,-1,'Update Frequency',size=size, style=wx.ALIGN_CENTER),(self.currRow,3))
+        self.currRow+=1
+        self.sizer.Add(wx.StaticLine(self,-1), (self.currRow,0), (1,4))
+        self.currRow+=1
+        
+        #loop through the params
         for fieldName in keys:
-            #check if it has limited set of options
-            if fieldName in self.allowed.keys(): allowed=self.allowed[fieldName]
-            else: allowed=[]
-            #create the field (with a label)
-            fieldCtrl, fieldLabel= self.addField(fieldName,self.params[fieldName], allowed,self.hints[fieldName])
-            if fieldName in fixed: fieldCtrl.Disable()
-            #store info about the field
-            self.inputFields[fieldName] = fieldCtrl
-            self.inputFieldTypes[fieldName]=type(self.params[fieldName])
-            
-        #show it and collect data
-        self.sizer.Fit(self)
-    
+            param=self.params[fieldName]
+            ctrls=ParamCtrls(dlg=self, label=fieldName,param=param)
+            self.paramCtrls[fieldName] = ctrls
+            # self.valueCtrl = self.typeCtrl = self.updateCtrl
+            self.sizer.Add(ctrls.nameCtrl, (self.currRow,0), (1,1),wx.ALIGN_RIGHT )
+            self.sizer.Add(ctrls.valueCtrl, (self.currRow,1) )
+            if ctrls.typeCtrl: 
+                self.sizer.Add(ctrls.typeCtrl, (self.currRow,2) )
+            if ctrls.updateCtrl: 
+                self.sizer.Add(ctrls.updateCtrl, (self.currRow,3))      
+            self.currRow+=1
+        
     def addText(self, text, size=None):
         if size==None:
             size = wx.Size(8*len(text)+16, 25)
@@ -791,12 +869,14 @@ class _BaseParamsDlg(wx.Dialog):
                                 label=text,
                                 style=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_CENTER_HORIZONTAL,
                                 size=size)
-        self.sizer.Add(myTxt,0,wx.ALIGN_CENTER)
+        self.sizer.Add(myTxt,wx.EXPAND)#add to current row spanning entire
         return myTxt
         
     def show(self):
-        """Adds an OK and cancel button, shows dialogue. After showing a .OK
-        attribute is created which is simply True or False (unlike wx.OK)
+        """Adds an OK and cancel button, shows dialogue. 
+        
+        This method returns wx.ID_OK (as from ShowModal), but also 
+        sets self.OK to be True or False
         """
         #add buttons for OK and Cancel
         buttons = wx.BoxSizer(wx.HORIZONTAL)
@@ -805,110 +885,68 @@ class _BaseParamsDlg(wx.Dialog):
         buttons.Add(OK, 0, wx.ALL,border=3)
         CANCEL = wx.Button(self, wx.ID_CANCEL, " Cancel ")
         buttons.Add(CANCEL, 0, wx.ALL,border=3)
-        self.sizer.Add(buttons,1,flag=wx.ALIGN_RIGHT|wx.ALIGN_BOTTOM|wx.ALL,border=3)
-        
+#        self.sizer.Add(buttons,1,flag=wx.ALIGN_RIGHT|wx.ALIGN_BOTTOM|wx.ALL,border=3)
+        self.sizer.Add(buttons) 
         self.SetSizerAndFit(self.sizer)
-        if self.ShowModal() == wx.ID_OK:
-            self.OK=True
-        else: 
-            self.OK=False
-    def getData(self):
-        """retrieves data from any fields in self.inputFields 
-        (self.inputFields was populated during the __init__ function)
+        #do show and process return
+        retVal = self.ShowModal() 
+        if retVal== wx.ID_OK: self.OK=True
+        else:  self.OK=False
+        return wx.ID_OK
+        
+    def getParams(self):
+        """retrieves data from any fields in self.paramCtrls 
+        (populated during the __init__ function)
+        
+        The new data from the dlg get inserted back into the original params
+        used in __init__ and are also returned from this method.
         """
         #get data from input fields
-        self.data={}      
-        print 'getting data from:', self.inputFields.keys()   
-        for thisFieldName in self.inputFields.keys():
-            thisVal = self.inputFields[thisFieldName].GetValue()
+        for fieldName in self.params.keys():
+            param=self.params[fieldName]
+            ctrls = self.paramCtrls[fieldName]#the various dlg ctrls for this param            
+            param.val = ctrls.valueCtrl.GetValue()
+            if ctrls.typeCtrl: param.valType = ctrls.typeCtrl.GetValue()
+            if ctrls.updateCtrl: param.updates = ctrls.updateCtrl.getValue()
+            print "name:%s, val:%s, type:%s, updates:%s" %(fieldName, param.val, param.valType, param.updates)
             
-            thisType= self.inputFieldTypes[thisFieldName]
-            #try to handle different types of input from strings
-            if thisType in [tuple,list,float,int]:
-                #probably a tuple or list
-                exec("self.data[thisFieldName]="+thisVal+"")#evaluate it
-            elif thisType==numpy.ndarray:
-                exec("self.data[thisFieldName]=numpy.array("+thisVal+")")
-            elif thisType==bool:
-                self.data[thisFieldName] = bool(thisVal)
-            elif thisType in [str, unicode]:
-                self.data[thisFieldName]=thisVal
-            else:
-                print "GOT %s (type=%s) for %s" %(thisVal, thisType, self.inputFields[n])
-            self.params[thisFieldName]=self.data[thisFieldName]
-                
-    def addField(self, label='', initial='',allowed=[], hint=''):
-        """
-        Adds a (labelled) input field to a dialogue box
-        Returns a handle to the field (but not to the label)
-                
-        usage: field = addDlgField(sizer, label='', initial='', hint='')
-        
-        """
-        if type(initial)==numpy.ndarray:
-            initial=initial.tolist() #convert numpy arrays to lists
-        labelLength = wx.Size(9*len(label)+16,25)#was 8*until v0.91.4
-        container=wx.BoxSizer(wx.HORIZONTAL)
-        inputLabel = wx.StaticText(self,-1,label,
-                                        size=labelLength,
-                                        style=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT)
-        if label=='text':
-            #for text input we need a bigger (multiline) box
-            inputBox = wx.TextCtrl(self,-1,str(initial),
-                style=wx.TE_MULTILINE,
-                size=wx.Size(30*self.maxFieldLength,-1))       
-        elif len(allowed)==2 and (True in allowed) and (False in allowed): 
-            #only True or False - use a checkbox   
-             inputBox = wx.CheckBox(self)
-             inputBox.SetValue(initial)
-        elif len(allowed)>1:
-            #there are limitted options - use a Choice control
-            inputBox = wx.Choice(self, choices=allowed)
-        else:
-            inputBox = wx.TextCtrl(self,-1,str(initial),size=wx.Size(10*self.maxFieldLength,-1))
-        inputBox.SetToolTipString(hint)
-        container.Add(inputLabel, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT|wx.ALL, border=3)
-        container.Add(inputBox,proportion=1, flag=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_LEFT|wx.ALL, border=3)
-        self.sizer.Add(container, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_RIGHT|wx.ALL, border=3)
-        
-        return inputBox, inputLabel
+        return self.params()
+            
 class DlgLoopProperties(_BaseParamsDlg):    
     def __init__(self,frame,title="Loop properties",loop=None,
             pos=wx.DefaultPosition, size=wx.DefaultSize,
-            style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
-        style=style|wx.RESIZE_BORDER
-        #if the loop is being created there should be no parameters
-        if hasattr(loop,'type') and loop.type in ['TrialHandler','StairHandler']:
-            paramsInit=loop.params; hintsInit=loop.hints
-        else:
-            paramsInit={'name':''}; hintsInit={'name':'e.g. trials, epochs, trialLoop'}
-            
-        _BaseParamsDlg.__init__(self, frame,title,
-                    params={},hints={})
+            style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT|wx.RESIZE_BORDER):       
+        wx.Dialog.__init__(self, frame,-1,title,pos,size,style)
         self.frame=frame
         self.app=frame.app
         self.Center()
-        self.sizer = wx.BoxSizer(wx.VERTICAL)#needs to be done before any addField calls
+        self.panel = wx.Panel(self, -1)
+        self.globalCtrls={}
+        self.constantsCtrls={}
+        self.staircaseCtrls={}
+        self.data = []
+        self.sizer= wx.BoxSizer(wx.VERTICAL)
         
-        self.maxFieldLength = 10 #max( len(str(self.params[x])) for x in keys )
-        
-        self.initLoop=loop
         #create instances of the two loop types
-        if hasattr(loop,'type') and loop.type=='TrialHandler':
-            self.trialHandler = loop
-            print 'loop', loop.params
-        else:
-            self.trialHandler=experiment.TrialHandler(name=paramsInit['name'],loopType='random',nReps=5,trialList=[]) #for 'random','sequential'
-        if hasattr(loop,'type') and loop.type=='StairHandler':
-            self.stairHandler = loop
-        else:
-            self.stairHandler=experiment.StairHandler(name=paramsInit['name'], 
-                nReps=50, nReversals=12,
-                stepSizes=[0.8,0.8,0.4,0.4,0.2], stepType='log') #for staircases
-                
+        if loop==None:
+            self.trialHandler=experiment.TrialHandler('trials',loopType='random',nReps=5,trialList=[]) #for 'random','sequential'
+            self.stairHandler=experiment.StairHandler('trials', nReps=50, nReversals=12,
+                stepSizes=[0.8,0.8,0.4,0.4,0.2], stepType='log', startVal=0.5) #for staircases
+            self.currentType='random'
+            self.currentHandler=self.trialHandler
+        elif loop.type=='TrialHandler':
+            self.trialHandler = self.currentHandler = loop
+            self.currentType=loop.params['loopType']#could be 'random' or 'sequential'
+            self.stairHandler=experiment.StairHandler('trials', nReps=50, nReversals=12,
+                stepSizes=[0.8,0.8,0.4,0.4,0.2], stepType='log', startVal=0.5) #for staircases
+        elif loop.type=='StairHandler':
+            self.stairHandler = self.currentHandler = loop            
+            self.currentType='staircase'
+            experiment.TrialHandler(name=paramsInit['name'],loopType='random',nReps=5,trialList=[]) #for 'random','sequential'
+
         self.makeGlobalCtrls()
+        self.makeConstantsCtrls()#the controls for Method of Constants
         self.makeStaircaseCtrls()
-        self.makeRandAndSeqCtrls()
         self.setCtrls(self.currentType)
         self.SetSizer(self.sizer)
         self.SetAutoLayout(True)
@@ -916,58 +954,24 @@ class DlgLoopProperties(_BaseParamsDlg):
         #show dialog and get most of the data
         self.show()
         if self.OK:
-            if self.currentType in ['random','sequential']:
-                self.inputFields.extend(self.randFields)
-            else:
-                self.inputFields.extend(self.stairFields)
-            self.getData()#standard data (from self.inputFields)
+            self.params = self.getParams()
             
-            #need to get additional data from non-standard fields
-            self.params['name']=self.nameField.GetValue()
-            exec("self.params['endPoints']= %s" %(self.endpointField.GetValue()))
-            self.params['loopType']=self.currentType
-            if self.currentType in ['random','sequential']:
-                self.params['nReps']= int(self.randFields['nReps'].GetValue())
-            else:
-                self.params['nReversals']= int(self.stairFields['nReversals'].GetValue())
-                self.params['nReps']= int(self.stairFields['nReps'].GetValue())   
-                             
     def makeGlobalCtrls(self):
-        self.inputFields={}
-        self.inputFieldLabels={}
-        self.inputFieldTypes={} #setup the chooser to set which type we need
-        
-        for fieldName in ['name','endPoints']:            
-            field, label, fieldType = self.addField(label=fieldName,initial=paramsInit[fieldName],
-                        allowed=[],hint=hintsInit[fieldName])
-            self.inputFields[fieldName]=field
-            self.inputFieldLabels[fieldName]=label
-            self.inputFieldTypes[fieldName]=fieldType
+        for fieldName in ['name','loopType','endPoints']: 
+            container=wx.BoxSizer(wx.HORIZONTAL)#to put them in     
+            self.globalCtrls[fieldName] = ctrls = ParamCtrls(self, fieldName, self.currentHandler.params[fieldName])
+            container.AddMany( (ctrls.nameCtrl, ctrls.valueCtrl))
+            self.sizer.Add(container)
             
-        self.loopTypes=['random','sequential','staircase']
-        if self.initLoop:
-            self.currentType=self.initLoop.params['loopType']
-            initEnds = self.initLoop.params['endPoints']
-        else: 
-            self.currentType=self.loopTypes[0]
-            initEnds = [0,1]
-        self.choiceLoop, label = self.addField(label='loop type',initial=self.currentType, allowed=self.loopTypes,
-            hint='How does the next trial get chosen?')
-        self.endpointField, label2 = self.addField(label='endPoints',initial=initEnds, 
-            hint='Where to loop from and to (see values currently shown in the flow view)')
-        self.Bind(wx.EVT_CHOICE, self.onTypeChanged, self.choiceLoop)
+        self.Bind(wx.EVT_CHOICE, self.onTypeChanged, self.globalCtrls['loopType'].valueCtrl)
         
-    def makeRandAndSeqCtrls(self):
+    def makeConstantsCtrls(self):
         #a list of controls for the random/sequential versions
         #that can be hidden or shown
-        self.randFields = {}
-        self.randFieldLabels={}
-        self.randFieldTypes={} 
         handler=self.trialHandler
-        
         #loop through the params 
         keys = handler.params.keys()  
-        #add trialList stuff to the end      
+        #add trialList stuff to the *end*      
         if 'trialListFile' in keys:
             keys.remove('trialListFile')
             keys.insert(-1,'trialListFile')
@@ -975,45 +979,48 @@ class DlgLoopProperties(_BaseParamsDlg):
             keys.remove('trialList')
             keys.insert(-1,'trialList')
         #then step through them    
-        for thisFieldName in keys:
-            if thisFieldName in ['name','loopType','endPoints']: continue
-            elif thisFieldName=='trialListFile':                
+        for fieldName in keys:
+            if fieldName in self.globalCtrls.keys():
+                #these have already been made and inserted into sizer
+                ctrls=self.globalCtrls[fieldName]
+            elif fieldName=='trialListFile':          
                 container=wx.BoxSizer(wx.HORIZONTAL)
-                if handler.params.has_key('trialListFile'):
-                    initPth=handler.params['trialListFile']
-                else: 
-                    initPth='Need a .csv file'
-                fieldCtrl = wx.StaticText(self,-1,self.getAbbriev(initPth),
-                    style=wx.ALIGN_RIGHT,
-                    size=wx.Size(30*self.maxFieldLength,-1))          
-                fieldLabelCtrl=wx.Button(self, -1, "Browse...") #we don't need a label for this  
-                self.Bind(wx.EVT_BUTTON, self.onBrowseTrialsFile,fieldLabelCtrl)  
-                fieldType=str
-                container.Add(fieldCtrl)
-                container.Add(fieldLabelCtrl)
+                ctrls=ParamCtrls(self, fieldName, handler.params[fieldName], browse=True) 
+                self.Bind(wx.EVT_BUTTON, self.onBrowseTrialsFile,ctrls.browseCtrl)  
+                container.AddMany((ctrls.nameCtrl, ctrls.valueCtrl, ctrls.browseCtrl))
                 self.sizer.Add(container)
-            elif thisFieldName=='trialList':
+            elif fieldName=='trialList':
                 if handler.params.has_key('trialList'):
                     text=self.getTrialsSummary(handler.params['trialList'])
-                    print text, type(text)
                 else: 
                     text = """No parameters set  """
+                ctrls = ParamCtrls(self, 'trialList',text,noCtrls=True)#we'll create our own widgets
                 size = wx.Size(200, 50)
-                fieldCtrl = self.trialListCtrl = self.addText(text, size)
-                fieldLabelCtrl=fieldCtrl #we don't need a label for this   
-                fieldType=str
+                ctrls.valueCtrl = self.addText(text, size)#NB this automatically adds to self.sizer
+                #self.sizer.Add(ctrls.valueCtrl)
             else: #normal text entry field
-                #check if it has limited set of options
-                if thisFieldName in handler.allowed.keys(): allowed=handler.allowed[thisFieldName]
-                else: allowed=[]
-                #create the field (with a label)
-                fieldCtrl, fieldLabelCtrl= self.addField(thisFieldName,
-                    handler.params[thisFieldName], allowed,handler.hints[thisFieldName])
-                fieldType = type(handler.params[thisFieldName])
+                container=wx.BoxSizer(wx.HORIZONTAL)
+                ctrls=ParamCtrls(self, fieldName, handler.params[fieldName])
+                container.AddMany((ctrls.nameCtrl, ctrls.valueCtrl))
+                self.sizer.Add(container)
             #store info about the field
-            self.randFields[thisFieldName]=fieldCtrl
-            self.randFieldLabels[thisFieldName]=fieldLabelCtrl
-            self.randFieldTypes[thisFieldName] =fieldType
+            self.constantsCtrls[fieldName] = ctrls
+    def makeStaircaseCtrls(self):
+        """Setup the controls for a StairHandler"""
+        handler=self.stairHandler
+        #loop through the params
+        for fieldName in handler.params.keys():
+            if fieldName in self.globalCtrls.keys():
+                #these have already been made and inserted into sizer
+                ctrls=self.globalCtrls[fieldName]
+            else: #normal text entry field
+                container=wx.BoxSizer(wx.HORIZONTAL)
+                ctrls=ParamCtrls(self, fieldName, handler.params[fieldName])
+                container.AddMany((ctrls.nameCtrl, ctrls.valueCtrl))
+                self.sizer.Add(container)
+            #store info about the field
+            self.staircaseCtrls[fieldName] = ctrls
+            
     def getAbbriev(self, longStr, n=30):
         """for a filename (or any string actually), give the first
         5 characters, an ellipsis and then n of the final characters"""
@@ -1047,53 +1054,36 @@ class DlgLoopProperties(_BaseParamsDlg):
                 thisTrial[fieldName] = trialsArr[trialN][fieldN]
             trialList.append(thisTrial)            
         self.params['trialList']=trialList
-    def makeStaircaseCtrls(self):
-        """Setup the controls for a StairHandler"""
-        self.stairFields = {}
-        self.stairFieldTypes={}
-        self.stairFieldLabels={}     
-        handler=self.stairHandler
-        #loop through the params
-        for thisFieldName in handler.params.keys():
-            if thisFieldName in ['name','loopType','endPoints']: continue
-            #check if it has limited set of options
-            if thisFieldName in handler.allowed.keys(): allowed=handler.allowed[thisFieldName]
-            else: allowed=[]
-            #create the field (with a label)
-            fieldCtrl, fieldLabelCtrl= self.addField(thisFieldName,
-                handler.params[thisFieldName], handler.allowed, handler.hints[thisFieldName])
-            #store info about the field
-            self.stairFields[thisFieldName] = fieldCtrl
-            self.stairFieldLabels[thisFieldName] =fieldLabelCtrl
-            self.stairFieldTypes[thisFieldName] = type(handler.params[thisFieldName])
-            
-            
     def setCtrls(self, ctrlType):
-        #take a copy of the input fields and append the label fields        
-#        randFields=copy.copy(self.randFields)#this was used when we had lists of fields instead of dicts
-#        randFields.extend(self.randFieldLabels)
-#        stairFields=copy.copy(self.stairFields)
-#        stairFields.extend(self.stairFieldLabels)
-
-        randFields=self.randFields.values()
-        randFields.extend(self.randFieldLabels.values())
-        stairFields=self.stairFields.values()
-        stairFields.extend(self.stairFieldLabels.values())
-        if ctrlType=='staircase':
-            for ctrl in randFields: ctrl.Hide()
-            for ctrl in stairFields:ctrl.Show()
-        else:
-            for ctrl in stairFields: ctrl.Hide()
-            for ctrl in randFields: ctrl.Show()
+        #choose the ctrls to show/hide
+        if ctrlType=='staircase': 
+            self.currentHandler = self.stairHandler
+            self.currentCtrls = self.staircaseCtrls
+            toHideCtrls = self.constantsCtrls
+        else: 
+            self.currentHandler = self.trialHandler
+            self.currentCtrls = self.constantsCtrls
+            toHideCtrls = self.staircaseCtrls
+        #hide them
+        for paramName in toHideCtrls.keys():
+            ctrls = toHideCtrls[paramName]
+            if ctrls.nameCtrl: ctrls.nameCtrl.Hide()
+            if ctrls.valueCtrl: ctrls.valueCtrl.Hide()
+            if ctrls.browseCtrl: ctrls.browseCtrl.Hide()
+        #show them
+        for paramName in self.currentCtrls.keys():
+            ctrls = self.currentCtrls[paramName]
+            if ctrls.nameCtrl: ctrls.nameCtrl.Show()
+            if ctrls.valueCtrl: ctrls.valueCtrl.Show()
+            if ctrls.browseCtrl: ctrls.browseCtrl.Show()
         self.sizer.Layout()
         self.Fit()       
+        self.Refresh()
     def onTypeChanged(self, evt=None):
         newType = evt.GetString()
         if newType==self.currentType:
             return
         self.setCtrls(newType)
-        self.currentType = newType
-        
     def onBrowseTrialsFile(self, event):
         dlg = wx.FileDialog(
             self, message="Open file ...", style=wx.OPEN
@@ -1104,20 +1094,38 @@ class DlgLoopProperties(_BaseParamsDlg):
             self.importTrialTypes(newPath)
             self.randFields['trialListFile'].SetLabel(self.getAbbriev(newPath))
             self.randFields['trialList'].SetLabel(self.getTrialsSummary(self.params['trialList']))
+    def getParams(self):
+        """retrieves data and re-inserts it into the handler and returns those handler params
+        """
+        #get data from input fields
+        for fieldName in self.currentHandler.params.keys():
+            param=self.currentHandler.params[fieldName]
+            ctrls = self.currentCtrls[fieldName]#the various dlg ctrls for this param     
+            if hasattr(ctrls.valueCtrl, 'GetValue'): #e.g. TextCtrl
+                param.val = ctrls.valueCtrl.GetValue()
+            elif hasattr(ctrls.valueCtrl, 'GetStringSelection'): #for wx.Choice
+                param.val = ctrls.valueCtrl.GetStringSelection()
+            elif hasattr(ctrls.valueCtrl, 'GetLabel'): #for wx.StaticText
+                param.val = ctrls.valueCtrl.GetLabel()
+            else:
+                print "failed to retrieve the value for %s: %s" %(fieldName, ctrls.valueCtrl)
+            if ctrls.typeCtrl: param.valType = ctrls.typeCtrl.GetValue()
+            if ctrls.updateCtrl: param.updates = ctrls.updateCtrl.getValue()
+            print "name:%s, val:%s, type:%s, updates:%s" %(fieldName, param.val, param.valType, param.updates)
             
+        return self.currentHandler.params
 class DlgComponentProperties(_BaseParamsDlg):    
-    def __init__(self,frame,title,params,hints,fixed=[],allowed={},
+    def __init__(self,frame,title,params,
             pos=wx.DefaultPosition, size=wx.DefaultSize,
             style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
         style=style|wx.RESIZE_BORDER
         
-        _BaseParamsDlg.__init__(self,frame,title,params,hints,fixed,allowed,
-            pos,size,style)
+        _BaseParamsDlg.__init__(self,frame,title,params,pos,size,style)
         self.frame=frame        
         self.app=frame.app
         self.show()
         if self.OK:
-            self.getData()
+            self.params = self.getParams()#get new vals from dlg
         self.Destroy()
         
 class BuilderFrame(wx.Frame):
@@ -1132,7 +1140,7 @@ class BuilderFrame(wx.Frame):
         self.bitmaps={}
         for eventType in eventTypes:
             self.bitmaps[eventType]=wx.Bitmap( \
-                os.path.join(iconDir,"%s.png" %eventType.lower()))      
+                os.path.join(self.app.dirResources,"%s.png" %eventType.lower()))      
                 
         #setup a blank exp
         self.filename='untitled.py'
@@ -1177,14 +1185,14 @@ class BuilderFrame(wx.Frame):
         else:
             toolbarSize=32 #size 16 doesn't work on mac wx
         self.toolbar.SetToolBitmapSize((toolbarSize,toolbarSize))
-        new_bmp = wx.Bitmap(os.path.join(iconDir, 'filenew%i.png' %toolbarSize))
-        open_bmp = wx.Bitmap(os.path.join(iconDir, 'fileopen%i.png' %toolbarSize))
-        save_bmp = wx.Bitmap(os.path.join(iconDir, 'filesave%i.png' %toolbarSize))
-        saveAs_bmp = wx.Bitmap(os.path.join(iconDir, 'filesaveas%i.png' %toolbarSize), wx.BITMAP_TYPE_PNG)
-        undo_bmp = wx.Bitmap(os.path.join(iconDir, 'undo%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
-        redo_bmp = wx.Bitmap(os.path.join(iconDir, 'redo%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
-        stop_bmp = wx.Bitmap(os.path.join(iconDir, 'stop%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
-        run_bmp = wx.Bitmap(os.path.join(iconDir, 'run%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        new_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'filenew%i.png' %toolbarSize))
+        open_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'fileopen%i.png' %toolbarSize))
+        save_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'filesave%i.png' %toolbarSize))
+        saveAs_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'filesaveas%i.png' %toolbarSize), wx.BITMAP_TYPE_PNG)
+        undo_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'undo%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        redo_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'redo%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        stop_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'stop%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        run_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'run%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
             
         self.toolbar.AddSimpleTool(TB_FILENEW, new_bmp, "New [Ctrl+N]", "Create new python file")
         self.toolbar.Bind(wx.EVT_TOOL, self.fileNew, id=TB_FILENEW)
@@ -1265,14 +1273,14 @@ class BuilderFrame(wx.Frame):
         
         #---_demos---#000000#FFFFFF--------------------------------------------------
         #for demos we need a dict where the event ID will correspond to a filename
-        demoList = glob.glob(os.path.join(appDir,'demos','*.psyexp'))   
+        demoList = glob.glob(os.path.join(self.app.dirApp,'demos','*.psyexp'))   
         #demoList = glob.glob(os.path.join(appDir,'..','demos','*.py'))
         ID_DEMOS = \
             map(lambda _makeID: wx.NewId(), range(len(demoList)))
         self.demos={}
         for n in range(len(demoList)):
             self.demos[ID_DEMOS[n]] = demoList[n]
-                self.demosMenu = wx.Menu()
+        self.demosMenu = wx.Menu()
         #menuBar.Append(self.demosMenu, '&Demos') 
         for thisID in ID_DEMOS:
             junk, shortname = os.path.split(demos[thisID])
@@ -1293,6 +1301,7 @@ class BuilderFrame(wx.Frame):
         self.helpMenu.Append(ID_LICENSE, "License...", "PsychoPy License")
         wx.EVT_MENU(self, ID_LICENSE, self.showLicense)
         
+        self.demosMenu
         self.helpMenu.AppendSubMenu(self.demosMenu, 'PsychoPy Demos')
         self.SetMenuBar(menuBar)
         

@@ -1200,14 +1200,14 @@ class CoderFrame(wx.Frame):
         else:
             toolbarSize=32 #size 16 doesn't work on mac wx
         self.toolbar.SetToolBitmapSize((toolbarSize,toolbarSize))
-        new_bmp = wx.Bitmap(os.path.join(self.app.dirRes, 'filenew%i.png' %toolbarSize))
-        open_bmp = wx.Bitmap(os.path.join(self.app.dirRes, 'fileopen%i.png' %toolbarSize))
-        save_bmp = wx.Bitmap(os.path.join(self.app.dirRes, 'filesave%i.png' %toolbarSize))
-        saveAs_bmp = wx.Bitmap(os.path.join(self.app.dirRes, 'filesaveas%i.png' %toolbarSize), wx.BITMAP_TYPE_PNG)
-        undo_bmp = wx.Bitmap(os.path.join(self.app.dirRes, 'undo%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
-        redo_bmp = wx.Bitmap(os.path.join(self.app.dirRes, 'redo%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
-        stop_bmp = wx.Bitmap(os.path.join(self.app.dirRes, 'stop%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
-        run_bmp = wx.Bitmap(os.path.join(self.app.dirRes, 'run%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        new_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'filenew%i.png' %toolbarSize))
+        open_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'fileopen%i.png' %toolbarSize))
+        save_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'filesave%i.png' %toolbarSize))
+        saveAs_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'filesaveas%i.png' %toolbarSize), wx.BITMAP_TYPE_PNG)
+        undo_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'undo%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        redo_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'redo%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        stop_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'stop%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        run_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'run%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
             
         self.toolbar.AddSimpleTool(TB_FILENEW, new_bmp, "New [Ctrl+N]", "Create new python file")
         self.toolbar.Bind(wx.EVT_TOOL, self.fileNew, id=TB_FILENEW)
