@@ -5,4 +5,5 @@ Changes to the final digit (0.92.1 -> 0.92.2) implies a bug-fixing release or ve
 !!Changelog 
 
 PsychoPY 2:
-* BACKWARDS NONCOMPAT: monitors is a subpackage of psychopy again
+* BACKWARDS NONCOMPAT: monitors is moved to be a subpackage of psychopy
+* Added TrialType object to data (allowing trial.SF as well as trial['SF'])

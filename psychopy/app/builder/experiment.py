@@ -117,12 +117,17 @@ class Param:
         self.allowedVals=allowedVals
     def __str__(self):
         if self.valType == 'num':
-            return "numpy.asarray(%s)" %(self.val)
-        if self.valType == 'str':
-            return "\"%s\"" %(self.val)
-        if self.valType == 'code':
+            try:
+                return str(float(self.val))#will work if it can be represented as a float
+            except:#might be an array
+                return "numpy.asarray(%s)" %(self.val)
+        elif self.valType == 'str':
+            return repr(self.val)#this neatly handles like "it's" and 'He says "hello"'
+        elif self.valType == 'code':
             return "%s" %(self.val)
-    
+        else:
+            raise TypeError, "Can't represent a Param of type %s" %self.valType
+            
 class TrialHandler():    
     """A looping experimental control object
             (e.g. generating a psychopy TrialHandler or StairHandler).
@@ -143,7 +148,7 @@ class TrialHandler():
         """
         self.type='TrialHandler'
         self.params={}
-        self.params['name']=Param(name, valType='str', updates=None, allowedUpdates=None,
+        self.params['name']=Param(name, valType='code', updates=None, allowedUpdates=None,
             hint="Name of this loop")
         self.params['nReps']=Param(nReps, valType='num', updates=None, allowedUpdates=None,
             hint="Number of repeats (for each type of trial)")
@@ -159,13 +164,18 @@ class TrialHandler():
         self.params['endPoints']=Param(endPoints,valType='num',
             hint='Where to loop from and to (see values currently shown in the flow view)')
     def writeInitCode(self,buff):
-        buff.writeIndented("%s=data.TrialHandler(trialList=%s,nReps=%i,\n)" \
+        #todo: need to write code to fetch trialList from file!
+        buff.writeIndented("%s=data.TrialHandler(trialList=%s,nReps=%s)\n" \
             %(self.params['name'], self.params['trialList'], self.params['nReps']))
     def writeLoopStartCode(self,buff):
         #work out a name for e.g. thisTrial in trials:
-        thisName = ("this"+self.params['name'].capitalize()[:-1])
+        self.thisName = ("this"+self.params['name'].val.capitalize()[:-1])
         buff.writeIndented("\n")
-        buff.writeIndented("for %s in %s:\n" %(thisName, self.params['name']))
+        buff.writeIndented("for %s in %s:\n" %(self.thisName, self.params['name']))
+        buff.setIndentLevel(1, relative=True)
+    def writeLoopEndCode(self,buff):
+        buff.setIndentLevel(-1, relative=True)
+        buff.writeIndented("# end of '%s' after %i repeats (of each entry in trialList)\n" %(self.loop.params['name'], self.loop.params['nReps']))
     def getType(self):
         return 'TrialHandler'     
 class StairHandler():    
@@ -180,8 +190,7 @@ class StairHandler():
         """
         self.type='StairHandler'
         self.params={}
-        self.params['name']=Param(name, valType='str', 
-            hint="Name of this loop")
+        self.params['name']=Param(name, valType='code', hint="Name of this loop")
         self.params['nReps']=Param(nReps, valType='num', 
             hint="(Minimum) number of trials in the staircase")
         self.params['start value']=Param(startVal, valType='num', 
@@ -190,7 +199,7 @@ class StairHandler():
             hint="The size of the jump at each step (can change on each 'reversal')")
         self.params['step type']=Param(stepType, valType='str', 
             hint="The units of the step size (e.g. 'linear' will add/subtract that value each step, whereas 'log' will ad that many log units)")
-        self.params['nReversals']=Param(nReversals, valType='num', 
+        self.params['nReversals']=Param(nReversals, valType='code', 
             hint="Minimum number of times the staircase must change direction before ending")
         #these two are really just for making the dialog easier (they won't be used to generate code)
         self.params['loopType']=Param('staircase', valType='str', allowedVals=['random','sequential','staircase'],
@@ -198,6 +207,7 @@ class StairHandler():
         self.params['endPoints']=Param(endPoints,valType='num',
             hint='Where to loop from and to (see values currently shown in the flow view)')
     def writeInitCode(self,buff):
+        #TODO: code for stair handler init!
         buff.writeIndented("init loop '%s' (%s)\n" %(self.params['name'], self.loopType))
         buff.writeIndented("%s=data.StairHandler(nReps=%i,\n)" \
             %(self.name, self.nReps))
@@ -205,6 +215,10 @@ class StairHandler():
         #work out a name for e.g. thisTrial in trials:
         thisName = ("this"+self.params['name'].capitalize()[:-1])
         buff.writeIndented("for %s in %s:\n" %(thisName, self.params['name']))
+        buff.setIndentLevel(1, relative=True)
+    def writeLoopEndCode(self,buff):
+        buff.setIndentLevel(-1, relative=True)
+        buff.writeIndented("# end of '%s' after %i repeats (of each entry in trialList)\n" %(self.loop.params['name'], self.loop.params['nReps']))
     def getType(self):
         return 'StairHandler'   
 class LoopInitiator:
@@ -215,8 +229,7 @@ class LoopInitiator:
     def writeInitCode(self,buff):
         self.loop.writeInitCode(buff)
     def writeMainCode(self,buff):
-        self.loop.writeLoopStartCode(buff)
-        buff.setIndentLevel(1, relative=True)#we started a loop so increment indent        
+        self.loop.writeLoopStartCode(buff)       
     def getType(self):
         return 'LoopInitiator'
 class LoopTerminator:
@@ -227,8 +240,7 @@ class LoopTerminator:
     def writeInitCode(self,buff):
         pass
     def writeMainCode(self,buff):
-        buff.setIndentLevel(-1, relative=True)
-        buff.writeIndented("# end of '%s' after %i repeats (of each entry in trialList)\n" %(self.loop.params['name'], self.loop.params['nReps']))
+        self.loop.writeLoopStartCode(buff)
     def getType(self):
         return 'LoopTerminator'
 class Flow(list):
@@ -271,23 +283,24 @@ class Routine(list):
         list.__init__(self)
     def writeInitCode(self,buff):
         buff.writeIndented('\n')
-        buff.writeIndented('#Initialise components for %s routine\n' %self.name)
+        buff.writeIndented('#Initialise components for routine:%s\n' %(self.name))
+        self.clockName = self.name+"Clock"
+        buff.writeIndented('%s=core.Clock()\n' %(self.clockName))
         for thisEvt in self:
             thisEvt.writeInitCode(buff)
         
     def writeMainCode(self,buff):
         """This defines the code for the frames of a single routine
         """
-        clockName=self.name+"Clock"
         #create the frame loop for this routine
-        buff.writeIndented('%s=core.Clock()\n' %(clockName))
         buff.writeIndented('t=0\n')
+        buff.writeIndented('%s.reset()\n' %(self.clockName))
         buff.writeIndented('while t<maxTime:\n')
         buff.setIndentLevel(1,True)
         
         #on each frame
         buff.writeIndented('#get current time\n')
-        buff.writeIndented('t=%s.getTime()\n\n' %clockName)
+        buff.writeIndented('t=%s.getTime()\n\n' %self.clockName)
         
         #write the code for each component during frame
         for event in self:
@@ -313,7 +326,7 @@ class BaseComponent:
     def __init__(self, name='', times=[0,1]):
         self.type='Base'
         self.params={}
-        self.params['name']=Param(name, valType='str', 
+        self.params['name']=Param(name, valType='code', 
             hint="Name of this loop")
 
     def writeInitCode(self,buff):
@@ -336,10 +349,10 @@ class BaseComponent:
         """Write the code for each frame that tests whether the component is being
         drawn/used.
         """
-        times=self.params['times']
-        if type(times[0].val) in [int, float]:
-            times.val=[times.val]#make a list of lists
-        
+        exec("times=%s" %self.params['times'].val)
+        if type(times[0]) in [int, float]:
+            times=[times]#make a list of lists
+        print times
         #write the code for the first repeat of the stimulus
         buff.writeIndented("if (%.f <= t < %.f)" %(times[0][0], times[0][1]))
         if len(times)>1:
@@ -347,14 +360,14 @@ class BaseComponent:
                 buff.write("\n")
                 buff.writeIndented("    or (%.f <= t < %.f)" %(epoch[0], epoch[1]))
         buff.write(':\n')#the condition is done add the : and new line to finish        
-    def writeParamUpdates(buff, updateType):
+    def writeParamUpdates(self, buff, updateType):
         """write updates to the buffer for each parameter that needs it
         updateType can be 'experiment', 'routine' or 'frame'
         """
         for thisParamName in self.params.keys():
             thisParam=self.params[thisParamName]
             if thisParam.updates=='frame':
-                buff.writeIndented("%s.set%s(%s)" %(self.params['name'], thisParamName.capitalize(), thisParam) )
+                buff.writeIndented("%s.set%s(%s)\n" %(self.params['name'], thisParamName.capitalize(), thisParam) )
     
 
 class VisualComponent(BaseComponent):
@@ -363,8 +376,7 @@ class VisualComponent(BaseComponent):
     def __init__(self, name='', units='window units', colour=[1,1,1],
         pos=[0,0], size=[0,0], ori=0, times=[0,1], colourSpace='rgb'):
         self.params={}
-        self.params['name']=Param(name, valType='str', allowedTypes=['str'],
-            updates="never", allowedUpdates=["never"],
+        self.params['name']=Param(name,  valType='code', updates="never", 
             hint="Name of this stimulus")
         self.params['units']=Param(units, valType='str', allowedVals=['window units', 'deg', 'cm', 'pix', 'norm'],
             hint="Units of dimensions for this stimulus")
@@ -458,8 +470,8 @@ class MovieComponent(VisualComponent):
         VisualComponent.__init__(self,name=name, units=units, 
                     pos=pos, size=size, ori=ori, times=times)
         #these are normally added but we don't want them for a movie            
-        junk = self.params.pop('colour')
-        junk = self.params.pop('colourSpace')
+        del self.params['colour']
+        del self.params['colourSpace']
         self.type='Movie'
         self.params['movie']=Param(movie, valType='str', allowedTypes=['str','code'],
             updates="never", allowedUpdates=["never","routine"],
@@ -476,8 +488,7 @@ class SoundComponent(BaseComponent):
         
         self.type='Sound'
         self.params={}
-        self.params['name']=Param(name, valType='str', allowedTypes=['str','code'],
-            hint="A filename for the movie (including path)")  
+        self.params['name']=Param(name,  valType='code', hint="A filename for the movie (including path)")  
         self.params['sound']=Param(sound, valType='str', allowedTypes=['str','num','code'],
             updates="never", allowedUpdates=["never","routine"],
             hint="A sound can be a string (e.g. 'A' or 'Bf') or a number to specify Hz, or a filename")  
@@ -504,8 +515,7 @@ class KeyboardComponent(BaseComponent):
         self.type='Keyboard'
                 
         self.params={}
-        self.params['name']=Param(name, valType='str', allowedTypes=['str','code'],
-            hint="A name for this keyboard object (e.g. response)")  
+        self.params['name']=Param(name,  valType='code', hint="A name for this keyboard object (e.g. response)")  
         self.params['allowedKeys']=Param(sound, valType='str', allowedTypes=['str','code'],
             updates="never", allowedUpdates=["never","routine"],
             hint="The keys the user may press, e.g. a,b,q,left,right")  
@@ -529,8 +539,7 @@ class MouseComponent(BaseComponent):
     def __init__(self, name='mouse', times=[0,1], save='final'):
         self.type='Mouse'
         self.params={}
-        self.params['name']=Param(name, valType='str', allowedTypes=['str','code'],
-            hint="Even mice have names!") 
+        self.params['name']=Param(name,  valType='code', hint="Even mice have names!") 
         self.params['times']=Param(times, valType='num', allowedTypes=['num','code'],
             updates="never", allowedUpdates=["never"],
             hint="A series of one or more periods to read the mouse, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]")

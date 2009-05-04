@@ -7,8 +7,10 @@ import experiment, numpy
 #import psychopy
 from keybindings import *
 
-eventTypes=['Patch','Text','Movie','Sound','Mouse','Keyboard']
-    
+#TODO: this should be loaded from prefs rather than hard-coded
+componentTypes=['Patch','Text','Movie','Sound','Mouse','Keyboard']
+
+#todo: need to implement right-click context menus for flow and routine canvas!
 #create wx event/object IDs
 ID_EXIT=wx.NewId()
 #edit menu
@@ -143,9 +145,6 @@ class FlowPanel(wx.ScrolledWindow):
             exec("ends=%s" %handler.params['endPoints'])#creates a copy of endPoints as an array
             self.frame.exp.flow.addLoop(handler, startPos=ends[0], endPos=ends[1])
             self.frame.setIsModified(True)
-            print 'final type',handler.type, 
-            print 'final loop params',handler.params
-            print 'final dlg params', loopDlg.params
         #remove the points from the timeline
         self.setDrawPoints(None)
         self.redrawFlow()
@@ -175,7 +174,7 @@ class FlowPanel(wx.ScrolledWindow):
         self.setDrawPoints(None)
         self.redrawFlow()
     def onRemLoop(self, event=None):
-        #todo: implement the removal of loops
+        #todo: implement the removal of loops!
         print 'removing loops not implemented yet'
     
     def OnMouse(self, event):
@@ -597,7 +596,7 @@ class RoutineCanvas(wx.ScrolledWindow):
         font.SetPointSize(12)
         dc.SetFont(font)
         
-        name = component.params['name']
+        name = component.params['name'].val
         #get size based on text
         w,h = self.GetFullTextExtent(name)[0:2]  
         #draw text
@@ -611,7 +610,8 @@ class RoutineCanvas(wx.ScrolledWindow):
         #for the fill, draw once in white near-opaque, then in transp colour
         dc.SetBrush(wx.Brush(wx.Colour(200,100,100, 200)))
         h = self.componentStep/2
-        times = component.params['times']
+        #convert params.times to list
+        exec("times = %s" %component.params['times'].val)
         if type(times[0]) in [int,float]:
             times=[times]
         for thisOcc in times:#each occasion/occurence
@@ -640,8 +640,8 @@ class RoutineCanvas(wx.ScrolledWindow):
             component=self.routine.getComponentFromName(componentName)
         
         dlg = DlgComponentProperties(frame=self.frame,
-            title=component.params['name']+' Properties',
-            params = component.params, hints=component.hints)
+            title=component.params['name'].val+' Properties',
+            params = component.params)
         if dlg.OK:
             self.redrawRoutine()#need to refresh timings section
             self.Refresh()#then redraw visible
@@ -688,11 +688,11 @@ class RoutinesNotebook(wx.aui.AuiNotebook):
     def onClosePane(self, event=None):
         """Close the pane and remove the routine from the exp
         """
-        #todo: check that the user really wants this!?
+        #todo: check that the user really wants the routine deleted
         routine = self.GetPage(event.GetSelection()).routine
         #update experiment object and flow window (if this is being used)
         if routine.name in self.frame.exp.routines.keys(): 
-            junk=self.frame.exp.routines.pop(routine.name)
+            del self.frame.exp.routines[routine.name]
         if routine in self.frame.exp.flow:
             self.frame.exp.flow.remove(routine)
             self.frame.flowPanel.redrawFlow()
@@ -708,16 +708,16 @@ class ComponentsPanel(scrolled.ScrolledPanel):
         
         # add a button for each type of event that can be added
         self.componentButtons={}; self.componentFromID={}
-        for eventType in eventTypes:
+        for componentType in componentTypes:
             img =wx.Bitmap(
-                os.path.join(self.app.dirResources,"%sAdd.png" %eventType.lower()))    
+                os.path.join(self.app.dirResources,"%sAdd.png" %componentType.lower()))    
             btn = wx.BitmapButton(self, -1, img, (20, 20),
                            (img.GetWidth()+10, img.GetHeight()+10),
-                           name=eventType)  
-            self.componentFromID[btn.GetId()]=eventType
+                           name=componentType)  
+            self.componentFromID[btn.GetId()]=componentType
             self.Bind(wx.EVT_BUTTON, self.onComponentAdd,btn)  
             self.sizer.Add(btn, 0,wx.EXPAND|wx.ALIGN_CENTER )
-            self.componentButtons[eventType]=btn#store it for elsewhere
+            self.componentButtons[componentType]=btn#store it for elsewhere
             
         self.SetSizer(self.sizer)
         self.SetAutoLayout(1)
@@ -817,7 +817,7 @@ class ParamCtrls:
 class _BaseParamsDlg(wx.Dialog):   
     def __init__(self,frame,title,params,
             pos=wx.DefaultPosition, size=wx.DefaultSize,
-            style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT|wx.RESIZE_BORDER):        
+            style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT|wx.TAB_TRAVERSAL):        
         wx.Dialog.__init__(self, frame,-1,title,pos,size,style)
         self.frame=frame
         self.app=frame.app
@@ -885,8 +885,10 @@ class _BaseParamsDlg(wx.Dialog):
         buttons.Add(OK, 0, wx.ALL,border=3)
         CANCEL = wx.Button(self, wx.ID_CANCEL, " Cancel ")
         buttons.Add(CANCEL, 0, wx.ALL,border=3)
-#        self.sizer.Add(buttons,1,flag=wx.ALIGN_RIGHT|wx.ALIGN_BOTTOM|wx.ALL,border=3)
-        self.sizer.Add(buttons) 
+        if hasattr(self, 'currRow'):#then we are using as GridBagSizer
+            self.sizer.Add(buttons, (self.currRow,2), (1,2)) 
+        else:#we are using a box sizer
+            self.sizer.Add(buttons)
         self.SetSizerAndFit(self.sizer)
         #do show and process return
         retVal = self.ShowModal() 
@@ -905,13 +907,26 @@ class _BaseParamsDlg(wx.Dialog):
         for fieldName in self.params.keys():
             param=self.params[fieldName]
             ctrls = self.paramCtrls[fieldName]#the various dlg ctrls for this param            
-            param.val = ctrls.valueCtrl.GetValue()
-            if ctrls.typeCtrl: param.valType = ctrls.typeCtrl.GetValue()
-            if ctrls.updateCtrl: param.updates = ctrls.updateCtrl.getValue()
-            print "name:%s, val:%s, type:%s, updates:%s" %(fieldName, param.val, param.valType, param.updates)
+            param.val = self.getCtrlValue(ctrls.valueCtrl)
+            if ctrls.typeCtrl: param.valType = self.getCtrlValue(ctrls.typeCtrl)
+            if ctrls.updateCtrl: param.updates = self.getCtrlValue(ctrls.updateCtrl)
             
-        return self.params()
-            
+        return self.params
+        
+    def getCtrlValue(self, ctrl):
+        """Different types of control have different methods for retrieving value. 
+        This function checks them all and returns the value or None.
+        """
+        if ctrl==None: return None
+        elif hasattr(ctrl, 'GetValue'): #e.g. TextCtrl
+            return ctrl.GetValue()
+        elif hasattr(ctrl, 'GetStringSelection'): #for wx.Choice
+            return ctrl.GetStringSelection()
+        elif hasattr(ctrl, 'GetLabel'): #for wx.StaticText
+            return ctrl.GetLabel()
+        else:
+            print "failed to retrieve the value for %s: %s" %(fieldName, ctrls.valueCtrl)
+            return None
 class DlgLoopProperties(_BaseParamsDlg):    
     def __init__(self,frame,title="Loop properties",loop=None,
             pos=wx.DefaultPosition, size=wx.DefaultSize,
@@ -1111,7 +1126,6 @@ class DlgLoopProperties(_BaseParamsDlg):
                 print "failed to retrieve the value for %s: %s" %(fieldName, ctrls.valueCtrl)
             if ctrls.typeCtrl: param.valType = ctrls.typeCtrl.GetValue()
             if ctrls.updateCtrl: param.updates = ctrls.updateCtrl.getValue()
-            print "name:%s, val:%s, type:%s, updates:%s" %(fieldName, param.val, param.valType, param.updates)
             
         return self.currentHandler.params
 class DlgComponentProperties(_BaseParamsDlg):    
@@ -1138,9 +1152,9 @@ class BuilderFrame(wx.Frame):
         self.app=app
         #load icons for the various stimulus events 
         self.bitmaps={}
-        for eventType in eventTypes:
-            self.bitmaps[eventType]=wx.Bitmap( \
-                os.path.join(self.app.dirResources,"%s.png" %eventType.lower()))      
+        for componentType in componentTypes:
+            self.bitmaps[componentType]=wx.Bitmap( \
+                os.path.join(self.app.dirResources,"%s.png" %componentType.lower()))      
                 
         #setup a blank exp
         self.filename='untitled.py'
@@ -1442,7 +1456,7 @@ class BuilderFrame(wx.Frame):
         pass
     def runFile(self, event=None):
         #todo: runFile
-        script = self.exp.generateScript()
+        script = self.exp.writeScript()
         print script.getvalue()      
     def stopFile(self, event=None):
         #todo: stopFile
