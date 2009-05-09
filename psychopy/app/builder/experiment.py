@@ -394,7 +394,7 @@ class VisualComponent(BaseComponent):
         self.params['ori']=Param(ori, valType='num', allowedTypes=['num','code'],
             updates="never", allowedUpdates=["never","routine","frame"],
             hint="Orientation of this stimulus (in deg)")
-        self.params['times']=Param(times, valType='num', allowedTypes=['num','code'],
+        self.params['times']=Param(times, valType='code', allowedTypes=['code'],
             updates="never", allowedUpdates=["never"],
             hint="Start and end times for this stimulus (e.g. [0,1] or [[0,1],[2,3]] for a repeated appearance")
             
@@ -492,7 +492,7 @@ class SoundComponent(BaseComponent):
         self.params['sound']=Param(sound, valType='str', allowedTypes=['str','num','code'],
             updates="never", allowedUpdates=["never","routine"],
             hint="A sound can be a string (e.g. 'A' or 'Bf') or a number to specify Hz, or a filename")  
-        self.params['times']=Param(times, valType='num', allowedTypes=['num','code'],
+        self.params['times']=Param(times, valType='code', allowedTypes=['code'],
             updates="never", allowedUpdates=["never"],
             hint="A series of one or more onset/offset times, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]")  
 

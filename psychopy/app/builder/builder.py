@@ -610,8 +610,7 @@ class RoutineCanvas(wx.ScrolledWindow):
         #for the fill, draw once in white near-opaque, then in transp colour
         dc.SetBrush(wx.Brush(wx.Colour(200,100,100, 200)))
         h = self.componentStep/2
-        #convert params.times to list
-        exec("times = %s" %component.params['times'].val)
+        exec("times=%s" %component.params['times'])
         if type(times[0]) in [int,float]:
             times=[times]
         for thisOcc in times:#each occasion/occurence
@@ -1116,14 +1115,7 @@ class DlgLoopProperties(_BaseParamsDlg):
         for fieldName in self.currentHandler.params.keys():
             param=self.currentHandler.params[fieldName]
             ctrls = self.currentCtrls[fieldName]#the various dlg ctrls for this param     
-            if hasattr(ctrls.valueCtrl, 'GetValue'): #e.g. TextCtrl
-                param.val = ctrls.valueCtrl.GetValue()
-            elif hasattr(ctrls.valueCtrl, 'GetStringSelection'): #for wx.Choice
-                param.val = ctrls.valueCtrl.GetStringSelection()
-            elif hasattr(ctrls.valueCtrl, 'GetLabel'): #for wx.StaticText
-                param.val = ctrls.valueCtrl.GetLabel()
-            else:
-                print "failed to retrieve the value for %s: %s" %(fieldName, ctrls.valueCtrl)
+            param.val = self.getCtrlValue(ctrls.valueCtrl)#from _baseParamsDlg (handles diff control types)
             if ctrls.typeCtrl: param.valType = ctrls.typeCtrl.GetValue()
             if ctrls.updateCtrl: param.updates = ctrls.updateCtrl.getValue()
             
