@@ -55,46 +55,13 @@ class PsychoPyApp(wx.App):
         self.dirResources = dirResources
         self.dirPsychopy = dirPsychopy
         self.pathPrefs=pathPrefs
-        try:
-            self.options = fromPickle(optionsPath)
-        except: 
-            self.options={}
-            self.options['winSize']=[800,800]
-            self.options['analyseAuto']=True
-            self.options['showOutput']=True   
-            self.options['auiPerspective']=None
-            self.options['winPos']=wx.DefaultPosition
-            self.options['recentFiles']={}    
-            self.options['prevFiles']=[]
-            if sys.platform=='darwin':
-                self.options['showSourceAsst']=False  
-            else:
-                self.options['showSourceAsst']=True
+        self.options = Preferences(pathPrefs) #from preferences.py
+        #create frame(s) for coder/builder as necess
+        self.coder=None
+        self.builder=None
+        if mainFrame == 'coder': self.newCoderFrame(args)
+        else: self.newBuilderFrame(args)
         
-        if False:# force reinitialise (don't use file)
-            self.options={}
-            self.options['winSize']=[800,800]
-            self.options['analyseAuto']=True
-            self.options['showOutput']=True   
-            self.options['auiPerspective']=None
-            self.options['winPos']=wx.DefaultPosition
-            self.options['recentFiles']={}   
-            self.options['prevFiles']=[]        
-            if sys.platform=='darwin':
-                self.options['showSourceAsst']=False  
-            else:
-                self.options['showSourceAsst']=True
-                
-        if mainFrame == 'coder':
-            #NB a frame doesn't have an app as a parent
-            self.frame = coder.CoderFrame(None, -1, 
-                                      title="PsychoPy Coder (IDE) (v%s)" %psychopy.__version__,
-                                      files = args, app=self)  
-        else:
-            #NB a frame doesn't have an app as a parent
-            self.frame = builder.BuilderFrame(None, -1, 
-                                      title="PsychoPy Experiment Builder",
-                                      files = args, app=self)
         splash = PsychoSplashScreen(self)
         if splash:
             splash.Show()
@@ -117,16 +84,29 @@ class PsychoPyApp(wx.App):
                     config.Write("tips", str( (showTip, index) ))
                     config.Flush()"""
         
-        self.frame.Show(True)
-        self.SetTopWindow(self.frame)
         return True
+    def newCoderFrame(self, filelist=None):
+        #NB a frame doesn't have an app as a parent
+        self.coder = coder.CoderFrame(None, -1, 
+                                  title="PsychoPy Coder (IDE) (v%s)" %psychopy.__version__,
+                                  files = filelist, app=self)         
+        self.coder.Show(True)
+        self.SetTopWindow(self.coder)
+    def newBuilderFrame(self, fileList=None):    
+        #NB a frame doesn't have an app as a parent
+        self.builder = builder.BuilderFrame(None, -1, 
+                                  title="PsychoPy Experiment Builder",
+                                  files = fileList, app=self)       
+        self.builder.Show(True)
+        self.SetTopWindow(self.builder)
     def MacOpenFile(self,fileName):
         self.frame.setCurrentDoc(fileName)
     def Quit(self):
         
-        print 'prevFiles', self.options['prevFiles']
-        toPickle(optionsPath, self.options)
-        self.frame.Destroy()
+        print 'prevFiles', self.options.coder['prevFiles']
+        self.options.save()
+        for frame in [self.coder, self.builder]:
+            if hasattr(frame,'Destroy'): frame.Destroy()
         
 if __name__=='__main__':
     app = PsychoPyApp(0)

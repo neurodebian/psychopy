@@ -930,7 +930,7 @@ class StdOutRich(wx.richtext.RichTextCtrl):
 class CoderFrame(wx.Frame):
     def __init__(self, parent, ID, title, files=[], app=None):
         self.app = app
-        self.options = self.app.options
+        self.options = self.app.options.coder
             
         self.currentDoc=None
         self.ignoreErrors = False
@@ -1015,7 +1015,8 @@ class CoderFrame(wx.Frame):
         self.makeToolbar()
         
         #take files from arguments and append the previously opened files
-        self.options['prevFiles'].extend(files)
+        if files:
+            self.options['prevFiles'].extend(files)
         if len(self.options['prevFiles'])==0:
             #then no files previously opened
             self.setCurrentDoc('')#a dummy page to start
@@ -1351,19 +1352,15 @@ class CoderFrame(wx.Frame):
         self.options['auiPerspective'] = self.paneManager.SavePerspective()
         
         self.app.Quit()
-    def fileNew(self, event):
-        self.setCurrentDoc("")
-        
-    
+    def fileNew(self, event=None, filepath=""):
+        self.setCurrentDoc(filepath)
     def findDocID(self, filename):
         #find the ID of the current doc in self.allDocs list and the notebook panel (returns -1 if not found)
         for n in range(len(self.allDocs)):
             if self.allDocs[n].filename == filename:
                 return n
         return -1
-        
-    def setCurrentDoc(self, filename):       
-            
+    def setCurrentDoc(self, filename): 
         #check if this file is already open
         docID=self.findDocID(filename)
         if docID>=0:

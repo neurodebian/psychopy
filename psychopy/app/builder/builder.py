@@ -1145,7 +1145,8 @@ class BuilderFrame(wx.Frame):
                 os.path.join(self.app.dirResources,"%s.png" %componentType.lower()))      
                 
         #setup a blank exp
-        self.filename='untitled.py'
+        self.filename='untitled.psyexp'
+        initPath, shortname = os.path.split(self.filename)
         self.fileNew(closeCurrent=False)#don't try to close before opening
         self.exp.addRoutine('trial') #create the trial routine
         self.exp.flow.addRoutine(self.exp.routines['trial'], pos=1)#add it to flow 
@@ -1376,6 +1377,7 @@ class BuilderFrame(wx.Frame):
         """
         if filename==None: filename = self.filename
         initPath, filename = os.path.split(filename)
+        
         os.getcwd()
         if sys.platform=='darwin':
             wildcard="PsychoPy experiments (*.psyexp)|*.psyexp|Any file (*.*)|*"
@@ -1438,8 +1440,7 @@ class BuilderFrame(wx.Frame):
         licFile = open(os.path.join(self.app.dirPsychopy,'LICENSE.txt'))
         licTxt = licFile.read()
         licFile.close()
-        dlg = wx.MessageDialog(self, licTxt,
-                              "PsychoPy License", wx.OK | wx.ICON_INFORMATION)
+        dlg = wx.MessageDialog(self, licTxt, "PsychoPy License", wx.OK | wx.ICON_INFORMATION)
         dlg.ShowModal()
         dlg.Destroy()
     def followLink(self, event=None):
@@ -1455,7 +1456,12 @@ class BuilderFrame(wx.Frame):
     def compileScript(self, event=None):
         #todo: exportScript
         script = self.exp.writeScript()
-        print script.getvalue() 
+        if not self.app.coder:#it doesn't exist so make one
+            self.app.newCoderFrame()
+        name = os.path.splitext(self.filename)[0]+".py"
+        self.app.coder.fileNew(filepath=name)
+        self.app.coder.currentDoc.SetText(script.getvalue())
+        self.app.coder.currentDoc.setFileModified(False)#it won't need saving unless user changes
     def openMonitorCenter(self, event=None):
         #todo: openMonitorCenter
         pass

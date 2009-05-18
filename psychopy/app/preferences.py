@@ -16,6 +16,11 @@ coderDefaults=dict(codeFont="",
             codeFontSize="",
             outputFont="",
             outputFontSize="",
+            prevFiles=[],
+            recentFiles=[],
+            showSourceAsst=False,
+            analyseAuto=True,
+            showOutput=True,
             )
 builderDefaults=dict(defaultTimeUnits='secs'
             )
@@ -31,13 +36,13 @@ dirApp, appName = os.path.split(fullAppPath)
 #get path to settings
 join = os.path.join
 if sys.platform=='win32':
-    dirPrefs = join(os.environ['APPDATA'],'PsychoPy') #this is the folder that this file is stored in
+    dirPrefs = join(os.environ['APPDATA'],'PsychoPy2') #this is the folder that this file is stored in
 else:
-    dirPrefs = join(os.environ['HOME'], '.PsychoPy')
+    dirPrefs = join(os.environ['HOME'], '.PsychoPy2')
 #from the directory for preferences wor out the path for preferences (incl filename)
 if not os.path.isdir(dirPrefs):
     os.makedirs(dirPrefs)
-pathPrefs = join(dirPrefs, 'PsychoPy2.0.prefs')
+pathPrefs = join(dirPrefs, 'prefs.pickle')
 #path to Resources (icons etc)
 if os.path.isdir(join(dirApp, 'Resources')):
     dirResources = join(dirApp, 'Resources')
@@ -47,33 +52,29 @@ dirPsychopy = os.path.split(dirApp)[0]
  
 class Preferences:
     def __init__(self, prefsPath):
-        self.general=generalDefaultsdict(loadPrevFiles=True,
-            )
+        self.general=generalDefaults
         self.coder=coderDefaults
         self.builder=builderDefaults
-        self.connections=connectionDefaults
-        self.psychopy=dict()
-        
+        self.connections=connectionDefaults        
         self.path=prefsPath
-        
-        ##set some defaults
-        #coder
-        
         #connections
-        if autoProxy: self.connections['proxy'] = self.getAutoProxy()
-        #builder
+        if self.connections['autoProxy']: self.connections['proxy'] = self.getAutoProxy()
         
-    def loadFromPickle(self, pickleFile):
+        if os.path.isfile(self.path):
+            self.load()
+    def load(self):
         """A function to allow a class with attributes to be loaded from a 
         pickle file necessarily without having the same attribs (so additional 
         attribs can be added in future).
         """
         prefFile=fromPickle(self.path)
-        for sectionName in prefFile.keys():#each section (builder, coder...)
-            section = prefFile[sectionName]
-            for thisPrefName in section.keys():#a dictionary entry
-                exec("self.%s[thisPrefName]=section[thisPrefName]")
-                
+        for sectionName in ['general','coder','builder','connections']:#each section (builder, coder...)
+            exec("current=self.%s; imported=self.%s" %(sectionName,sectionName))
+            for thisPrefName in imported.keys():#a dictionary entry
+                current[thisPrefName]=imported[thisPrefName]
+    def save(self):
+        toPickle(self.path, self)
+        
     def getAutoProxy(self):
         """Fetch the proxy from the the system environment variables
         """
