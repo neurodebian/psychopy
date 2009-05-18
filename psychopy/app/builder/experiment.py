@@ -519,7 +519,7 @@ class KeyboardComponent(BaseComponent):
         self.params['allowedKeys']=Param(sound, valType='str', allowedTypes=['str','code'],
             updates="never", allowedUpdates=["never","routine"],
             hint="The keys the user may press, e.g. a,b,q,left,right")  
-        self.params['times']=Param(times, valType='num', allowedTypes=['num','code'],
+        self.params['times']=Param(times, valType='code', allowedTypes=['code'],
             updates="never", allowedUpdates=["never"],
             hint="A series of one or more periods to read the keyboard, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]")
             
