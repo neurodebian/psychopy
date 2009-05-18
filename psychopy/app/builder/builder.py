@@ -44,6 +44,7 @@ TB_UNDO= 70
 TB_REDO= 80
 TB_RUN = 100
 TB_STOP = 110
+TB_COMPILE=120
 
 class FlowPanel(wx.ScrolledWindow):
     def __init__(self, frame, id=-1,size = (600,100)):
@@ -1193,6 +1194,7 @@ class BuilderFrame(wx.Frame):
         redo_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'redo%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
         stop_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'stop%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
         run_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'run%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        compile_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'compile%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
             
         self.toolbar.AddSimpleTool(TB_FILENEW, new_bmp, "New [Ctrl+N]", "Create new python file")
         self.toolbar.Bind(wx.EVT_TOOL, self.fileNew, id=TB_FILENEW)
@@ -1208,6 +1210,8 @@ class BuilderFrame(wx.Frame):
         self.toolbar.AddSimpleTool(TB_REDO, redo_bmp, "Redo [Ctrl+R]", "Redo last action")
         self.toolbar.Bind(wx.EVT_TOOL, self.redo, id=TB_REDO)
         self.toolbar.AddSeparator()
+        self.toolbar.AddSimpleTool(TB_COMPILE, compile_bmp, "Comile Script [F4]",  "Run current script")
+        self.toolbar.Bind(wx.EVT_TOOL, self.compileScript, id=TB_COMPILE)
         self.toolbar.AddSimpleTool(TB_RUN, run_bmp, "Run [F5]",  "Run current script")
         self.toolbar.Bind(wx.EVT_TOOL, self.runFile, id=TB_RUN)
         self.toolbar.AddSimpleTool(TB_STOP, stop_bmp, "Stop [Shift+F5]",  "Stop current script")
@@ -1447,9 +1451,10 @@ class BuilderFrame(wx.Frame):
     def stopFile(self, event=None):
         #todo: stopFile
         pass
-    def exportScript(self, event=None):
+    def compileScript(self, event=None):
         #todo: exportScript
-        pass
+        script = self.exp.writeScript()
+        print script.getvalue() 
     def openMonitorCenter(self, event=None):
         #todo: openMonitorCenter
         pass
