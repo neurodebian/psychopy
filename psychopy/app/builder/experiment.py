@@ -539,8 +539,9 @@ class MouseComponent(BaseComponent):
     def __init__(self, name='mouse', times=[0,1], save='final'):
         self.type='Mouse'
         self.params={}
-        self.params['name']=Param(name,  valType='code', hint="Even mice have names!") 
-        self.params['times']=Param(times, valType='num', allowedTypes=['num','code'],
+        self.params['name']=Param(name, valType='str', allowedTypes=['str','code'],
+            hint="Even mice have names!") 
+        self.params['times']=Param(times, valType='code', allowedTypes=['code'],
             updates="never", allowedUpdates=["never"],
             hint="A series of one or more periods to read the mouse, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]")
         self.params['save']=Param(save, valType='str', allowedVals=['final values','every frame'])
