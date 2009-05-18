@@ -242,10 +242,10 @@ class FlowPanel(wx.ScrolledWindow):
         
         #draw the main time line
         linePos = 120
-        pdc.DrawLine(x1=100,y1=linePos,x2=500,y2=linePos)
         
         #step through components in flow
         currX=120; gap=40
+        pdc.DrawLine(x1=100,y1=linePos,x2=100+gap,y2=linePos)
         self.loopInits = []#these will be entry indices
         self.loopTerms = []
         self.loops=[]#these will be copies of the actual loop obects
@@ -259,6 +259,7 @@ class FlowPanel(wx.ScrolledWindow):
             if entry.getType()=='Routine':
                 currX = self.drawFlowBox(pdc,entry.name, pos=[currX,linePos-40])
             self.gapMidPoints.append(currX+gap/2)
+            pdc.DrawLine(x1=currX,y1=linePos,x2=currX+gap,y2=linePos)
             currX+=gap
             
         #draw the loops second    
