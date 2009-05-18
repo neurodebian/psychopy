@@ -118,7 +118,6 @@ class FlowPanel(wx.ScrolledWindow):
         addRoutineDlg = DlgAddRoutineToFlow(frame=self.frame, 
                     possPoints=self.pointsToDraw)
         if addRoutineDlg.ShowModal()==wx.ID_OK:
-            print 'routines', self.frame.exp.routines, addRoutineDlg.routine
             newRoutine = self.frame.exp.routines[addRoutineDlg.routine]#fetch the routine with the returned name
             self.frame.exp.flow.addRoutine(newRoutine, addRoutineDlg.loc)
             self.frame.setIsModified(True)
@@ -165,9 +164,6 @@ class FlowPanel(wx.ScrolledWindow):
                 loop= loopDlg.stairHandler
             else:
                 loop=loopDlg.trialHandler
-            print 'final type', loop.type, 
-            print 'final loop params', loop.params
-            print 'final dlg params', loopDlg.params
             loop.params=loop.params
             self.frame.setIsModified(True)
         #remove the points from the timeline
@@ -909,7 +905,6 @@ class _BaseParamsDlg(wx.Dialog):
             param.val = self.getCtrlValue(ctrls.valueCtrl)
             if ctrls.typeCtrl: param.valType = self.getCtrlValue(ctrls.typeCtrl)
             if ctrls.updateCtrl: param.updates = self.getCtrlValue(ctrls.updateCtrl)
-            
         return self.params
         
     def getCtrlValue(self, ctrl):
@@ -1118,7 +1113,6 @@ class DlgLoopProperties(_BaseParamsDlg):
             param.val = self.getCtrlValue(ctrls.valueCtrl)#from _baseParamsDlg (handles diff control types)
             if ctrls.typeCtrl: param.valType = ctrls.typeCtrl.GetValue()
             if ctrls.updateCtrl: param.updates = ctrls.updateCtrl.getValue()
-            
         return self.currentHandler.params
 class DlgComponentProperties(_BaseParamsDlg):    
     def __init__(self,frame,title,params,
