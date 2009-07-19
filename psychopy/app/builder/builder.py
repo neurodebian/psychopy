@@ -638,7 +638,8 @@ class RoutineCanvas(wx.ScrolledWindow):
         
         dlg = DlgComponentProperties(frame=self.frame,
             title=component.params['name'].val+' Properties',
-            params = component.params)
+            params = component.params,
+            order = component.order)
         if dlg.OK:
             self.redrawRoutine()#need to refresh timings section
             self.Refresh()#then redraw visible
@@ -721,15 +722,20 @@ class ComponentsPanel(scrolled.ScrolledPanel):
         self.SetupScrolling()
         
     def onComponentAdd(self,evt):
+        #get name of current routine
+        currRoutinePage = self.frame.routinePanel.getCurrentPage()
+        currRoutine = self.frame.routinePanel.getCurrentRoutine()
+        #get component name
         componentName = self.componentFromID[evt.GetId()]
         newClassStr = componentName+'Component'
-        exec('newComp = experiment.%s()' %newClassStr)
+        exec('newComp = experiment.%s("%s")' %(newClassStr,currRoutine.name))
+        #create component template    
         dlg = DlgComponentProperties(frame=self.frame,
+            parentName = currRoutine.name,
             title=componentName+' Properties',
-            params = newComp.params)
+            params = newComp.params,
+            order = newComp.order)
         if dlg.OK:
-            currRoutinePage = self.frame.routinePanel.getCurrentPage()
-            currRoutine = self.frame.routinePanel.getCurrentRoutine()
             currRoutine.append(newComp)#add to the actual routing
             currRoutinePage.redrawRoutine()#update the routine's view with the new component too
 #            currRoutinePage.Refresh()#done at the end of redrawRoutine
@@ -812,7 +818,7 @@ class ParamCtrls:
             self.browseCtrl = wx.Button(self.dlg, -1, "Browse...") #we don't need a label for this  
         
 class _BaseParamsDlg(wx.Dialog):   
-    def __init__(self,frame,title,params,
+    def __init__(self,frame,title,params,order,
             pos=wx.DefaultPosition, size=wx.DefaultSize,
             style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT|wx.TAB_TRAVERSAL):        
         wx.Dialog.__init__(self, frame,-1,title,pos,size,style)
@@ -822,19 +828,14 @@ class _BaseParamsDlg(wx.Dialog):
         self.panel = wx.Panel(self, -1)
         self.params=params   #dict
         self.paramCtrls={}
+        self.order=order
         self.data = []
         self.sizer= wx.GridBagSizer(vgap=2,hgap=2)
         self.currRow = 0
-        
-        keys = sorted(self.params.keys())
-        
+                
         self.maxFieldLength = 10#max( len(str(self.params[x])) for x in keys )
         types=dict([])
         
-        #for components with names (all?) we want that at the top of the dlg
-        if 'name' in keys:
-            keys.remove('name')
-            keys.insert(0,'name')
         #create a header row of titles        
         size=wx.Size(100,-1)
         self.sizer.Add(wx.StaticText(self,-1,'Parameter',size=size, style=wx.ALIGN_CENTER),(self.currRow,0))
@@ -845,20 +846,27 @@ class _BaseParamsDlg(wx.Dialog):
         self.sizer.Add(wx.StaticLine(self,-1), (self.currRow,0), (1,4))
         self.currRow+=1
         
-        #loop through the params
-        for fieldName in keys:
-            param=self.params[fieldName]
-            ctrls=ParamCtrls(dlg=self, label=fieldName,param=param)
-            self.paramCtrls[fieldName] = ctrls
-            # self.valueCtrl = self.typeCtrl = self.updateCtrl
-            self.sizer.Add(ctrls.nameCtrl, (self.currRow,0), (1,1),wx.ALIGN_RIGHT )
-            self.sizer.Add(ctrls.valueCtrl, (self.currRow,1) )
-            if ctrls.typeCtrl: 
-                self.sizer.Add(ctrls.typeCtrl, (self.currRow,2) )
-            if ctrls.updateCtrl: 
-                self.sizer.Add(ctrls.updateCtrl, (self.currRow,3))      
-            self.currRow+=1
-        
+        remaining = sorted(self.params.keys())
+        #loop through the params with a prescribed order
+        for fieldName in self.order:
+            self.addParam(fieldName)
+            remaining.remove(fieldName)
+        #add any params that weren't specified in the order
+        for fieldName in remaining:
+            self.addParam(fieldName)
+    def addParam(self,fieldName):
+        param=self.params[fieldName]
+        ctrls=ParamCtrls(dlg=self, label=fieldName,param=param)
+        self.paramCtrls[fieldName] = ctrls
+        # self.valueCtrl = self.typeCtrl = self.updateCtrl
+        self.sizer.Add(ctrls.nameCtrl, (self.currRow,0), (1,1),wx.ALIGN_RIGHT )
+        self.sizer.Add(ctrls.valueCtrl, (self.currRow,1) )
+        if ctrls.typeCtrl: 
+            self.sizer.Add(ctrls.typeCtrl, (self.currRow,2) )
+        if ctrls.updateCtrl: 
+            self.sizer.Add(ctrls.updateCtrl, (self.currRow,3))      
+        self.currRow+=1
+            
     def addText(self, text, size=None):
         if size==None:
             size = wx.Size(8*len(text)+16, 25)
@@ -1117,18 +1125,39 @@ class DlgLoopProperties(_BaseParamsDlg):
             if ctrls.updateCtrl: param.updates = ctrls.updateCtrl.getValue()
         return self.currentHandler.params
 class DlgComponentProperties(_BaseParamsDlg):    
-    def __init__(self,frame,title,params,
+    def __init__(self,frame,title,params,order,
             pos=wx.DefaultPosition, size=wx.DefaultSize,
             style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
-        style=style|wx.RESIZE_BORDER
-        
-        _BaseParamsDlg.__init__(self,frame,title,params,pos,size,style)
+        style=style|wx.RESIZE_BORDER        
+        _BaseParamsDlg.__init__(self,frame,title,params,order,pos,size,style)
         self.frame=frame        
         self.app=frame.app
+        
+        #for input devices:
+        if 'storeCorrect' in self.params:
+            self.onStoreCorrectChange(event=None)#do this just to set the initial values to be 
+            self.Bind(wx.EVT_CHECKBOX, self.onStoreCorrectChange, self.paramCtrls['storeCorrect'].valueCtrl)
+        
+        #for all components
         self.show()
         if self.OK:
             self.params = self.getParams()#get new vals from dlg
-        self.Destroy()
+        self.Destroy()     
+    def onStoreCorrectChange(self,event=None):
+        """store correct has been checked/unchecked. Show or hide the correctIf field accordingly"""
+        if self.paramCtrls['storeCorrect'].valueCtrl.GetValue():
+            self.paramCtrls['correctIf'].valueCtrl.Show()
+            self.paramCtrls['correctIf'].nameCtrl.Show()
+            self.paramCtrls['correctIf'].typeCtrl.Show()
+            self.paramCtrls['correctIf'].updateCtrl.Show()
+        else:
+            self.paramCtrls['correctIf'].valueCtrl.Hide()
+            self.paramCtrls['correctIf'].nameCtrl.Hide()
+            self.paramCtrls['correctIf'].typeCtrl.Hide()
+            self.paramCtrls['correctIf'].updateCtrl.Hide()    
+        self.sizer.Layout()
+        self.Fit()       
+        self.Refresh()        
         
 class BuilderFrame(wx.Frame):
 

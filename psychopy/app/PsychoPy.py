@@ -8,8 +8,6 @@ class PsychoSplashScreen(wx.SplashScreen):
     Create a splash screen widget.
     """
     def __init__(self, app):
-        # This is a recipe to a the screen.
-        # Modify the following variables as necessary.
         self.app=app
         splashFile = os.path.join(self.app.dirResources, 'psychopySplash.png')
         aBitmap = wx.Image(name = splashFile).ConvertToBitmap()

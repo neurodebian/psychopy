@@ -147,6 +147,7 @@ class TrialHandler():
         @type trialList: string (filename)
         """
         self.type='TrialHandler'
+        self.order=['name']#make name come first (others don't matter)
         self.params={}
         self.params['name']=Param(name, valType='code', updates=None, allowedUpdates=None,
             hint="Name of this loop")
@@ -189,6 +190,7 @@ class StairHandler():
         @type nReps:int
         """
         self.type='StairHandler'
+        self.order=['name']#make name come first (others don't matter)
         self.params={}
         self.params['name']=Param(name, valType='code', hint="Name of this loop")
         self.params['nReps']=Param(nReps, valType='num', 
@@ -323,12 +325,12 @@ class Routine(list):
     
 class BaseComponent:
     """A general template for components"""
-    def __init__(self, name='', times=[0,1]):
+    def __init__(self, parentName, name='', times=[0,1]):
         self.type='Base'
         self.params={}
         self.params['name']=Param(name, valType='code', 
             hint="Name of this loop")
-
+        self.order=['name']#make name come first (others don't matter)
     def writeInitCode(self,buff):
         pass
     def writeFrameCode(self,buff):
@@ -373,8 +375,9 @@ class BaseComponent:
 class VisualComponent(BaseComponent):
     """Base class for most visual stimuli
     """
-    def __init__(self, name='', units='window units', colour=[1,1,1],
+    def __init__(self, parentName, name='', units='window units', colour=[1,1,1],
         pos=[0,0], size=[0,0], ori=0, times=[0,1], colourSpace='rgb'):
+        self.order=['name']#make name come first (others don't matter)
         self.params={}
         self.params['name']=Param(name,  valType='code', updates="never", 
             hint="Name of this stimulus")
@@ -411,7 +414,7 @@ class VisualComponent(BaseComponent):
 
 class TextComponent(VisualComponent):
     """An event class for presenting image-based stimuli"""
-    def __init__(self, name='', text='', font='arial',
+    def __init__(self, parentName, name='', text='', font='arial',
         units='window units', colour=[1,1,1], colourSpace='rgb',
         pos=[0,0], size=[0,0], ori=0, times=[0,1]):
         #initialise main parameters from base stimulus
@@ -435,7 +438,7 @@ class TextComponent(VisualComponent):
         
 class PatchComponent(VisualComponent):
     """An event class for presenting image-based stimuli"""
-    def __init__(self, name='', image='sin', mask='none', sf=1, interpolate='linear',
+    def __init__(self, parentName, name='', image='sin', mask='none', sf=1, interpolate='linear',
         units='window units', colour=[1,1,1], colourSpace='rgb',
         pos=[0,0], size=[0,0], ori=0, times=[0,1]):
         #initialise main parameters from base stimulus
@@ -463,7 +466,7 @@ class PatchComponent(VisualComponent):
 
 class MovieComponent(VisualComponent):
     """An event class for presenting image-based stimuli"""
-    def __init__(self, name='', movie='', 
+    def __init__(self, parentName, name='', movie='', 
         units='window units', 
         pos=[0,0], size=[0,0], ori=0, times=[0,1]):
         #initialise main parameters from base stimulus
@@ -483,7 +486,7 @@ class MovieComponent(VisualComponent):
         
 class SoundComponent(BaseComponent):
     """An event class for presenting image-based stimuli"""
-    def __init__(self, name='', sound='A', 
+    def __init__(self, parentName, name='', sound='A', 
             size=1, ori=0, times=[0,1]):
         
         self.type='Sound'
@@ -511,18 +514,33 @@ class SoundComponent(BaseComponent):
             
 class KeyboardComponent(BaseComponent):
     """An event class for checking the keyboard at given times"""
-    def __init__(self, name='', allowedKeys='q,left,right',times=[0,1]):
+    def __init__(self, parentName, name='', allowedKeys='q,left,right',storeWhat='first key',
+            forceEndTrial=True,storeCorrect=False,correctIf="==thisTrial.corrAns",times=[0,1]):
         self.type='Keyboard'
-                
+        self.parentName=parentName
         self.params={}
+        self.order=['name','allowedKeys',
+            'storeWhat','storeCorrect','correctIf',
+            'forceEndTrial','times']
         self.params['name']=Param(name,  valType='code', hint="A name for this keyboard object (e.g. response)")  
-        self.params['allowedKeys']=Param(sound, valType='str', allowedTypes=['str','code'],
+        self.params['allowedKeys']=Param(allowedKeys, valType='str', allowedTypes=['str','code'],
             updates="never", allowedUpdates=["never","routine"],
             hint="The keys the user may press, e.g. a,b,q,left,right")  
         self.params['times']=Param(times, valType='code', allowedTypes=['code'],
             updates="never", allowedUpdates=["never"],
             hint="A series of one or more periods to read the keyboard, e.g. [2.0,2.5] or [[2.0,2.5],[3.0,3.8]]")
-            
+        self.params['storeWhat']=Param(storeWhat, valType='str', allowedTypes=['str'],allowedVals=['first key', 'all keys'],
+            updates="never", allowedUpdates=["never"],
+            hint="Store a single key, or append to a list of all keys pressed during the routine")  
+        self.params['forceEndTrial']=Param(forceEndTrial, valType='bool', allowedTypes=['bool'],
+            updates="never", allowedUpdates=["never"],
+            hint="Should the keypress force the end of the routine (e.g end the trial)?")
+        self.params['storeCorrect']=Param(storeCorrect, valType='bool', allowedTypes=['bool'],
+            updates="never", allowedUpdates=["never"],
+            hint="Do you want to save the response as correct/incorrect?")
+        self.params['correctIf']=Param(correctIf, valType='code', allowedTypes=['code'],
+            updates="never", allowedUpdates=["never"],
+            hint="Do you want to save the response as correct/incorrect? Might be helpful to add a corrAns column in the trialList")
     def writeInitCode(self,buff):
         pass#no need to initialise keyboards?
     def writeFrameCode(self,buff):
@@ -531,13 +549,15 @@ class KeyboardComponent(BaseComponent):
         self.writeTimeTestCode(buff)#writes an if statement to determine whether to draw etc
         buff.setIndentLevel(1, relative=True)#because of the 'if' statement of the times test
         #draw the stimulus
-        buff.writeIndented("%(name)s.getKeys(allowed=%(allowedKeys)s)\n" %(self.params))
+        buff.writeIndented("%(name)s = event.getKeys(allowed=%(allowedKeys)s)\n" %(self.params))
         buff.setIndentLevel(-1, relative=True)        
-
+    def writeRoutineEndCode(buff):
+        buff.writeIndented("%s.addData(%s)" %(self.parentName, self.params.name))
 class MouseComponent(BaseComponent):
     """An event class for checking the mouse location and buttons at given times"""
-    def __init__(self, name='mouse', times=[0,1], save='final'):
+    def __init__(self, parentName, name='mouse', times=[0,1], save='final'):
         self.type='Mouse'
+        self.order = ['name']
         self.params={}
         self.params['name']=Param(name, valType='str', allowedTypes=['str','code'],
             hint="Even mice have names!") 
