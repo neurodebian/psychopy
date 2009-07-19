@@ -1,3 +1,14 @@
+import ConfigParser, wx, os
+
+#prefs are stored as config files for easy modification by users
+prefs = ConfigParser.SafeConfigParser()
+prefs.loadfp(open('prefs.cfg'))#load the defaults
+prefs.load('
+
+#app data isn't useful to user and might include arbitrary serialised python objects
+#maybe we should use pickle instead of configs?
+appData=ConfigParser.SafeConfigParser()
+
 import wx, sys, os, cPickle, urllib
 
 RUN_SCRIPTS = 'process' #'process', or 'thread' or 'dbg'
