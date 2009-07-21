@@ -7,7 +7,7 @@ import psychoParser
 import introspect, py_compile
 from keybindings import *
 
-from preferences import *
+from psychopy.preferences import *
 
 #create IDs for the events
 ID_EXIT=wx.NewId()

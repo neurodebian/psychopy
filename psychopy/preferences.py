@@ -1,91 +1,96 @@
-import ConfigParser, wx, os
+import wx, os, sys, urllib
+from shutil import copyfile
+from psychopy import configobj, configobjValidate
 
-#prefs are stored as config files for easy modification by users
-prefs = ConfigParser.SafeConfigParser()
-prefs.loadfp(open('prefs.cfg'))#load the defaults
-prefs.load('
-
-#app data isn't useful to user and might include arbitrary serialised python objects
-#maybe we should use pickle instead of configs?
-appData=ConfigParser.SafeConfigParser()
-
-import wx, sys, os, cPickle, urllib
-
-RUN_SCRIPTS = 'process' #'process', or 'thread' or 'dbg'
-IMPORT_LIBS='none'# should be 'thread' or 'inline' or 'none'
-ANALYSIS_LEVEL=1
-if sys.platform=='darwin':
-    ALLOW_MODULE_IMPORTS=False
-else:
-    ALLOW_MODULE_IMPORTS=True
-
-#set default values
-generalDefaults = dict(loadPrevFiles=True,
-            defaultView='builder',
-            )
-coderDefaults=dict(codeFont="",
-            codeFontSize="",
-            outputFont="",
-            outputFontSize="",
-            prevFiles=[],
-            recentFiles=[],
-            showSourceAsst=False,
-            analyseAuto=True,
-            showOutput=True,
-            )
-builderDefaults=dict(defaultTimeUnits='secs'
-            )
-connectionDefaults = dict(sendStats=True,
-            proxy="",#but will be updated by autoproxy setting
-            autoProxy=True)
-
-#SETUP PATHS------------------
-homeDir = os.getcwd()
-#on mac __file__ might be a local path
-fullAppPath= os.path.abspath(__file__)
-dirApp, appName = os.path.split(fullAppPath)
-#get path to settings
+#GET PATHS------------------
 join = os.path.join
-if sys.platform=='win32':
-    dirPrefs = join(os.environ['APPDATA'],'PsychoPy2') #this is the folder that this file is stored in
-else:
-    dirPrefs = join(os.environ['HOME'], '.PsychoPy2')
-#from the directory for preferences wor out the path for preferences (incl filename)
-if not os.path.isdir(dirPrefs):
-    os.makedirs(dirPrefs)
-pathPrefs = join(dirPrefs, 'prefs.pickle')
-#path to Resources (icons etc)
-if os.path.isdir(join(dirApp, 'Resources')):
-    dirResources = join(dirApp, 'Resources')
-else:dirResources = dirApp
-#path to PsychoPy's root folder
-dirPsychopy = os.path.split(dirApp)[0]
- 
+
 class Preferences:
-    def __init__(self, prefsPath):
-        self.general=generalDefaults
-        self.coder=coderDefaults
-        self.builder=builderDefaults
-        self.connections=connectionDefaults        
-        self.path=prefsPath
-        #connections
-        if self.connections['autoProxy']: self.connections['proxy'] = self.getAutoProxy()
+    def __init__(self):
+        self.prefsCfg=None#the config object for the preferences
+        self.appDataCfg=None #the config object for the app data (users don't need to see)
         
-        if os.path.isfile(self.path):
-            self.load()
-    def load(self):
+        self.general=None
+        self.coder=None
+        self.builder=None
+        self.connections=None        
+        self.paths={}#this will remain a dictionary
+        
+        self.getPaths()
+        self.loadAll()            
+        
+    def getPaths(self):
+        #on mac __file__ might be a local path, so make it the full path
+        thisFileAbsPath= os.path.abspath(__file__)
+        dirPsychoPy = os.path.split(thisFileAbsPath)[0]
+        #paths to user settings
+        if sys.platform=='win32':
+            dirUserPrefs = join(os.environ['APPDATA'],'psychoy2') #the folder where the user cfg file is stored
+        else:
+            dirUserPrefs = join(os.environ['HOME'], '.psychopy2')
+        #from the directory for preferences work out the path for preferences (incl filename)
+        if not os.path.isdir(dirUserPrefs):
+            os.makedirs(dirUserPrefs)
+        #path to Resources (icons etc)
+        dirApp = join(dirPsychoPy, 'app')
+        if os.path.isdir(join(dirApp, 'Resources')):
+            dirResources = join(dirApp, 'Resources')
+        else:dirResources = dirApp
+        
+        self.paths['psychopy']=dirPsychoPy
+        self.paths['appDir']=dirApp
+        self.paths['appFile']=join(dirApp, 'PsychoPy.py')
+        self.paths['resources']=dirResources
+        self.paths['userPrefs']=dirUserPrefs
+        self.paths['userPrefsFile']=join(dirUserPrefs, 'prefsUser.cfg')
+        self.paths['appDataFile']=join(dirUserPrefs,'appData.cfg')
+        self.paths['sitePrefsFile']=join(self.paths['psychopy'], 'sitePrefs.cfg')
+
+    def loadAll(self):
         """A function to allow a class with attributes to be loaded from a 
         pickle file necessarily without having the same attribs (so additional 
         attribs can be added in future).
         """
-        prefFile=fromPickle(self.path)
-        for sectionName in ['general','coder','builder','connections']:#each section (builder, coder...)
-            exec("current=self.%s; imported=self.%s" %(sectionName,sectionName))
-            for thisPrefName in imported.keys():#a dictionary entry
-                current[thisPrefName]=imported[thisPrefName]
-    def save(self):
-        toPickle(self.path, self)
+        #load against the spec, then validate and save to a file 
+        #(this won't overwrite existing values, but will create additional ones if necess)
+        prefsSpec = configobj.ConfigObj(join(self.paths['psychopy'], 'prefsSpec.cfg'), encoding='UTF8', list_values=False)
+        vdt=configobjValidate.Validator()
+        self.prefsCfg = configobj.ConfigObj(self.paths['sitePrefsFile'], configspec=prefsSpec)
+        self.prefsCfg.validate(vdt, copy=True)#copy means all settings get saved
+        if len(self.prefsCfg['general']['userPrefsFile'])==0:
+            self.prefsCfg['general']['userPrefsFile']=self.paths['userPrefsFile']#set path to home
+        else:
+            self.paths['userPrefsFile']=self.prefsCfg['general']['userPrefsFile']#set app path to user override
+        self.prefsCfg.write()#so the user can see what's (now) available
         
+        #then add user prefs
+        if os.path.isfile(self.paths['userPrefsFile']):
+            self.generateUserPrefsFile()#create an empty one
+        self.userPrefsCfg = configobj.ConfigObj(self.paths['userPrefsFile'])
+        
+        #merge site prefs and user prefs
+        self.prefsCfg.merge(self.userPrefsCfg)
+                
+        self.general=self.prefsCfg['general']
+        self.coder=self.prefsCfg['coder']
+        self.builder=self.prefsCfg['builder']
+        self.connections=self.prefsCfg['connections'] 
+        
+        #override some platfrom-specific settings
+        if sys.platform=='darwin':
+            self.prefsCfg['app']['allowImportModules']=False            
+        #connections
+        print self.connections
+        if self.connections['autoProxy']: self.connections['proxy'] = self.getAutoProxy()
+    def saveAppData(self):
+        """Save the various setting to the appropriate files (or discard, in some cases)
+        """
+        self.appDataCfg.write(self.paths['appData'])
+    def resetSitePrefs():
+        """Reset the site preferences to the original defaults (to reset user prefs, just delete entries)
+        """
+        copyfile(self.paths['defaultPrefs.cfg'], self.paths['sitePrefs'])
+    
     def getAutoProxy(self):
         """Fetch the proxy from the the system environment variables
         """
@@ -93,26 +98,34 @@ class Preferences:
             return urllib.getproxies()['http']
         else:
             return ""
-        
-class PreferencesDlg(wx.Frame):
-    def __init__(self, parent, ID, title, files=[]):
-        pass
-def toPickle(filename, data):
-    """save data (of any sort) as a pickle file
-    
-    simple wrapper of the cPickle module in core python
-    """
-    f = open(filename, 'w')
-    cPickle.dump(data,f)
-    f.close()
-
-def fromPickle(filename):
-    """load data (of any sort) from a pickle file
-    
-    simple wrapper of the cPickle module in core python
-    """
-    f = open(filename)
-    contents = cPickle.load(f)
-    f.close()
-    return contents
-
+    def generateUserPrefsFile(self):
+        """Generate a preferences file for the user (and any necessary directories)
+        """
+        #check for folder
+        if not os.path.isdir(self.paths['userPrefs']):
+            os.makedirs(self.paths['userPrefs'])
+        f = open(self.paths['userPrefsFile'], 'w')
+        f.write("#this file allows you to override various settings. Any setting defined in \n%s\n can be added here to override" %self.paths['sitePrefsFile'])
+        f.close()
+#class PreferencesDlg(wx.Frame):
+#    def __init__(self, parent, ID, title, files=[]):
+#        pass
+#def toPickle(filename, data):
+#    """save data (of any sort) as a pickle file
+#    
+#    simple wrapper of the cPickle module in core python
+#    """
+#    f = open(filename, 'w')
+#    cPickle.dump(data,f)
+#    f.close()
+#
+#def fromPickle(filename):
+#    """load data (of any sort) from a pickle file
+#    
+#    simple wrapper of the cPickle module in core python
+#    """
+#    f = open(filename)
+#    contents = cPickle.load(f)
+#    f.close()
+#    return contents
+#

@@ -1,7 +1,7 @@
 import wx, sys, os
 from keybindings import *
 import psychopy, coder, builder
-from preferences import *
+from psychopy.preferences import *
 
 class PsychoSplashScreen(wx.SplashScreen):
     """
@@ -49,11 +49,7 @@ class PsychoPyApp(wx.App):
             args=[]
         
         #set default paths and import options
-        self.dirApp = dirApp#defined in the prefs
-        self.dirResources = dirResources
-        self.dirPsychopy = dirPsychopy
-        self.pathPrefs=pathPrefs
-        self.options = Preferences(pathPrefs) #from preferences.py
+        self.prefs = Preferences() #from preferences.py
         #create frame(s) for coder/builder as necess
         self.coder=None
         self.builder=None
