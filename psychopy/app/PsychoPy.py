@@ -9,7 +9,7 @@ class PsychoSplashScreen(wx.SplashScreen):
     """
     def __init__(self, app):
         self.app=app
-        splashFile = os.path.join(self.app.dirResources, 'psychopySplash.png')
+        splashFile = os.path.join(self.app.prefs.paths['resources'], 'psychopySplash.png')
         aBitmap = wx.Image(name = splashFile).ConvertToBitmap()
         splashStyle = wx.SPLASH_CENTRE_ON_SCREEN | wx.NO_BORDER
         # Call the constructor with the above arguments in exactly the
@@ -96,9 +96,7 @@ class PsychoPyApp(wx.App):
     def MacOpenFile(self,fileName):
         self.frame.setCurrentDoc(fileName)
     def Quit(self):
-        
-        print 'prevFiles', self.options.coder['prevFiles']
-        self.options.save()
+        self.prefs.saveAppData()
         for frame in [self.coder, self.builder]:
             if hasattr(frame,'Destroy'): frame.Destroy()
         

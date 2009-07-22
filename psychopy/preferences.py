@@ -40,6 +40,7 @@ class Preferences:
         self.paths['psychopy']=dirPsychoPy
         self.paths['appDir']=dirApp
         self.paths['appFile']=join(dirApp, 'PsychoPy.py')
+        self.paths['demos'] = join(dirPsychoPy, 'demos')
         self.paths['resources']=dirResources
         self.paths['userPrefs']=dirUserPrefs
         self.paths['userPrefsFile']=join(dirUserPrefs, 'prefsUser.cfg')
@@ -64,28 +65,36 @@ class Preferences:
         self.prefsCfg.write()#so the user can see what's (now) available
         
         #then add user prefs
-        if os.path.isfile(self.paths['userPrefsFile']):
+        if not os.path.isfile(self.paths['userPrefsFile']):
             self.generateUserPrefsFile()#create an empty one
         self.userPrefsCfg = configobj.ConfigObj(self.paths['userPrefsFile'])
         
         #merge site prefs and user prefs
         self.prefsCfg.merge(self.userPrefsCfg)
-                
+        
+        #fetch appData too against a config spec
+        appDataSpec = configobj.ConfigObj(join(self.paths['appDir'], 'appDataSpec.cfg'), encoding='UTF8', list_values=False)
+        self.appDataCfg = configobj.ConfigObj(self.paths['appDataFile'], configspec=appDataSpec)
+        self.appDataCfg.validate(vdt, copy=True)
+        
+        #simplify namespace
         self.general=self.prefsCfg['general']
         self.coder=self.prefsCfg['coder']
         self.builder=self.prefsCfg['builder']
         self.connections=self.prefsCfg['connections'] 
+        self.appData = self.appDataCfg
         
         #override some platfrom-specific settings
         if sys.platform=='darwin':
             self.prefsCfg['app']['allowImportModules']=False            
         #connections
-        print self.connections
         if self.connections['autoProxy']: self.connections['proxy'] = self.getAutoProxy()
     def saveAppData(self):
         """Save the various setting to the appropriate files (or discard, in some cases)
         """
-        self.appDataCfg.write(self.paths['appData'])
+        vdt=configobjValidate.Validator()
+        self.appDataCfg.validate(vdt, copy=True)#copy means all settings get saved
+        self.appDataCfg.write()
     def resetSitePrefs():
         """Reset the site preferences to the original defaults (to reset user prefs, just delete entries)
         """
@@ -105,7 +114,8 @@ class Preferences:
         if not os.path.isdir(self.paths['userPrefs']):
             os.makedirs(self.paths['userPrefs'])
         f = open(self.paths['userPrefsFile'], 'w')
-        f.write("#this file allows you to override various settings. Any setting defined in \n%s\n can be added here to override" %self.paths['sitePrefsFile'])
+        f.write("#this file allows you to override various settings. Any setting defined in"+\
+                "\n#%s\n#can be added here to override\n" %self.paths['sitePrefsFile'])
         f.close()
 #class PreferencesDlg(wx.Frame):
 #    def __init__(self, parent, ID, title, files=[]):

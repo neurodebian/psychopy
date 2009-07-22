@@ -491,7 +491,7 @@ class CodeEditor(wx.stc.StyledTextCtrl):
             #self.Refresh(False)
         
 
-        if self.frame.options['showSourceAsst']:
+        if self.frame.prefs['showSourceAsst']:
             #check current word including .
             if charBefore== ord('('):
                 startPos = self.WordStartPosition(caretPos-2, True)
@@ -768,7 +768,7 @@ class CodeEditor(wx.stc.StyledTextCtrl):
                     newAttrs=[]
                     
                 #only dig deeper if we haven't exceeded the max level of analysis
-                if thisSymbol.find('.') < ANALYSIS_LEVEL:
+                if thisSymbol.find('.') < self.frame.prefs['analysisLevel']:
                     #we should carry on digging deeper
                     for thisAttr in newAttrs:
                         #by appending the symbol it will also get analysed!
@@ -930,31 +930,31 @@ class StdOutRich(wx.richtext.RichTextCtrl):
 class CoderFrame(wx.Frame):
     def __init__(self, parent, ID, title, files=[], app=None):
         self.app = app
-        self.options = self.app.options.coder
-            
+        self.appData = self.app.prefs.appData#things the user doesn't set like winsize etc
+        self.prefs = self.app.prefs.coder#things about the coder that get set
+        self.paths = self.app.prefs.paths
+        
         self.currentDoc=None
         self.ignoreErrors = False
-        
-        if not 'auiPerspective' in self.options.keys():
-            self.options['auiPerspective']=None
-        if not 'winPos' in self.options.keys() or self.options['winPos'][1]<0:#we didn't have the key or the win was minimized/invalid
-            self.options['winPos']=wx.DefaultPosition
-            self.options['winSize']=wx.DefaultSize
+#        print self.appData
+        if self.appData['winH']==0 or self.appData['winW']==0:#we didn't have the key or the win was minimized/invalid
+            self.appData['winH'], self.appData['winH'] =wx.DefaultSize
+            self.appData['winX'],self.appData['winY'] =wx.DefaultPosition
         wx.Frame.__init__(self, parent, ID, title,
-                         self.options['winPos'], 
-                         size=self.options['winSize']) #the size settingdoesn't work but using the aui manager we can recover previous size
+                         (self.appData['winX'], self.appData['winY']),
+                         size=(self.appData['winW'],self.appData['winH']))#the size settingdoesn't work but using the aui manager we can recover previous size
 
         #create icon
         if sys.platform=='darwin':
             pass#doesn't work and not necessary - handled by application bundle
         else:
-            iconFile = os.path.join(self.app.dirApp, 'psychopy.ico')
+            iconFile = os.path.join(self.paths['resources'], 'psychopy.ico')
             if os.path.isfile(iconFile):
                 self.SetIcon(wx.Icon(iconFile, wx.BITMAP_TYPE_ICO))
         wx.EVT_CLOSE(self, self.quit)
         wx.EVT_IDLE(self, self.onIdle)
 #        self.SetAcceleratorTable(makeAccelTable())
-        if self.options.has_key('state') and self.options['state']=='maxim':
+        if self.appData.has_key('state') and self.appData['state']=='maxim':
             self.Maximize()
         #initialise some attributes
         self.modulesLoaded=False #will turn true when loading thread completes
@@ -1002,7 +1002,7 @@ class CoderFrame(wx.Frame):
         
         
         #for demos we need a dict where the event ID will correspond to a filename
-        self.demoList = glob.glob(os.path.join(self.app.dirPsychopy,'demos','*.py'))
+        self.demoList = glob.glob(os.path.join(self.paths['demos'],'*.py'))
         if '__init__.py' in self.demoList: self.demoList.remove('__init__.py')
         #demoList = glob.glob(os.path.join(appDir,'..','demos','*.py'))
         self.ID_DEMOS = \
@@ -1015,14 +1015,13 @@ class CoderFrame(wx.Frame):
         self.makeToolbar()
         
         #take files from arguments and append the previously opened files
-        if files:
-            self.options['prevFiles'].extend(files)
-        if len(self.options['prevFiles'])==0:
+        if files: self.appData['prevFiles'].extend(files)
+        if len(self.appData['prevFiles'])==0:
             #then no files previously opened
             self.setCurrentDoc('')#a dummy page to start
         else:
             #re-open previous files
-            for filename in self.options['prevFiles']: 
+            for filename in self.appData['prevFiles']: 
                 if not os.path.isfile(filename): continue
                 self.setCurrentDoc(filename)      
                 
@@ -1048,20 +1047,21 @@ class CoderFrame(wx.Frame):
                                  RightDockable(True).LeftDockable(True).CloseButton(False).
                                  Right())
         #will we show the pane straight away?
-        if self.options['showSourceAsst']:
+        if self.prefs['showSourceAsst']:
             self.paneManager.GetPane('SourceAsst').Show()
         else:self.paneManager.GetPane('SourceAsst').Hide()
         
         
         #self.SetSizer(self.mainSizer)#not necessary for aui type controls
-        if self.options['auiPerspective']:
-            self.paneManager.LoadPerspective(self.options['auiPerspective'])
+        if self.appData['auiPerspective']:
+            self.paneManager.LoadPerspective(self.appData['auiPerspective'])
         else:
             self.SetMinSize(wx.Size(800, 800)) #min size for the whole window
             self.Fit()
             self.paneManager.Update()
             self.SetMinSize(wx.Size(200, 200)) #min size for the whole window
-            
+        self.SendSizeEvent()
+        
     def makeMenus(self):
         #---Menus---#000000#FFFFFF--------------------------------------------------
         menuBar = wx.MenuBar()
@@ -1081,8 +1081,10 @@ class CoderFrame(wx.Frame):
         wx.EVT_MENU(self, wx.ID_CLOSE,  self.fileClose)
 
         # and a file history
-        self.filehistory = wx.FileHistory()
-        self.filehistory.UseMenu(self.fileMenu)
+        self.fileHistory = wx.FileHistory()
+        
+        self.fileHistory.UseMenu(self.fileMenu)
+        for filename in self.appData['fileHistory']: self.fileHistory.AddFileToHistory(filename)
         self.Bind(
             wx.EVT_MENU_RANGE, self.OnFileHistory, id=wx.ID_FILE1, id2=wx.ID_FILE9
             )
@@ -1139,7 +1141,7 @@ class CoderFrame(wx.Frame):
         wx.EVT_MENU(self, ID_OPEN_MONCENTER,  self.openMonitorCenter)
         self.analyseAutoChk = self.toolsMenu.AppendCheckItem(ID_ANALYZE_AUTO, "Analyse on file save/open", "Automatically analyse source (for autocomplete etc...). Can slow down the editor on a slow machine or with large files")
         wx.EVT_MENU(self, ID_ANALYZE_AUTO,  self.setAnalyseAuto)
-        self.analyseAutoChk.Check(self.options['analyseAuto'])
+        self.analyseAutoChk.Check(self.prefs['analyseAuto'])
         self.toolsMenu.Append(ID_ANALYZE_NOW, "Analyse now\t%s" %key_analysecode, "Force a reananalysis of the code now")
         wx.EVT_MENU(self, ID_ANALYZE_NOW,  self.analyseCodeNow)
         
@@ -1156,13 +1158,13 @@ class CoderFrame(wx.Frame):
         #output window
         self.outputChk= self.viewMenu.AppendCheckItem(ID_TOGGLE_OUTPUT, "&Output",
                                                   "shows the output (and error messages) from your script")
-        self.outputChk.Check(self.options['showOutput'])
+        self.outputChk.Check(self.prefs['showOutput'])
         wx.EVT_MENU(self, ID_TOGGLE_OUTPUT,  self.setOutputWindow)
         
         #source assistant
         self.sourceAsstChk= self.viewMenu.AppendCheckItem(ID_TOGGLE_SOURCEASST, "&Source Assistant",
                                                   "Provides help functions and attributes of classes in your script")
-        self.sourceAsstChk.Check(self.options['showSourceAsst'])
+        self.sourceAsstChk.Check(self.prefs['showSourceAsst'])
         wx.EVT_MENU(self, ID_TOGGLE_SOURCEASST,  self.setSourceAsst)
         
         
@@ -1196,20 +1198,21 @@ class CoderFrame(wx.Frame):
             | wx.NO_BORDER
             | wx.TB_FLAT))
             
-        if sys.platform=='win32':
-            toolbarSize=32
+        if sys.platform=='win32' or sys.platform.startswith('linux'):
+            if self.prefs['largeIcons']: toolbarSize=32         
+            else: toolbarSize=16
         else:
             toolbarSize=32 #size 16 doesn't work on mac wx
         self.toolbar.SetToolBitmapSize((toolbarSize,toolbarSize))
-        new_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'filenew%i.png' %toolbarSize))
-        open_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'fileopen%i.png' %toolbarSize))
-        save_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'filesave%i.png' %toolbarSize))
-        saveAs_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'filesaveas%i.png' %toolbarSize), wx.BITMAP_TYPE_PNG)
-        undo_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'undo%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
-        redo_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'redo%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
-        stop_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'stop%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
-        run_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'run%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
-            
+        new_bmp = wx.Bitmap(os.path.join(self.paths['resources'], 'filenew%i.png' %toolbarSize), wx.BITMAP_TYPE_PNG)
+        open_bmp = wx.Bitmap(os.path.join(self.paths['resources'], 'fileopen%i.png' %toolbarSize), wx.BITMAP_TYPE_PNG)
+        save_bmp = wx.Bitmap(os.path.join(self.paths['resources'], 'filesave%i.png' %toolbarSize), wx.BITMAP_TYPE_PNG)
+        saveAs_bmp = wx.Bitmap(os.path.join(self.paths['resources'], 'filesaveas%i.png' %toolbarSize), wx.BITMAP_TYPE_PNG)
+        undo_bmp = wx.Bitmap(os.path.join(self.paths['resources'], 'undo%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        redo_bmp = wx.Bitmap(os.path.join(self.paths['resources'], 'redo%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        stop_bmp = wx.Bitmap(os.path.join(self.paths['resources'], 'stop%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        run_bmp = wx.Bitmap(os.path.join(self.paths['resources'], 'run%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        
         self.toolbar.AddSimpleTool(TB_FILENEW, new_bmp, "New [Ctrl+N]", "Create new python file")
         self.toolbar.Bind(wx.EVT_TOOL, self.fileNew, id=TB_FILENEW)
         self.toolbar.AddSimpleTool(TB_FILEOPEN, open_bmp, "Open [Ctrl+O]", "Open an existing file'")
@@ -1269,7 +1272,7 @@ class CoderFrame(wx.Frame):
         dlg.ShowModal()
         dlg.Destroy()
     def showLicense(self, event):
-        licFile = open(os.path.join(self.app.dirPsychopy,'LICENSE.txt'))
+        licFile = open(os.path.join(self.paths['psychopy'],'LICENSE.txt'))
         licTxt = licFile.read()
         licFile.close()
         dlg = wx.MessageDialog(self, licTxt,
@@ -1299,13 +1302,13 @@ class CoderFrame(wx.Frame):
     def OnFindClose(self, event):
         self.findDlg.Destroy()
         self.findDlg = None
-    def OnFileHistory(self, evt):
+    def OnFileHistory(self, evt=None):
         # get the file based on the menu ID
         fileNum = evt.GetId() - wx.ID_FILE1
-        path = self.filehistory.GetHistoryFile(fileNum)
+        path = self.fileHistory.GetHistoryFile(fileNum)
         self.setCurrentDoc(path)#load the file
         # add it back to the history so it will be moved up the list
-        self.filehistory.AddFileToHistory(path)
+        self.fileHistory.AddFileToHistory(path)
         
     def followLink(self, event):
         if event.GetId()==ID_PSYCHO_HOME: wx.LaunchDefaultBrowser('http://www.psychopy.org/')
@@ -1328,28 +1331,33 @@ class CoderFrame(wx.Frame):
         #undo
         sys.stdout = self._origStdOut#discovered during __init__
         sys.stderr = self._origStdErr
-        os.chdir(self.app.dirApp)
-        self.options['prevFiles'] = []
+        
+        #store current appData
+        self.appData['prevFiles'] = []
         for thisFile in self.allDocs:
-            self.options['prevFiles'].append(thisFile.filename)
-            
-        #close each file (which will check for saving)
-        for thisFile in self.allDocs:#must do this for all files AFTER adding them to the list
+            self.appData['prevFiles'].append(thisFile.filename)
+                #get size and window layout info
+        if self.IsIconized():
+            self.Iconize(False)#will return to normal mode to get size info
+            self.appData['state']='normal'
+        elif self.IsMaximized():
+            self.Maximize(False)#will briefly return to normal mode to get size info
+            self.appData['state']='maxim'
+        else:
+            self.appData['state']='normal'
+        self.appData['winW'], self.appData['winH']=self.GetSize()
+        self.appData['winX'], self.appData['winY']=self.GetPosition() 
+        self.appData['auiPerspective'] = self.paneManager.SavePerspective()
+        
+        for ii in range(self.fileHistory.GetCount()):
+            self.appData['fileHistory'].append(self.fileHistory.GetHistoryFile(ii))
+        self.appData.write()#do the actual save
+        
+        #close each file (so that we check for saving)
+        for thisFile in self.allDocs:
             ok = self.fileClose(event=0)
             if ok==-1:
                 return -1 #user cancelled - don't quit
-        #get size and window layout info
-        if self.IsIconized():
-            self.Iconize(False)#will return to normal mode to get size info
-            self.options['state']='normal'
-        elif self.IsMaximized():
-            self.Maximize(False)#will briefly return to normal mode to get size info
-            self.options['state']='maxim'
-        else:
-            self.options['state']='normal'
-        self.options['winSize']=self.GetSize()
-        self.options['winPos']=self.GetPosition() 
-        self.options['auiPerspective'] = self.paneManager.SavePerspective()
         
         self.app.Quit()
     def fileNew(self, event=None, filepath=""):
@@ -1385,7 +1393,7 @@ class CoderFrame(wx.Frame):
             #load text from document
             if os.path.isfile(filename):
                 self.currentDoc.SetText(open(filename).read())
-                self.filehistory.AddFileToHistory(filename)
+                self.fileHistory.AddFileToHistory(filename)
             else:
                 self.currentDoc.SetText("")
             self.currentDoc.EmptyUndoBuffer()
@@ -1407,7 +1415,7 @@ class CoderFrame(wx.Frame):
             self.setFileModified(False)
         
         self.SetLabel('PsychoPy IDE - %s' %self.currentDoc.filename)
-        if self.options['analyseAuto'] and len(self.allDocs)>0:
+        if self.prefs['analyseAuto'] and len(self.allDocs)>0:
             self.SetStatusText('Analysing code')
             self.currentDoc.analyseScript()
             self.SetStatusText('')
@@ -1431,7 +1439,7 @@ class CoderFrame(wx.Frame):
             self.setFileModified(False)        
                     
         self.SetStatusText('')
-        
+        #self.fileHistory.AddFileToHistory(newPath)#thisis done by setCurrentDoc
     def fileSave(self,event, filename=None):
         
         if self.currentDoc.AutoCompActive():
@@ -1448,11 +1456,12 @@ class CoderFrame(wx.Frame):
             f.close()
         self.setFileModified(False)
             
-        if self.options['analyseAuto'] and len(self.allDocs)>0:
+        if self.prefs['analyseAuto'] and len(self.allDocs)>0:
             self.SetStatusText('Analysing current source code')
             self.currentDoc.analyseScript()
         #reset status text
         self.SetStatusText('')
+        self.fileHistory.AddFileToHistory(filename)
         
     def fileSaveAs(self,event, filename=None):
                     
@@ -1658,14 +1667,14 @@ class CoderFrame(wx.Frame):
         #show/hide the output window (from the view menu control)  
         if self.outputChk.IsChecked():
             #show the pane
-            self.options['showOutput']=True
+            self.prefs['showOutput']=True
             self.paneManager.GetPane('Output').Show()
             #will we actually redirect the output?
             sys.stdout = self.outputWindow
             sys.stderr = self.outputWindow
         else:
             #show the pane
-            self.options['showOutput']=False
+            self.prefs['showOutput']=False
             self.paneManager.GetPane('Output').Hide()
             sys.stdout = self._origStdOut#discovered during __init__
             sys.stderr = self._origStdErr
@@ -1676,10 +1685,10 @@ class CoderFrame(wx.Frame):
         #show/hide the source assistant (from the view menu control)
         if not self.sourceAsstChk.IsChecked():
             self.paneManager.GetPane("SourceAsst").Hide()
-            self.options['showSourceAsst']=False
+            self.prefs['showSourceAsst']=False
         else:
             self.paneManager.GetPane("SourceAsst").Show()
-            self.options['showSourceAsst']=True
+            self.prefs['showSourceAsst']=True
         self.paneManager.Update()
     def analyseCodeNow(self, event):
         self.SetStatusText('analysing code')
@@ -1692,9 +1701,9 @@ class CoderFrame(wx.Frame):
     def setAnalyseAuto(self, event):
         #set autoanalysis (from the check control in the tools menu)
         if self.analyseAutoChk.IsChecked():
-            self.options['analyseAuto']=True
+            self.prefs['analyseAuto']=True
         else:
-            self.options['analyseAuto']=False
+            self.prefs['analyseAuto']=False
     def openMonitorCenter(self,event):
         from monitors import MonitorCenter
         frame = MonitorCenter.MainFrame(None,'PsychoPy Monitor Centre')
