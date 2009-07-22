@@ -708,7 +708,7 @@ class ComponentsPanel(scrolled.ScrolledPanel):
         self.componentButtons={}; self.componentFromID={}
         for componentType in componentTypes:
             img =wx.Bitmap(
-                os.path.join(self.app.dirResources,"%sAdd.png" %componentType.lower()))    
+                os.path.join(self.app.prefs.paths['resources'],"%sAdd.png" %componentType.lower()))    
             btn = wx.BitmapButton(self, -1, img, (20, 20),
                            (img.GetWidth()+10, img.GetHeight()+10),
                            name=componentType)  
@@ -1171,7 +1171,7 @@ class BuilderFrame(wx.Frame):
         self.bitmaps={}
         for componentType in componentTypes:
             self.bitmaps[componentType]=wx.Bitmap( \
-                os.path.join(self.app.dirResources,"%s.png" %componentType.lower()))      
+                os.path.join(self.app.prefs.paths['resources'],"%s.png" %componentType.lower()))      
                 
         #setup a blank exp
         self.filename='untitled.psyexp'
@@ -1212,21 +1212,23 @@ class BuilderFrame(wx.Frame):
             | wx.NO_BORDER
             | wx.TB_FLAT))
             
-        if sys.platform=='win32':
-            toolbarSize=32
+        if sys.platform=='win32' or sys.platform.startswith('linux'):
+            if self.prefs['largeIcons']: toolbarSize=32         
+            else: toolbarSize=16
         else:
             toolbarSize=32 #size 16 doesn't work on mac wx
         self.toolbar.SetToolBitmapSize((toolbarSize,toolbarSize))
-        new_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'filenew%i.png' %toolbarSize))
-        open_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'fileopen%i.png' %toolbarSize))
-        save_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'filesave%i.png' %toolbarSize))
-        saveAs_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'filesaveas%i.png' %toolbarSize), wx.BITMAP_TYPE_PNG)
-        undo_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'undo%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
-        redo_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'redo%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
-        stop_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'stop%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
-        run_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'run%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
-        compile_bmp = wx.Bitmap(os.path.join(self.app.dirResources, 'compile%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
-            
+        self.toolbar.SetToolBitmapSize((toolbarSize,toolbarSize))
+        new_bmp = wx.Bitmap(os.path.join(self.app.prefs.paths['resources'], 'filenew%i.png' %toolbarSize), wx.BITMAP_TYPE_PNG)
+        open_bmp = wx.Bitmap(os.path.join(self.app.prefs.paths['resources'], 'fileopen%i.png' %toolbarSize), wx.BITMAP_TYPE_PNG)
+        save_bmp = wx.Bitmap(os.path.join(self.app.prefs.paths['resources'], 'filesave%i.png' %toolbarSize), wx.BITMAP_TYPE_PNG)
+        saveAs_bmp = wx.Bitmap(os.path.join(self.app.prefs.paths['resources'], 'filesaveas%i.png' %toolbarSize), wx.BITMAP_TYPE_PNG)
+        undo_bmp = wx.Bitmap(os.path.join(self.app.prefs.paths['resources'], 'undo%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        redo_bmp = wx.Bitmap(os.path.join(self.app.prefs.paths['resources'], 'redo%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        stop_bmp = wx.Bitmap(os.path.join(self.app.prefs.paths['resources'], 'stop%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        run_bmp = wx.Bitmap(os.path.join(self.app.prefs.paths['resources'], 'run%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        compile_bmp = wx.Bitmap(os.path.join(self.app.prefs.paths['resources'], 'compile%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
+        
         self.toolbar.AddSimpleTool(TB_FILENEW, new_bmp, "New [Ctrl+N]", "Create new python file")
         self.toolbar.Bind(wx.EVT_TOOL, self.fileNew, id=TB_FILENEW)
         self.toolbar.AddSimpleTool(TB_FILEOPEN, open_bmp, "Open [Ctrl+O]", "Open an existing file'")
@@ -1308,7 +1310,7 @@ class BuilderFrame(wx.Frame):
         
         #---_demos---#000000#FFFFFF--------------------------------------------------
         #for demos we need a dict where the event ID will correspond to a filename
-        demoList = glob.glob(os.path.join(self.app.dirApp,'demos','*.psyexp'))   
+        demoList = glob.glob(os.path.join(self.app.prefs.paths['demos'],'*.psyexp'))   
         #demoList = glob.glob(os.path.join(appDir,'..','demos','*.py'))
         ID_DEMOS = \
             map(lambda _makeID: wx.NewId(), range(len(demoList)))
@@ -1318,7 +1320,7 @@ class BuilderFrame(wx.Frame):
         self.demosMenu = wx.Menu()
         #menuBar.Append(self.demosMenu, '&Demos') 
         for thisID in ID_DEMOS:
-            junk, shortname = os.path.split(demos[thisID])
+            junk, shortname = os.path.split(self.demos[thisID])
             self.demosMenu.Append(thisID, shortname)
             wx.EVT_MENU(self, thisID, self.loadDemo)
         
@@ -1466,7 +1468,7 @@ class BuilderFrame(wx.Frame):
         dlg.ShowModal()
         dlg.Destroy()
     def showLicense(self, event):
-        licFile = open(os.path.join(self.app.dirPsychopy,'LICENSE.txt'))
+        licFile = open(os.path.join(self.app.prefs.paths['psychopy'],'LICENSE.txt'))
         licTxt = licFile.read()
         licFile.close()
         dlg = wx.MessageDialog(self, licTxt, "PsychoPy License", wx.OK | wx.ICON_INFORMATION)
