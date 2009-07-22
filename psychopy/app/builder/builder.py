@@ -1125,7 +1125,7 @@ class DlgLoopProperties(_BaseParamsDlg):
             if ctrls.updateCtrl: param.updates = ctrls.updateCtrl.getValue()
         return self.currentHandler.params
 class DlgComponentProperties(_BaseParamsDlg):    
-    def __init__(self,frame,title,params,order,
+    def __init__(self,frame,parentName,title,params,order,
             pos=wx.DefaultPosition, size=wx.DefaultSize,
             style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT):
         style=style|wx.RESIZE_BORDER        

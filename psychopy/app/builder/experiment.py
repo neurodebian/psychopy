@@ -418,7 +418,7 @@ class TextComponent(VisualComponent):
         units='window units', colour=[1,1,1], colourSpace='rgb',
         pos=[0,0], size=[0,0], ori=0, times=[0,1]):
         #initialise main parameters from base stimulus
-        VisualComponent.__init__(self,name=name, units=units, 
+        VisualComponent.__init__(self,parentName,name=name, units=units, 
                     colour=colour, colourSpace=colourSpace,
                     pos=pos, size=size, ori=ori, times=times)
         self.type='Text'
@@ -442,7 +442,7 @@ class PatchComponent(VisualComponent):
         units='window units', colour=[1,1,1], colourSpace='rgb',
         pos=[0,0], size=[0,0], ori=0, times=[0,1]):
         #initialise main parameters from base stimulus
-        VisualComponent.__init__(self,name=name, units=units, 
+        VisualComponent.__init__(self,parentName,name=name, units=units, 
                     colour=colour, colourSpace=colourSpace,
                     pos=pos, size=size, ori=ori, times=times)
                         
@@ -470,7 +470,7 @@ class MovieComponent(VisualComponent):
         units='window units', 
         pos=[0,0], size=[0,0], ori=0, times=[0,1]):
         #initialise main parameters from base stimulus
-        VisualComponent.__init__(self,name=name, units=units, 
+        VisualComponent.__init__(self,parentName,name=name, units=units, 
                     pos=pos, size=size, ori=ori, times=times)
         #these are normally added but we don't want them for a movie            
         del self.params['colour']
@@ -488,7 +488,7 @@ class SoundComponent(BaseComponent):
     """An event class for presenting image-based stimuli"""
     def __init__(self, parentName, name='', sound='A', 
             size=1, ori=0, times=[0,1]):
-        
+        self.order=['name']#make sure name comes first
         self.type='Sound'
         self.params={}
         self.params['name']=Param(name,  valType='code', hint="A filename for the movie (including path)")  
