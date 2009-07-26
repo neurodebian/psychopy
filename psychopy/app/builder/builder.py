@@ -121,7 +121,7 @@ class FlowPanel(wx.ScrolledWindow):
         if addRoutineDlg.ShowModal()==wx.ID_OK:
             newRoutine = self.frame.exp.routines[addRoutineDlg.routine]#fetch the routine with the returned name
             self.frame.exp.flow.addRoutine(newRoutine, addRoutineDlg.loc)
-            self.frame.setIsModified(True)
+            self.frame.addToUndoStack("AddRoutine")
             
         #remove the points from the timeline
         self.setDrawPoints(None)
@@ -144,7 +144,7 @@ class FlowPanel(wx.ScrolledWindow):
             handler=loopDlg.currentHandler
             exec("ends=%s" %handler.params['endPoints'])#creates a copy of endPoints as an array
             self.frame.exp.flow.addLoop(handler, startPos=ends[0], endPos=ends[1])
-            self.frame.setIsModified(True)
+            self.frame.addToUndoStack("AddLoopToFlow")
         #remove the points from the timeline
         self.setDrawPoints(None)
         self.redrawFlow()
@@ -166,7 +166,7 @@ class FlowPanel(wx.ScrolledWindow):
             else:
                 loop=loopDlg.trialHandler
             loop.params=loop.params
-            self.frame.setIsModified(True)
+            self.frame.addToUndoStack("EditLoop")
         #remove the points from the timeline
         self.setDrawPoints(None)
         self.redrawFlow()
@@ -643,7 +643,7 @@ class RoutineCanvas(wx.ScrolledWindow):
         if dlg.OK:
             self.redrawRoutine()#need to refresh timings section
             self.Refresh()#then redraw visible
-            self.frame.setIsModified(True)
+            self.frame.addToUndoStack("Editted %s" %componentName)
             
     def getSecsPerPixel(self):
         return float(self.timeMax)/(self.timeXposEnd-self.timeXposStart)
@@ -681,7 +681,7 @@ class RoutinesNotebook(wx.aui.AuiNotebook):
             routineName=dlg.GetValue()
             exp.addRoutine(routineName)#add to the experiment
             self.addRoutinePage(routineName, exp.routines[routineName])#then to the notebook
-            self.frame.setIsModified(True)
+            self.frame.addToUndoStack("created %s routine" %routinename)
         dlg.Destroy()
     def onClosePane(self, event=None):
         """Close the pane and remove the routine from the exp
@@ -694,7 +694,15 @@ class RoutinesNotebook(wx.aui.AuiNotebook):
         if routine in self.frame.exp.flow:
             self.frame.exp.flow.remove(routine)
             self.frame.flowPanel.redrawFlow()
-        self.frame.setIsModified(True)
+        self.frame.addToUndoStack("remove routine %" %routine.name)
+    def redrawRoutines(self):
+        """Removes all the routines, adds them back and sets current back to orig
+        """
+        currPage = self.getCurrentPage()        
+        for routineName in self.frame.exp.routines:         
+            self.addRoutinePage(routineName, self.frame.exp.routines[routineName])
+        print 'currPage is', currPage
+        self.SetSelection(currPage)
 class ComponentsPanel(scrolled.ScrolledPanel):
     def __init__(self, frame, id=-1):
         """A panel that shows how the routines will fit together
@@ -1174,17 +1182,14 @@ class BuilderFrame(wx.Frame):
                 os.path.join(self.app.prefs.paths['resources'],"%s.png" %componentType.lower()))      
                 
         #setup a blank exp
-        self.filename='untitled.psyexp'
-        initPath, shortname = os.path.split(self.filename)
         self.fileNew(closeCurrent=False)#don't try to close before opening
-        self.exp.addRoutine('trial') #create the trial routine
+        self.exp.addRoutine('trial') #create the trial routine as an example
         self.exp.flow.addRoutine(self.exp.routines['trial'], pos=1)#add it to flow 
         # create our panels
         self.flowPanel=FlowPanel(frame=self, size=(600,200))
         self.routinePanel=RoutinesNotebook(self)
         self.componentButtons=ComponentsPanel(self)
         self.setIsModified(False)
-        self.updateWindowTitle()
         if True: #control the panes using aui manager
             self._mgr = wx.aui.AuiManager(self)
             self._mgr.AddPane(self.routinePanel,wx.CENTER, 'Routines')
@@ -1205,7 +1210,8 @@ class BuilderFrame(wx.Frame):
         self.makeMenus()
         self.SetAutoLayout(True)
         self.Bind(wx.EVT_CLOSE, self.OnClose)
-        
+        self.currentUndoStack=[]
+        self.currentUndoLevel=0
     def makeToolbar(self):
         #---toolbar---#000000#FFFFFF----------------------------------------------
         self.toolbar = self.CreateToolBar( (wx.TB_HORIZONTAL
@@ -1351,6 +1357,7 @@ class BuilderFrame(wx.Frame):
         if closeCurrent: self.fileClose()          
         self.filename=='untitled.py'
         self.exp = experiment.Experiment() 
+        self.updateAllViews()
     def fileOpen(self, event=None):
         """Open a FileDialog, then load the file if possible.
         """
@@ -1373,13 +1380,19 @@ class BuilderFrame(wx.Frame):
         #update exp vals
         self.exp=exp
         self.setIsModified(False)  
-        #update the views
-        self.flowPanel.redrawFlow()
+        self.filename = newPath
+        #load routines
         for thisRoutineName in self.exp.routines.keys():
             routine = self.exp.routines[thisRoutineName]
             self.routinePanel.addRoutinePage(thisRoutineName, routine)
-        self.filename = newPath
-        self.updateWindowTitle()
+        #update the views
+        self.updateAllViews()
+    def updateAllViews(self):
+        if hasAttr(self, 'flowPanel'):#might not have been initialised yet
+            self.flowPanel.redrawFlow()
+        if hasAttr(self, 'routinePanel'):#might not have been initialised yet
+            self.routinePanel.redrawRoutines()
+        self.updateWindowTitle()        
     def updateWindowTitle(self, newTitle=None):
         if newTitle==None:
             shortName = os.path.split(self.filename)[-1]
@@ -1390,6 +1403,9 @@ class BuilderFrame(wx.Frame):
         if hasattr(self, 'toolbar'):#initially there is no toolbar or menu
             self.toolbar.EnableTool(TB_FILESAVE, newVal)
             self.fileMenu.Enable(wx.ID_SAVE, newVal)
+    def getIsModified(self):
+        #todo: replace isModified with getIsModified() code, using currentUndoStack
+        pass
     def fileSave(self,event=None, filename=None):
         """Save file, revert to SaveAs if the file hasn't yet been saved 
         """
@@ -1444,16 +1460,75 @@ class BuilderFrame(wx.Frame):
             elif resp == wx.ID_NO:
                 pass #don't save just quit
         self.routinePanel.removePages()
-        self.filename = 'untitled.psyexp'          
-        self.setIsModified(False)
-        self.updateWindowTitle()
+        self.filename = 'untitled.psyexp'    
+        self.resetUndoStack()#will add the current exp as the start point for undo
+        self.updateAllViews()
         return 1
+    def resetUndoStack(self):
+        """Reset the undo stack. e.g. do this *immediately after* creating a new exp.
+        
+        Will implicitly call addToUndoStack() using the current exp as the state
+        """
+        self.currentUndoLevel=0
+        self.currentUndoStack=[]
+        self.addToUndoStack()
+    def addToUndoStack(self, action="", state=None):
+        """Add the given @action@ to the currentUndoStack, associated with the @state@.
+        @state@ should be a copy of the exp from *immediately after* the action was taken.
+        If no @state@ is given the current state of the experiment is used.
+        
+        If we are at end of stack already then simply append the action. 
+        If not (user has done an undo) then remove orphan actions and then append. 
+        """
+        if state==None:
+            state=copy.copy(self.exp)
+        #remove actions from after the current level
+        if self.currentUndoLevel>0:
+            self.currentUndoStack = self.currentUndoStack[:-self.currentUndoLevel]
+            print 'remaining action to undo is ', self.currentUndoStack[-1]['action']
+            self.currentUndoLevel=0
+        #append this action
+        self.currentUndoStack.append({'action':action,'state':state})
     def undo(self, event=None):
-        #todo: undo
-        pass
+        """Step the exp back one level in the @currentUndoStack@ if possible,
+        and update the windows
+        
+        Returns the final undo level (0=current, >0 for further in past)
+        or -1 if redo failed (probably can't undo)
+        """
+        if (self.currentUndoLevel+1)>=len(self.currentUndoStack):
+            return -1#can't undo
+        self.currentUndoLevel+=1
+        self.exp = self.currentUndoStack[-self.currentUndoLevel]
+        #set undo redo buttons
+        self.enableRedo(True)#if we've undone, then redo must be possible
+        if (self.currentUndoLevel+1)==len(self.currentUndoStack):
+            self.enableUndo(False)
+        # return
+        return self.currentUndoLevel
     def redo(self, event=None):
-        #todo: redo
-        pass
+        """Step the exp up one level in the @currentUndoStack@ if possible,
+        and update the windows
+        
+        Returns the final undo level (0=current, >0 for further in past)
+        or -1 if redo failed (probably can't redo)
+        """
+        if self.currentUndoLevel<=0:
+            return -1#can't redo, we're already at latest state
+        self.currentUndoLevel-=1
+        self.exp = self.currentUndoStack[-self.currentUndoLevel]
+        #set undo redo buttons
+        self.enableUndo(True)#if we've redone then undo must be possible
+        if self.currentUndoLevel==0:
+            self.enableRedo(False)
+        # return
+        return self.currentUndoLevel
+    def enableRedo(self,enable=True):
+        #todo: enable and disable redo button/menuitem
+        self.toolbar.EnableTool(TB_REDO,enable)
+    def enableUndo(self,enable=True):
+        #todo: enable and disable undo button/menuitem
+        self.toolbar.EnableTool(TB_UNDO,enable)
     def loadDemo(self, event=None):
         #todo: loadDemo
         pass
