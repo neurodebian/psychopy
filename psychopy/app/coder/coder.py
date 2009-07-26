@@ -930,7 +930,7 @@ class StdOutRich(wx.richtext.RichTextCtrl):
 class CoderFrame(wx.Frame):
     def __init__(self, parent, ID, title, files=[], app=None):
         self.app = app
-        self.appData = self.app.prefs.appData#things the user doesn't set like winsize etc
+        self.appData = self.app.prefs.appData['coder']#things the user doesn't set like winsize etc
         self.prefs = self.app.prefs.coder#things about the coder that get set
         self.paths = self.app.prefs.paths
         

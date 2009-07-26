@@ -1179,11 +1179,15 @@ class BuilderFrame(wx.Frame):
         wx.Frame.__init__(self, frame, id, title, pos, size, style)
         self.panel = wx.Panel(self)
         self.app=app
+        self.appData = self.app.prefs.appData['coder']#things the user doesn't set like winsize etc
+        self.prefs = self.app.prefs.builder#things about the coder that get set
+        self.paths = self.app.prefs.paths
+        
         #load icons for the various stimulus events 
         self.bitmaps={}
         for componentType in componentTypes:
             self.bitmaps[componentType]=wx.Bitmap( \
-                os.path.join(self.app.prefs.paths['resources'],"%s.png" %componentType.lower()))      
+                os.path.join(self.paths['resources'],"%s.png" %componentType.lower()))      
                 
         # create our panels
         self.flowPanel=FlowPanel(frame=self, size=(600,200))
