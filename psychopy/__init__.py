@@ -9,13 +9,11 @@ import string, sys, os, time
 try: import numpy
 except: pass
 
-__version__ = '0.96.01'#string.split('$Branch: 1.19 $')[1]
+__version__ = '2'
 __date__ = string.join(string.split('$Date: 2008-12-03 17:53:17 +0000 (Wed, 03 Dec 2008) $')[1:3], ' ')
-__svn__= '$Id: __init__.py 196 2008-12-03 17:53:17Z peircej $'
-__rev__= '$Revision: 196 $'
 __author__ = 'Jon Peirce'
 __author_email__='jon@peirce.org.uk'
-__maintainer_email__='psychpy-users@lists.sourceforge.net'
+__maintainer_email__='psychopy-users@groups.google.com'
 
 __all__ = ["gui", "misc", "visual", "core", "event", "data", "filters"]
 
