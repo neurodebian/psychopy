@@ -1140,10 +1140,11 @@ class DlgComponentProperties(_BaseParamsDlg):
         
 class BuilderFrame(wx.Frame):
 
-    def __init__(self, frame, id=-1, title='PsychoPy (Experiment Builder)',
+    def __init__(self, parent, id=-1, title='PsychoPy (Experiment Builder)',
                  pos=wx.DefaultPosition, size=(800, 600),files=None,
                  style=wx.DEFAULT_FRAME_STYLE, app=None):
-        wx.Frame.__init__(self, frame, id, title, pos, size, style)
+        wx.Frame.__init__(self, parent, id, title, pos, size, style)
+
         self.panel = wx.Panel(self)
         self.app=app
         self.appData = self.app.prefs.appData['coder']#things the user doesn't set like winsize etc

@@ -110,6 +110,10 @@ class PsychoPyApp(wx.App):
                 frame.Destroy()#then destroy it
             
         #todo: work out correct operation of closing wrt multiple frames etc...
+    def showPrefs(self, event):
+        prefsDlg = PreferencesDlg(app=self)
+        prefsDlg.Show()
+
     def showAbout(self, event):
         msg = """PsychoPy %s \nWritten by Jon Peirce.\n
         It has a liberal license; basically, do what you like with it, 

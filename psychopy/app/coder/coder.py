@@ -887,6 +887,7 @@ class CoderFrame(wx.Frame):
         self.app = app
         self.appData = self.app.prefs.appData['coder']#things the user doesn't set like winsize etc
         self.prefs = self.app.prefs.coder#things about the coder that get set
+        self.appPrefs = self.app.prefs.app
         self.paths = self.app.prefs.paths
         self.IDs = self.app.IDs
         
@@ -898,8 +899,8 @@ class CoderFrame(wx.Frame):
             self.appData['winX'],self.appData['winY'] =wx.DefaultPosition
         wx.Frame.__init__(self, parent, ID, title,
                          (self.appData['winX'], self.appData['winY']),
-                         size=(self.appData['winW'],self.appData['winH']))#the size settingdoesn't work but using the aui manager we can recover previous size
-                
+                         size=(self.appData['winW'],self.appData['winH']))
+        self.panel = wx.Panel(self)      
         self.Hide()#ugly to see it all initialise
         #create icon
         if sys.platform=='darwin':
@@ -955,8 +956,7 @@ class CoderFrame(wx.Frame):
         self.Bind(wx.EVT_FIND, self.OnFindNext)
         self.Bind(wx.EVT_FIND_NEXT, self.OnFindNext)
         self.Bind(wx.EVT_FIND_CLOSE, self.OnFindClose)
-        self.Bind(wx.EVT_END_PROCESS, self.onProcessEnded)
-        
+        self.Bind(wx.EVT_END_PROCESS, self.onProcessEnded)        
         
         #for demos we need a dict where the event ID will correspond to a filename
         self.demoList = glob.glob(os.path.join(self.paths['demos'],'*.py'))
@@ -1036,6 +1036,9 @@ class CoderFrame(wx.Frame):
         self.fileMenu.Enable(wx.ID_SAVE, False)
         wx.EVT_MENU(self, wx.ID_SAVEAS,  self.fileSaveAs)
         wx.EVT_MENU(self, wx.ID_CLOSE,  self.fileClose)
+        item = self.fileMenu.Append(wx.ID_PREFERENCES, text = "&Preferences")
+        self.Bind(wx.EVT_MENU, self.app.showPrefs, item)
+
 
         # and a file history
         self.fileHistory = wx.FileHistory()
@@ -1142,8 +1145,8 @@ class CoderFrame(wx.Frame):
         self.helpMenu.AppendSubMenu(self.demosMenu, 'PsychoPy Demos')
         
         self.helpMenu.AppendSeparator()       
-        self.helpMenu.Append(self.IDs.about, "&About...", "About PsychoPy")
-        wx.EVT_MENU(self, self.IDs.about, self.app.showAbout)
+        self.helpMenu.Append(wx.ID_ABOUT, "&About...", "About PsychoPy")#on mac this will move to appication menu
+        wx.EVT_MENU(self, wx.ID_ABOUT, self.app.showAbout)
         self.helpMenu.Append(self.IDs.license, "License...", "PsychoPy License")
         wx.EVT_MENU(self, self.IDs.license, self.app.showLicense)
         
@@ -1502,7 +1505,7 @@ class CoderFrame(wx.Frame):
         importName, ext = os.path.splitext(scriptName)
         #set the directory and add to path
         os.chdir(path)
-        
+        print 'running as process'
         self.scriptProcess=wx.Process(self) #self is the parent (which will receive an event when the process ends)
         self.scriptProcess.Redirect()#catch the stdout/stdin
         
@@ -1524,24 +1527,24 @@ class CoderFrame(wx.Frame):
         #check syntax by compiling - errors printed (not raised as error)
         py_compile.compile(fullPath, doraise=False)
         
-        print '\nRunning %s' %self.currentDoc.filename 
+        print '\nRunning %s as %s' %(self.currentDoc.filename, self.appPrefs['runScripts']) 
         self.ignoreErrors = False
         self.SetEvtHandlerEnabled(False)
         wx.EVT_IDLE(self, None)
         
         #try to run script
         try:# try to capture any errors in the script
-            if RUN_SCRIPTS == 'thread':
+            if self.appPrefs['runScripts'] == 'thread':
                 self.thread = ScriptThread(target= self._runFileAsImport, gui=self)
                 self.thread.start()
-            elif RUN_SCRIPTS=='process':          
+            elif self.appPrefs['runScripts']=='process':          
                 self._runFileAsProcess()
             
-            elif RUN_SCRIPTS=='dbg':            
+            elif self.appPrefs['runScripts']=='dbg':            
                 #create a thread and run file as debug within that thread
                 self.thread = ScriptThread(target= self._runFileInDbg, gui=self)
                 self.thread.start()
-            elif RUN_SCRIPTS=='import':
+            elif self.appPrefs['runScripts']=='import':
                 #simplest possible way, but fragile
                 #USING import of scripts (clunky)                
                 if importName in sys.modules: #delete the sys reference to it

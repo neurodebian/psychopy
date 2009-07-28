@@ -1,6 +1,8 @@
-import wx, os, sys, urllib
+import wx, wx.stc
+import os, sys, urllib
 from shutil import copyfile
 from psychopy import configobj, configobjValidate
+from keybindings import *
 
 #GET PATHS------------------
 join = os.path.join
@@ -79,11 +81,11 @@ class Preferences:
         
         #simplify namespace
         self.general=self.prefsCfg['general']
+        self.app = self.prefsCfg['app'] 
         self.coder=self.prefsCfg['coder']
         self.builder=self.prefsCfg['builder']
         self.connections=self.prefsCfg['connections'] 
         self.appData = self.appDataCfg
-        
         #override some platfrom-specific settings
         if sys.platform=='darwin':
             self.prefsCfg['app']['allowImportModules']=False            
@@ -99,7 +101,6 @@ class Preferences:
         """Reset the site preferences to the original defaults (to reset user prefs, just delete entries)
         """
         copyfile(self.paths['defaultPrefs.cfg'], self.paths['sitePrefs'])
-    
     def getAutoProxy(self):
         """Fetch the proxy from the the system environment variables
         """
@@ -117,25 +118,50 @@ class Preferences:
         f.write("#this file allows you to override various settings. Any setting defined in"+\
                 "\n#%s\n#can be added here to override\n" %self.paths['sitePrefsFile'])
         f.close()
-#class PreferencesDlg(wx.Frame):
-#    def __init__(self, parent, ID, title, files=[]):
-#        pass
-#def toPickle(filename, data):
-#    """save data (of any sort) as a pickle file
-#    
-#    simple wrapper of the cPickle module in core python
-#    """
-#    f = open(filename, 'w')
-#    cPickle.dump(data,f)
-#    f.close()
-#
-#def fromPickle(filename):
-#    """load data (of any sort) from a pickle file
-#    
-#    simple wrapper of the cPickle module in core python
-#    """
-#    f = open(filename)
-#    contents = cPickle.load(f)
-#    f.close()
-#    return contents
-#
+        
+class PreferencesDlg(wx.Frame):
+    def __init__(self, parent=None, ID=-1, app=None, title="PsychoPy Preferences"):
+        wx.Frame.__init__(self, parent, ID, title, size=(500,700))
+        panel = wx.Panel(self)
+        self.nb = wx.Notebook(panel)
+        self.paths = app.prefs.paths
+        
+        sitePage = self.makePage(self.paths['sitePrefsFile'])
+        self.nb.AddPage(sitePage,"site")
+        userPage = self.makePage(self.paths['userPrefsFile'])
+        self.nb.AddPage(userPage, "user")
+
+        sizer = wx.BoxSizer()
+        sizer.Add(self.nb, 1, wx.EXPAND)
+        panel.SetSizer(sizer)
+    
+        self.menuBar = wx.MenuBar()
+        self.fileMenu = wx.Menu()
+        self.fileMenu.Append(wx.ID_CLOSE,   "&Close file\t%s" %key_close)
+        wx.EVT_MENU(self, wx.ID_CLOSE,  self.fileClose)
+#        wx.EVT_MENU(self, wx.ID_SAVE,  self.fileSave)
+#        self.fileMenu.Enable(wx.ID_SAVE, False)
+        self.menuBar.Append(self.fileMenu, "&File")
+        self.SetMenuBar(self.menuBar)
+        
+    def makePage(self, path):
+        page = wx.stc.StyledTextCtrl(parent=self.nb)
+        
+        # setup the style
+        if sys.platform=='darwin':
+            page.StyleSetSpec(wx.stc.STC_STYLE_DEFAULT,     "face:Courier New,size:10d")
+        else:
+            page.StyleSetSpec(wx.stc.STC_STYLE_DEFAULT,     "face:Courier,size:12d")
+        page.StyleClearAll()  # Reset all to be like the default
+        page.SetLexer(wx.stc.STC_LEX_PROPERTIES)
+        page.StyleSetSpec(wx.stc.STC_PROPS_SECTION,"fore:#FF0000")
+        page.StyleSetSpec(wx.stc.STC_PROPS_COMMENT,"fore:#007F00")
+        f = open(path, 'r+')
+        page.SetText(f.read())
+        f.close()
+        
+        return page
+    def fileClose(self, event):
+        self.Destroy()
+    def fileClose(self, event):
+        self.Destroy()
