@@ -1,8 +1,14 @@
 import wx, sys, os
 from keybindings import *
+import wxIDs#handles for GUI controls
 import psychopy, coder, builder
 from psychopy.preferences import *
 
+links={
+    wxIDs.psychopyHome:"http://www.psychopy.org/",
+    wxIDs.psychopyReference:"http://www.psychopy.org/reference",
+    wxIDs.psychopyTutorial:"http://www.psychopy.org/home.php/Docs/Tutorials"
+    }
 class PsychoSplashScreen(wx.SplashScreen):
     """
     Create a splash screen widget.
@@ -50,33 +56,34 @@ class PsychoPyApp(wx.App):
         
         #set default paths and import options
         self.prefs = Preferences() #from preferences.py
-        #create frame(s) for coder/builder as necess
-        self.coder=None
-        self.builder=None
-        if mainFrame == 'coder': self.newCoderFrame(args)
-        else: self.newBuilderFrame(args)
-        
         splash = PsychoSplashScreen(self)
         if splash:
             splash.Show()
+        #create frame(s) for coder/builder as necess
+        self.coder=None
+        self.builder=None
+        self.IDs=wxIDs
+        if mainFrame == 'coder': self.newCoderFrame(args)
+        else: self.newBuilderFrame(args)
         
-            """This is in wx demo. Probably useful one day.
-            #---------------------------------------------
-            def ShowTip(self):
-                config = GetConfig()
-                showTipText = config.Read("tips")
-                if showTipText:
-                    showTip, index = eval(showTipText)
-                else:
-                    showTip, index = (1, 0)
-                    
-                if showTip:
-                    tp = wx.CreateFileTipProvider(opj("data/tips.txt"), index)
-                    ##tp = MyTP(0)
-                    showTip = wx.ShowTip(self, tp)
-                    index = tp.GetCurrentTip()
-                    config.Write("tips", str( (showTip, index) ))
-                    config.Flush()"""
+        
+        """This is in wx demo. Probably useful one day.
+        #---------------------------------------------
+        def ShowTip(self):
+            config = GetConfig()
+            showTipText = config.Read("tips")
+            if showTipText:
+                showTip, index = eval(showTipText)
+            else:
+                showTip, index = (1, 0)
+                
+            if showTip:
+                tp = wx.CreateFileTipProvider(opj("data/tips.txt"), index)
+                ##tp = MyTP(0)
+                showTip = wx.ShowTip(self, tp)
+                index = tp.GetCurrentTip()
+                config.Write("tips", str( (showTip, index) ))
+                config.Flush()"""
         
         return True
     def newCoderFrame(self, filelist=None):
@@ -95,11 +102,35 @@ class PsychoPyApp(wx.App):
         self.SetTopWindow(self.builder)
     def MacOpenFile(self,fileName):
         self.frame.setCurrentDoc(fileName)
-    def Quit(self):
+    def quit(self):
         self.prefs.saveAppData()
         for frame in [self.coder, self.builder]:
-            if hasattr(frame,'Destroy'): frame.Destroy()
-        
+            if hasattr(frame,'closeFrame'): 
+                frame.closeFrame()#this executes the saving of files etc
+                frame.Destroy()#then destroy it
+            
+        #todo: work out correct operation of closing wrt multiple frames etc...
+    def showAbout(self, event):
+        msg = """PsychoPy %s \nWritten by Jon Peirce.\n
+        It has a liberal license; basically, do what you like with it, 
+        don't kill me if something doesn't work! :-) But do let me know...
+        psychopy-users@googlegroups.com
+        """ %psychopy.__version__
+        dlg = wx.MessageDialog(None, message=msg,
+                              caption = "About PsychoPy", style=wx.OK | wx.ICON_INFORMATION)
+        dlg.ShowModal()
+        dlg.Destroy()
+    def showLicense(self, event):
+        licFile = open(os.path.join(self.prefs.paths['psychopy'],'LICENSE.txt'))
+        licTxt = licFile.read()
+        licFile.close()
+        dlg = wx.MessageDialog(self, licTxt, "PsychoPy License", wx.OK | wx.ICON_INFORMATION)
+        dlg.ShowModal()
+        dlg.Destroy()
+
+    def followLink(self, event):
+        wx.LaunchDefaultBrowser(links[event.GetId()])
+
 if __name__=='__main__':
     app = PsychoPyApp(0)
     app.MainLoop()

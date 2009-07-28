@@ -11,40 +11,7 @@ from keybindings import *
 componentTypes=['Patch','Text','Movie','Sound','Mouse','Keyboard']
 
 #todo: need to implement right-click context menus for flow and routine canvas!
-#create wx event/object IDs
-ID_EXIT=wx.NewId()
-#edit menu
-ID_CUT=wx.NewId()
-ID_COPY=wx.NewId()
-ID_PASTE=wx.NewId()
-#experiment menu
-ID_NEW_ROUTINE=wx.NewId()
-ID_ADD_ROUTINE_TO_FLOW=wx.NewId()
-ID_ADD_LOOP_TO_FLOW=wx.NewId()
-ID_REM_ROUTINE_FROM_FLOW=wx.NewId()
-ID_REM_LOOP_FROM_FLOW=wx.NewId()
-#view menu
-#tools menu
-ID_OPEN_MONCENTER=wx.NewId()
-ID_RUNFILE=wx.NewId()
-ID_STOPFILE=wx.NewId()
-#help menu
-ID_ABOUT=wx.ID_ABOUT#wx.NewId()
-ID_LICENSE=wx.NewId()
-ID_PSYCHO_TUTORIAL=wx.NewId()
-ID_PSYCHO_HOME=wx.NewId()
-ID_PSYCHO_REFERENCE=wx.NewId()
 
-#toolbar IDs
-TB_FILENEW=10
-TB_FILEOPEN=20
-TB_FILESAVE=30
-TB_FILESAVEAS=40
-TB_UNDO= 70
-TB_REDO= 80
-TB_RUN = 100
-TB_STOP = 110
-TB_COMPILE=120
 
 class FlowPanel(wx.ScrolledWindow):
     def __init__(self, frame, id=-1,size = (600,100)):
@@ -1182,6 +1149,7 @@ class BuilderFrame(wx.Frame):
         self.appData = self.app.prefs.appData['coder']#things the user doesn't set like winsize etc
         self.prefs = self.app.prefs.builder#things about the coder that get set
         self.paths = self.app.prefs.paths
+        self.IDs = self.app.IDs
         
         #load icons for the various stimulus events 
         self.bitmaps={}
@@ -1246,27 +1214,27 @@ class BuilderFrame(wx.Frame):
         run_bmp = wx.Bitmap(os.path.join(self.app.prefs.paths['resources'], 'run%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
         compile_bmp = wx.Bitmap(os.path.join(self.app.prefs.paths['resources'], 'compile%i.png' %toolbarSize),wx.BITMAP_TYPE_PNG)
         
-        self.toolbar.AddSimpleTool(TB_FILENEW, new_bmp, "New [Ctrl+N]", "Create new python file")
-        self.toolbar.Bind(wx.EVT_TOOL, self.fileNew, id=TB_FILENEW)
-        self.toolbar.AddSimpleTool(TB_FILEOPEN, open_bmp, "Open [Ctrl+O]", "Open an existing file'")
-        self.toolbar.Bind(wx.EVT_TOOL, self.fileOpen, id=TB_FILEOPEN)
-        self.toolbar.AddSimpleTool(TB_FILESAVE, save_bmp, "Save [Ctrl+S]", "Save current file")        
-        self.toolbar.EnableTool(TB_FILESAVE, False)
-        self.toolbar.Bind(wx.EVT_TOOL, self.fileSave, id=TB_FILESAVE)
-        self.toolbar.AddSimpleTool(TB_FILESAVEAS, saveAs_bmp, "Save As... [Ctrl+Shft+S]", "Save current python file as...")
-        self.toolbar.Bind(wx.EVT_TOOL, self.fileSaveAs, id=TB_FILESAVEAS)
-        self.toolbar.AddSimpleTool(TB_UNDO, undo_bmp, "Undo [Ctrl+U]", "Undo last action")
-        self.toolbar.Bind(wx.EVT_TOOL, self.undo, id=TB_UNDO)
-        self.toolbar.AddSimpleTool(TB_REDO, redo_bmp, "Redo [Ctrl+R]", "Redo last action")
-        self.toolbar.Bind(wx.EVT_TOOL, self.redo, id=TB_REDO)
+        self.toolbar.AddSimpleTool(self.IDs.tbFileNew, new_bmp, "New [Ctrl+N]", "Create new python file")
+        self.toolbar.Bind(wx.EVT_TOOL, self.fileNew, id=self.IDs.tbFileNew)
+        self.toolbar.AddSimpleTool(self.IDs.tbFileOpen, open_bmp, "Open [Ctrl+O]", "Open an existing file'")
+        self.toolbar.Bind(wx.EVT_TOOL, self.fileOpen, id=self.IDs.tbFileOpen)
+        self.toolbar.AddSimpleTool(self.IDs.tbFileSave, save_bmp, "Save [Ctrl+S]", "Save current file")        
+        self.toolbar.EnableTool(self.IDs.tbFileSave, False)
+        self.toolbar.Bind(wx.EVT_TOOL, self.fileSave, id=self.IDs.tbFileSave)
+        self.toolbar.AddSimpleTool(self.IDs.tbFileSaveAs, saveAs_bmp, "Save As... [Ctrl+Shft+S]", "Save current python file as...")
+        self.toolbar.Bind(wx.EVT_TOOL, self.fileSaveAs, id=self.IDs.tbFileSaveAs)
+        self.toolbar.AddSimpleTool(self.IDs.tbUndo, undo_bmp, "Undo [Ctrl+U]", "Undo last action")
+        self.toolbar.Bind(wx.EVT_TOOL, self.undo, id=self.IDs.tbUndo)
+        self.toolbar.AddSimpleTool(self.IDs.tbRedo, redo_bmp, "Redo [Ctrl+R]", "Redo last action")
+        self.toolbar.Bind(wx.EVT_TOOL, self.redo, id=self.IDs.tbRedo)
         self.toolbar.AddSeparator()
-        self.toolbar.AddSimpleTool(TB_COMPILE, compile_bmp, "Comile Script [F4]",  "Run current script")
-        self.toolbar.Bind(wx.EVT_TOOL, self.compileScript, id=TB_COMPILE)
-        self.toolbar.AddSimpleTool(TB_RUN, run_bmp, "Run [F5]",  "Run current script")
-        self.toolbar.Bind(wx.EVT_TOOL, self.runFile, id=TB_RUN)
-        self.toolbar.AddSimpleTool(TB_STOP, stop_bmp, "Stop [Shift+F5]",  "Stop current script")
-        self.toolbar.Bind(wx.EVT_TOOL, self.stopFile, id=TB_STOP)
-        self.toolbar.EnableTool(TB_STOP,False)
+        self.toolbar.AddSimpleTool(self.IDs.tbCompile, compile_bmp, "Comile Script [F4]",  "Run current script")
+        self.toolbar.Bind(wx.EVT_TOOL, self.compileScript, id=self.IDs.tbCompile)
+        self.toolbar.AddSimpleTool(self.IDs.tbRun, run_bmp, "Run [F5]",  "Run current script")
+        self.toolbar.Bind(wx.EVT_TOOL, self.runFile, id=self.IDs.tbRun)
+        self.toolbar.AddSimpleTool(self.IDs.tbStop, stop_bmp, "Stop [Shift+F5]",  "Stop current script")
+        self.toolbar.Bind(wx.EVT_TOOL, self.stopFile, id=self.IDs.tbStop)
+        self.toolbar.EnableTool(self.IDs.tbStop,False)
         self.toolbar.Realize()
         
     def makeMenus(self):
@@ -1297,13 +1265,13 @@ class BuilderFrame(wx.Frame):
         #---_tools---#000000#FFFFFF--------------------------------------------------
         self.toolsMenu = wx.Menu()
         menuBar.Append(self.toolsMenu, '&Tools')
-        self.toolsMenu.Append(ID_OPEN_MONCENTER, "Monitor Center", "To set information about your monitor")
-        wx.EVT_MENU(self, ID_OPEN_MONCENTER,  self.openMonitorCenter)
+        self.toolsMenu.Append(self.IDs.openMonCentre, "Monitor Center", "To set information about your monitor")
+        wx.EVT_MENU(self, self.IDs.openMonCentre,  self.openMonitorCenter)
         
-        self.toolsMenu.Append(ID_RUNFILE, "Run\t%s" %key_runscript, "Run the current script")
-        wx.EVT_MENU(self, ID_RUNFILE,  self.runFile)        
-        self.toolsMenu.Append(ID_STOPFILE, "Stop\t%s" %key_stopscript, "Run the current script")
-        wx.EVT_MENU(self, ID_STOPFILE,  self.stopFile)
+        self.toolsMenu.Append(self.IDs.runFile, "Run\t%s" %key_runscript, "Run the current script")
+        wx.EVT_MENU(self, self.IDs.runFile,  self.runFile)        
+        self.toolsMenu.Append(self.IDs.stopFile, "Stop\t%s" %key_stopscript, "Run the current script")
+        wx.EVT_MENU(self, self.IDs.stopFile,  self.stopFile)
 
         #---_view---#000000#FFFFFF--------------------------------------------------
         self.viewMenu = wx.Menu()
@@ -1312,18 +1280,18 @@ class BuilderFrame(wx.Frame):
         #---_experiment---#000000#FFFFFF--------------------------------------------------
         self.expMenu = wx.Menu()    
         menuBar.Append(self.expMenu, '&Experiment')
-        self.expMenu.Append(ID_NEW_ROUTINE, "New Routine", "Create a new routine (e.g. the trial definition)")
-        wx.EVT_MENU(self, ID_NEW_ROUTINE,  self.addRoutine)
+        self.expMenu.Append(self.IDs.newRoutine, "New Routine", "Create a new routine (e.g. the trial definition)")
+        wx.EVT_MENU(self, self.IDs.newRoutine,  self.addRoutine)
         self.expMenu.AppendSeparator()
         
-        self.expMenu.Append(ID_ADD_ROUTINE_TO_FLOW, "Insert Routine in Flow", "Select one of your routines to be inserted into the experiment flow")
-        wx.EVT_MENU(self, ID_ADD_ROUTINE_TO_FLOW,  self.flowPanel.onInsertRoutine)
-        self.expMenu.Append(ID_REM_ROUTINE_FROM_FLOW, "Remove Routine from Flow", "Create a new loop in your flow window")
-        wx.EVT_MENU(self, ID_REM_ROUTINE_FROM_FLOW,  self.flowPanel.onRemRoutine)
-        self.expMenu.Append(ID_ADD_LOOP_TO_FLOW, "Insert Loop in Flow", "Create a new loop in your flow window")
-        wx.EVT_MENU(self, ID_ADD_LOOP_TO_FLOW,  self.flowPanel.onInsertLoop)
-        self.expMenu.Append(ID_REM_LOOP_FROM_FLOW, "Remove Loop from Flow", "Remove a loop from your flow window")
-        wx.EVT_MENU(self, ID_REM_LOOP_FROM_FLOW,  self.flowPanel.onRemLoop)
+        self.expMenu.Append(self.IDs.addRoutineToFlow, "Insert Routine in Flow", "Select one of your routines to be inserted into the experiment flow")
+        wx.EVT_MENU(self, self.IDs.addRoutineToFlow,  self.flowPanel.onInsertRoutine)
+        self.expMenu.Append(self.IDs.remRoutineFromFlow, "Remove Routine from Flow", "Create a new loop in your flow window")
+        wx.EVT_MENU(self, self.IDs.remRoutineFromFlow,  self.flowPanel.onRemRoutine)
+        self.expMenu.Append(self.IDs.addLoopToFlow, "Insert Loop in Flow", "Create a new loop in your flow window")
+        wx.EVT_MENU(self, self.IDs.addLoopToFlow,  self.flowPanel.onInsertLoop)
+        self.expMenu.Append(self.IDs.remLoopFromFlow, "Remove Loop from Flow", "Remove a loop from your flow window")
+        wx.EVT_MENU(self, self.IDs.remLoopFromFlow,  self.flowPanel.onRemLoop)
         
         #---_demos---#000000#FFFFFF--------------------------------------------------
         #for demos we need a dict where the event ID will correspond to a filename
@@ -1344,16 +1312,16 @@ class BuilderFrame(wx.Frame):
         #---_help---#000000#FFFFFF--------------------------------------------------
         self.helpMenu = wx.Menu()
         menuBar.Append(self.helpMenu, '&Help') 
-        self.helpMenu.Append(ID_PSYCHO_HOME, "&PsychoPy Homepage", "Go to the PsychoPy homepage")
-        wx.EVT_MENU(self, ID_PSYCHO_HOME, self.followLink)
-        self.helpMenu.Append(ID_PSYCHO_TUTORIAL, "&PsychoPy Tutorial", "Go to the online PsychoPy tutorial")
-        wx.EVT_MENU(self, ID_PSYCHO_TUTORIAL, self.followLink)
+        self.helpMenu.Append(self.IDs.psychopyHome, "&PsychoPy Homepage", "Go to the PsychoPy homepage")
+        wx.EVT_MENU(self, self.IDs.psychopyHome, self.app.followLink)
+        self.helpMenu.Append(self.IDs.psychopyTutorial, "&PsychoPy Tutorial", "Go to the online PsychoPy tutorial")
+        wx.EVT_MENU(self, self.IDs.psychopyTutorial, self.app.followLink)
         
         self.helpMenu.AppendSeparator()       
-        self.helpMenu.Append(ID_ABOUT, "&About...", "About PsychoPy")
-        wx.EVT_MENU(self, ID_ABOUT, self.showAbout)
-        self.helpMenu.Append(ID_LICENSE, "License...", "PsychoPy License")
-        wx.EVT_MENU(self, ID_LICENSE, self.showLicense)
+        self.helpMenu.Append(self.IDs.about, "&About...", "About PsychoPy")
+        wx.EVT_MENU(self, self.IDs.about, self.app.showAbout)
+        self.helpMenu.Append(self.IDs.license, "License...", "PsychoPy License")
+        wx.EVT_MENU(self, self.IDs.license, self.app.showLicense)
         
         self.demosMenu
         self.helpMenu.AppendSubMenu(self.demosMenu, 'PsychoPy Demos')
@@ -1410,7 +1378,7 @@ class BuilderFrame(wx.Frame):
         self.SetTitle(newTitle)
     def setIsModified(self, newVal=True):
         self.isModified=newVal
-        self.toolbar.EnableTool(TB_FILESAVE, newVal)
+        self.toolbar.EnableTool(self.IDs.tbFileSave, newVal)
         self.fileMenu.Enable(wx.ID_SAVE, newVal)
     def getIsModified(self):
         #todo: replace isModified with getIsModified() code, using currentUndoStack
@@ -1540,33 +1508,13 @@ class BuilderFrame(wx.Frame):
         # return
         return self.currentUndoLevel
     def enableRedo(self,enable=True):
-        self.toolbar.EnableTool(TB_REDO,enable)
+        self.toolbar.EnableTool(self.IDs.tbRedo,enable)
         self.editMenu.Enable(wx.ID_REDO,enable)
     def enableUndo(self,enable=True):
-        self.toolbar.EnableTool(TB_UNDO,enable)
+        self.toolbar.EnableTool(self.IDs.tbUndo,enable)
         self.editMenu.Enable(wx.ID_UNDO,enable)
     def loadDemo(self, event=None):
         #todo: loadDemo
-        pass
-    def showAbout(self, event):
-        msg = """PsychoPy %s \nWritten by Jon Peirce.\n
-        It has a liberal license; basically, do what you like with it, 
-        don't kill me if something doesn't work! :-) But do let me know...
-        psychopy-users@googlegroups.com
-        """ %psychopy.__version__
-        dlg = wx.MessageDialog(None, message=msg,
-                              caption = "About PsychoPy", style=wx.OK | wx.ICON_INFORMATION)
-        dlg.ShowModal()
-        dlg.Destroy()
-    def showLicense(self, event):
-        licFile = open(os.path.join(self.app.prefs.paths['psychopy'],'LICENSE.txt'))
-        licTxt = licFile.read()
-        licFile.close()
-        dlg = wx.MessageDialog(self, licTxt, "PsychoPy License", wx.OK | wx.ICON_INFORMATION)
-        dlg.ShowModal()
-        dlg.Destroy()
-    def followLink(self, event=None):
-        #todo: add links to help menu and a method her to follow them
         pass
     def runFile(self, event=None):
         #todo: runFile
