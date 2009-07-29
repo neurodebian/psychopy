@@ -1506,7 +1506,6 @@ class CoderFrame(wx.Frame):
         importName, ext = os.path.splitext(scriptName)
         #set the directory and add to path
         os.chdir(path)
-        print 'running as process'
         self.scriptProcess=wx.Process(self) #self is the parent (which will receive an event when the process ends)
         self.scriptProcess.Redirect()#catch the stdout/stdin
         
@@ -1520,7 +1519,7 @@ class CoderFrame(wx.Frame):
             self.scriptProcessID = wx.Execute(command, wx.EXEC_ASYNC| wx.EXEC_MAKE_GROUP_LEADER, self.scriptProcess)
         self.toolbar.EnableTool(self.IDs.tbRun,False)
         self.toolbar.EnableTool(self.IDs.tbStop,True)             
-                    
+        
     def runFile(self, event):
         """Runs files by one of various methods
         """

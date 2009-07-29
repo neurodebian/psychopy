@@ -1382,8 +1382,7 @@ class BuilderFrame(wx.Frame):
         self.toolbar.EnableTool(self.IDs.tbFileSave, newVal)
         self.fileMenu.Enable(wx.ID_SAVE, newVal)
     def getIsModified(self):
-        #todo: replace isModified with getIsModified() code, using currentUndoStack
-        pass
+        return self.isModified
     def fileSave(self,event=None, filename=None):
         """Save file, revert to SaveAs if the file hasn't yet been saved 
         """
