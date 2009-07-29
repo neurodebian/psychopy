@@ -54,30 +54,13 @@ class Preferences:
         pickle file necessarily without having the same attribs (so additional 
         attribs can be added in future).
         """
-        #load against the spec, then validate and save to a file 
-        #(this won't overwrite existing values, but will create additional ones if necess)
-        prefsSpec = configobj.ConfigObj(join(self.paths['psychopy'], 'prefsSpec.cfg'), encoding='UTF8', list_values=False)
-        vdt=configobjValidate.Validator()
-        self.prefsCfg = configobj.ConfigObj(self.paths['sitePrefsFile'], configspec=prefsSpec)
-        self.prefsCfg.validate(vdt, copy=True)#copy means all settings get saved
-        if len(self.prefsCfg['general']['userPrefsFile'])==0:
-            self.prefsCfg['general']['userPrefsFile']=self.paths['userPrefsFile']#set path to home
-        else:
-            self.paths['userPrefsFile']=self.prefsCfg['general']['userPrefsFile']#set app path to user override
-        self.prefsCfg.write()#so the user can see what's (now) available
-        
-        #then add user prefs
-        if not os.path.isfile(self.paths['userPrefsFile']):
-            self.generateUserPrefsFile()#create an empty one
-        self.userPrefsCfg = configobj.ConfigObj(self.paths['userPrefsFile'])
-        
+        self._validator=configobjValidate.Validator()
+        self.appDataCfg = self.loadAppData()
+        self.prefsCfg = self.loadSitePrefs()
+        self.userPrefsCfg = self.loadUserPrefs()
+        self.userPrefsCfg.validate(self._validator, copy=True)#copy means all settings get saved
         #merge site prefs and user prefs
         self.prefsCfg.merge(self.userPrefsCfg)
-        
-        #fetch appData too against a config spec
-        appDataSpec = configobj.ConfigObj(join(self.paths['appDir'], 'appDataSpec.cfg'), encoding='UTF8', list_values=False)
-        self.appDataCfg = configobj.ConfigObj(self.paths['appDataFile'], configspec=appDataSpec)
-        self.appDataCfg.validate(vdt, copy=True)
         
         #simplify namespace
         self.general=self.prefsCfg['general']
@@ -86,6 +69,7 @@ class Preferences:
         self.builder=self.prefsCfg['builder']
         self.connections=self.prefsCfg['connections'] 
         self.appData = self.appDataCfg
+
         #override some platfrom-specific settings
         if sys.platform=='darwin':
             self.prefsCfg['app']['allowImportModules']=False            
@@ -94,13 +78,44 @@ class Preferences:
     def saveAppData(self):
         """Save the various setting to the appropriate files (or discard, in some cases)
         """
-        vdt=configobjValidate.Validator()
-        self.appDataCfg.validate(vdt, copy=True)#copy means all settings get saved
+        self.appDataCfg.validate(self._validator, copy=True)#copy means all settings get saved
         self.appDataCfg.write()
-    def resetSitePrefs():
+    def resetSitePrefs(self):
         """Reset the site preferences to the original defaults (to reset user prefs, just delete entries)
         """
-        copyfile(self.paths['defaultPrefs.cfg'], self.paths['sitePrefs'])
+        os.remove(self.paths['sitePrefsFile'])
+    def loadAppData(self):
+        #fetch appData too against a config spec
+        appDataSpec = configobj.ConfigObj(join(self.paths['appDir'], 'appDataSpec.cfg'), encoding='UTF8', list_values=False)
+        cfg = configobj.ConfigObj(self.paths['appDataFile'], configspec=appDataSpec)
+        cfg.validate(self._validator, copy=True)     
+        return cfg   
+    def loadSitePrefs(self):        
+        #load against the spec, then validate and save to a file 
+        #(this won't overwrite existing values, but will create additional ones if necess)
+        prefsSpec = configobj.ConfigObj(join(self.paths['psychopy'], 'prefsSpec.cfg'), encoding='UTF8', list_values=False)
+        cfg = configobj.ConfigObj(self.paths['sitePrefsFile'], configspec=prefsSpec)
+        cfg.validate(self._validator, copy=True)#copy means all settings get saved
+        if len(cfg['general']['userPrefsFile'])==0:
+            cfg['general']['userPrefsFile']=self.paths['userPrefsFile']#set path to home
+        else: self.paths['userPrefsFile']=cfg['general']['userPrefsFile']#set app path to user override
+        cfg.initial_comment=["#preferences set in this file apply to all users",
+            "the file can be found at %s" %self.paths['sitePrefsFile']]
+        cfg.write()#so the user can see what's (now) available
+        return cfg
+    def loadUserPrefs(self):  
+        #check for folder
+        if not os.path.isdir(self.paths['userPrefs']):
+            os.makedirs(self.paths['userPrefs'])  
+        #then add user prefs
+        prefsSpec = configobj.ConfigObj(join(self.paths['psychopy'], 'prefsSpec.cfg'), encoding='UTF8', list_values=False)
+        cfg = configobj.ConfigObj(self.paths['userPrefsFile'], configspec=prefsSpec)
+        cfg.validate(self._validator, copy=False)#copy means all settings get saved   
+        cfg.initial_comment=["#preferences set in this file will override the site-prefs",
+            "#to set a preference here simply copy and paste from the site-prefs file",
+            "the file can be found at %s" %self.paths['userPrefsFile']]
+        cfg.write()
+        return cfg
     def getAutoProxy(self):
         """Fetch the proxy from the the system environment variables
         """
@@ -108,37 +123,35 @@ class Preferences:
             return urllib.getproxies()['http']
         else:
             return ""
-    def generateUserPrefsFile(self):
-        """Generate a preferences file for the user (and any necessary directories)
-        """
-        #check for folder
-        if not os.path.isdir(self.paths['userPrefs']):
-            os.makedirs(self.paths['userPrefs'])
-        f = open(self.paths['userPrefsFile'], 'w')
-        f.write("#this file allows you to override various settings. Any setting defined in"+\
-                "\n#%s\n#can be added here to override\n" %self.paths['sitePrefsFile'])
-        f.close()
         
 class PreferencesDlg(wx.Frame):
     def __init__(self, parent=None, ID=-1, app=None, title="PsychoPy Preferences"):
         wx.Frame.__init__(self, parent, ID, title, size=(500,700))
         panel = wx.Panel(self)
         self.nb = wx.Notebook(panel)
+        self.pageIDs={}#store the page numbers
         self.paths = app.prefs.paths
+        self.app=app
         
-        sitePage = self.makePage(self.paths['sitePrefsFile'])
-        self.nb.AddPage(sitePage,"site")
-        userPage = self.makePage(self.paths['userPrefsFile'])
-        self.nb.AddPage(userPage, "user")
-
+        for n, prefsType in enumerate(['site','user']):
+            sitePage = self.makePage(self.paths['%sPrefsFile' %prefsType])
+            self.nb.AddPage(sitePage,prefsType)
+            self.pageIDs[prefsType]=n
+        
         sizer = wx.BoxSizer()
         sizer.Add(self.nb, 1, wx.EXPAND)
         panel.SetSizer(sizer)
     
         self.menuBar = wx.MenuBar()
         self.fileMenu = wx.Menu()
-        self.fileMenu.Append(wx.ID_CLOSE,   "&Close file\t%s" %key_close)
-        wx.EVT_MENU(self, wx.ID_CLOSE,  self.fileClose)
+        item = self.fileMenu.Append(wx.ID_SAVE,   "&Save prefs\t%s" %key_save)
+        self.Bind(wx.EVT_MENU, self.save, item)
+        item = self.fileMenu.Append(wx.ID_CLOSE,   "&Close (prefs)\t%s" %key_close)
+        self.Bind(wx.EVT_MENU, self.close, item)
+        self.fileMenu.AppendSeparator()
+        item = self.fileMenu.Append(-1, "&Quit (entire app)\t%s" %key_quit, "Terminate the application")
+        self.Bind(wx.EVT_MENU, self.quit, item)
+
 #        wx.EVT_MENU(self, wx.ID_SAVE,  self.fileSave)
 #        self.fileMenu.Enable(wx.ID_SAVE, False)
         self.menuBar.Append(self.fileMenu, "&File")
@@ -156,12 +169,42 @@ class PreferencesDlg(wx.Frame):
         page.SetLexer(wx.stc.STC_LEX_PROPERTIES)
         page.StyleSetSpec(wx.stc.STC_PROPS_SECTION,"fore:#FF0000")
         page.StyleSetSpec(wx.stc.STC_PROPS_COMMENT,"fore:#007F00")
+        
         f = open(path, 'r+')
         page.SetText(f.read())
-        f.close()
+        f.close()        
+        if not os.access(path,os.W_OK):#can only read so make the textctrl read-only
+            page.set_read_only()
         
         return page
-    def fileClose(self, event):
+    def close(self, event=None):
+        okToQuit=self.save(event=None)#will be -1 if user cancelled during save
         self.Destroy()
-    def fileClose(self, event):
-        self.Destroy()
+    def quit(self,event=None):
+        self.close()
+        self.app.quit()
+    def save(self, event=None):
+        ok=1
+        for prefsType in ['site','user']:
+            pageText = self.getPageText(prefsType)
+            filePath = self.paths['%sPrefsFile' %prefsType]
+            if self.isChanged(prefsType):
+                f=open(filePath,'w')
+                f.write(pageText)
+                f.close()
+                print "saved", filePath             
+        return ok
+    def getPageText(self,prefsType):
+        """Get the prefs text for a given page
+        """
+        self.nb.ChangeSelection(self.pageIDs[prefsType])
+        return self.nb.GetCurrentPage().GetText().encode('utf-8')
+    def isChanged(self,prefsType='site'):
+        filePath = self.paths['%sPrefsFile' %prefsType]
+        f = open(filePath, 'r+')
+        savedTxt = f.read()
+        f.close()
+        #find the notebook page
+        currTxt = self.getPageText(prefsType)
+        return (currTxt!=savedTxt)
+    
