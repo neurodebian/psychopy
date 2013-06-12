@@ -7,6 +7,10 @@ Build-Depends: cdbs, debhelper (>= 5.0.38),
                python-support, python, python-setuptools,
                help2man, imagemagick,
                python-configobj,
+               xvfb, xauth, libgl1-mesa-dri,
+               python-pyglet, python-pygame, python-opengl,
+               python-scipy, python-matplotlib, python-lxml,
+               python-configobj, python-imaging, python-openpyxl, python-mock, python-wxgtk2.8, libavbin0, python-pyo,
 Vcs-Git: git://git.debian.org/git/pkg-exppsy/psychopy.git
 Vcs-Browser: http://git.debian.org/?p=pkg-exppsy/psychopy.git
 Standards-Version: 3.9.3
