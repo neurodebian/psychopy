@@ -9,6 +9,8 @@ Overview
 --------
 **AudioCapture()** allows easy audio recording and saving of arbitrary sounds to a file (wav format).
 
+**AdvAudioCapture()** allows advanced audio recording (with onset-marker sound).
+
 **Speech2Text()** provides speech recognition (courtesy of google), with about 1-2 seconds latency for a
 2 sec voice recording. Note that the sound files are sent to google over the internet.
 Intended for within-experiment processing (near real-time, 1-2s delayed), in which
@@ -27,9 +29,13 @@ playback and manual onset determination (= the "gold standard" for RT).
 Audio Capture
 -------------
 .. autofunction:: psychopy.microphone.switchOn
-.. autofunction:: psychopy.microphone.switchOff 
 
 .. autoclass:: psychopy.microphone.AudioCapture
+    :members:
+    :undoc-members:
+    :inherited-members:
+
+.. autoclass:: psychopy.microphone.AdvAudioCapture
     :members:
     :undoc-members:
     :inherited-members:
