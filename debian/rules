@@ -49,6 +49,7 @@ dfsg-%:
 	  buildExeInstaller.nsi buildWinDistributions.bat \
 	  googlecode_upload.py; \
 	git rm -rf --ignore-unmatch iohub_docs psychopy/serial windlls; \
+	find -type d -iname win32 -print0 | xargs -0 git rm -rf --ignore-unmatch; \
 	diffstat="`git diff --cached $${branch} --stat`"; \
 	echo -e "Merge $$branch ($$descr) into DFSG\n\n$$diffstat" | \
 		git commit -F- -a && git tag -s -m "Autotagging DFSG version of $$descr" $$dfsgtag && \
