@@ -2,6 +2,8 @@ psychopy (1.77.00.dfsg-1) unstable; urgency=low
 
   * New upstream release
   * Enabling build-time unit-testing under Xvfb.
+  * debian/control:
+    - libxxf86vm1 to Recommends -- needed for XF86VidModeSetGammaRamp
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 12 Jun 2013 10:38:48 -0400
 

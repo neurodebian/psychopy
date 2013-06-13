@@ -31,7 +31,8 @@ Recommends: python-wxgtk2.8,
             python-serial,
             python-pyo,
             libavbin0,
-            ipython
+            libxxf86vm1,
+            ipython,
 Suggests: python-iolabs, python-pyxid
 Provides: ${python:Provides}
 XB-Python-Version: ${python:Versions}
