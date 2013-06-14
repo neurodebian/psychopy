@@ -17,7 +17,7 @@ install/psychopy:: debian/psychopy.1
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	echo "I: Running tests using default Python"
 	cd build && xvfb-run -s "-screen 0 1024x768x24 -ac +extension GLX +render -noreset" \
-		python ../psychopy/tests/runPytest.py -v -s -m "not needs_sound"
+		python ../psychopy/tests/runPytest.py -v -s -m "not needs_sound" || echo "TESTS FAILED"
 endif
 ## Fix up permissions on images -- pushed upstream, but left here
 ## just to make sure everything is ok
