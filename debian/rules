@@ -7,6 +7,9 @@ DEB_PYTHON_MODULE_PACKAGE = psychopy
 DEB_PYTHON_MODULE_PACKAGES = psychopy
 include /usr/share/cdbs/1/class/python-distutils.mk
 
+# We will disallow to fail on unstable/sid, but let them pass otherwise
+failed_tests_cmd = $(shell dpkg-parsechangelog --count 1 --format rfc822 | awk '/^Distribution:/{print $$2;}' | grep -q -e '\(sid\|unstable\)' && echo "exit 1" || echo ":")
+
 debian/psychopy.1: debian/psychopy.sh
 	chmod +x $^
 	PYTHONPATH=. help2man -N -n "Creating psychology stimuli in Python" $^ > $@
@@ -17,7 +20,7 @@ install/psychopy:: debian/psychopy.1
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	echo "I: Running tests using default Python"
 	cd build && xvfb-run -s "-screen 0 1024x768x24 -ac +extension GLX +render -noreset" \
-		python ../psychopy/tests/runPytest.py -v -s -m "not needs_sound" || echo "TESTS FAILED"
+		python ../psychopy/tests/runPytest.py -v -s -m "not needs_sound" || { echo "TESTS FAILED"; $(failed_tests_cmd); }
 endif
 ## Fix up permissions on images -- pushed upstream, but left here
 ## just to make sure everything is ok

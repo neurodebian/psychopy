@@ -1,6 +1,7 @@
 psychopy (1.77.02.dfsg-1) unstable; urgency=low
 
   * New upstream bugfix release
+  * Do not ignore tests failures while building for unstable/sid
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 12 Jul 2013 12:55:11 -0400
 
