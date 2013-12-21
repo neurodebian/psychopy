@@ -16,25 +16,47 @@ Changelog
 
 :blue:`Changes in blue typically indicate things that alter the PsychoPy behaviour in a way that could break compatibility. Be especially wary of those!`
 
+PsychoPy 1.79
+------------------------------
+
+* NEW: attributes for stimuli can now be updated using e.g. `stim.pos = newPos` rather than using `stim.setPos(newPos)` to make things more like standard Python (thanks Jonas Lindeløv)
+* ADDED: Builder component for ioLab Systems button-box; refactor PsychoPy's ioLabs code (Jeremy)
+
 PsychoPy 1.78
 ------------------------------
+
+PsychoPy 1.78.01
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Released Aug 2013
+
+* FIXED: Image Components were showing up a pastel versions when no actual image was provided
+* FIXED: MultiStairHandler wasn't working on Builder, and had insufficient data outputs when using wide-text csv files
+* FIXED: loops couldn't be deleted from the Flow if their conditions file couldn't be found (e.g. had been moved)
+* FIXED: setting of color values was not honouring the autolog setting (was always logging)
+* FIXED: gui choice boxes now handle unicode in their options as well as ASCII strings (thanks Anne Peschel)
+* FIXED: Scaling bug for SMI eye-tracker in binocular mode (thanks Sol)
+* FIXED: Builder Code Components that were showing up in unreadable, single-line boxes
+* IMPROVED: All Builder Dialogs now appear close to the top of the screen (so they don't shoot off the bottom in most screens)
 
 PsychoPy 1.78.00
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(not yet released)
+Released Aug 2013
 
-* ADDED: option to preload during Builder scripts using Static Component, which uses :class:`~psychopy.core.StaticPeriod` class
+* ADDED: option to preload during Builder scripts using :ref:`static`, which uses :class:`~psychopy.core.StaticPeriod` class
+
 * ADDED: Polygon Component to Builder for drawing regular polygons (including simple lines)
 * ADDED: TrialHander can now fetch previous trials as well as future ones (thanks Mike MacAskill)
 * ADDED: BufferImageStim accepts mask and pos params (thanks Jeremy)
 * ADDED: generated Sounds (not sound files) now use a Hamming window to get rid of sharp onset/offset noises (thanks Jeremy)
 * ADDED: microphone component able to play & identify a marker tone (for vocal RT), compute loudness, compression (Jeremy)
 * ADDED: sound files: lossless compress / uncompress (requires flac executable installed separately) (Jeremy)
-* FIXED: movieStim.contains() and .overlaps() can work, requires that the visual.Window has units of pix
 * ADDED: microphone compress() audio recordings; requires flac download (not packaged with PsychoPy)
-* ADDED: new preference `flac` = system path for flac, e.g. c:/Program Files (x86)/FLAC/flac.exe (not always needed)
-* FIXED: reduced number of queries when closing down and provides filenames of changed files in msg (thanks Piot Iwaniuk)
+* FIXED: greyscale images were being distorted during display since 1.77.00
+* FIXED: greyscale images were being distorted during display since 1.77.00
+* FIXED: movieStim.contains() and .overlaps() can work, requires that the visual.Window has units of pix
+* FIXED: movieStim.contains() and .overlaps() can work, requires that the visual.Window has units of pix
 
 PsychoPy 1.77
 ------------------------------
