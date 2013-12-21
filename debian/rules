@@ -34,8 +34,8 @@ endif
 ## convert and install icon's .xpm manually
 	convert psychopy/app/Resources/psychopy.png -geometry 32x32 \
       $(DEB_DESTDIR)/usr/share/pixmaps/psychopy.xpm
-## Install runner
-	install debian/psychopy.sh $(DEB_DESTDIR)/usr/bin/psychopy
+## Rename upstream's runner
+	mv $(DEB_DESTDIR)/usr/bin/psychopyApp.py $(DEB_DESTDIR)/usr/bin/psychopy
 
 # Make tree dfsg-compliant
 OREMOTE=
