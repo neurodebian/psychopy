@@ -19,6 +19,26 @@ Changelog
 PsychoPy 1.79
 ------------------------------
 
+PsychoPy 1.79.01
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+FIXED: startup crash in 1.79.00
+FIXED: long-standing memory leak in MovieStim
+FIXED: fixed problem with MovieStim not displaying the image but playing the audio
+ADDED: volume attribute to MovieStim (Frank Papenmeier)
+FIXED: experiments were crashing if first line of a conditions file contained a float but the rest were integers
+FIXED: QuestHandler.addResponse() should not try to replace existing intensity on first trial (Richard Höchenberger)
+FIXED: Window's viewPos and viewScale attributes could not be changed
+FIXED: Builder code generation for Cedrus Box when user provided a limited set of available buttons
+FIXED: multiple issues causing fatal errors when setting stimulus parameters (Pieter Moors and Damien Mannion)
+FIXED: Builder experiments would crash under certain conditions when there was no 'participant' in the info dialog box (Philipp Wiesemann)
+FIXED: bug toggling readme file window in Builder (Philipp Wiesemann)
+FIXED: further fix to the Coder raising excessive 'this file has changed' warnings
+FIXED: Component names now update on the Routine panel after being changed in a dialog (Philipp Wiesemann)
+
+PsychoPy 1.79.00
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 * NEW: attributes for stimuli can now be updated using e.g. `stim.pos = newPos` rather than using `stim.setPos(newPos)` to make things more like standard Python (thanks Jonas Lindeløv). This version also involved some major restructuring behind the scenes that should not be visible to users (thanks Todd Jennings)
 * ADDED: Builder Components for
     * ioLab Systems button-box; refactor PsychoPy's ioLabs code (Jeremy)
@@ -37,6 +57,7 @@ PsychoPy 1.79
     * pandas on win32 is now v1.3 (was already this version on OS X)
     * pyxid now includes Jared's upstream bug-fix
 * FIXED: many user interface tweaks, documentation and help string corrections (Philip Wiesemann)
+* FIXED: bug importing conditions if the first row of numbers was the only float. (importFromConditions now uses numpy instead of matplotlib)
 * CHANGED: data curve fitting functions are now using scipy.optimise.curve_fit and should hopefully be more robust to local minima(?)
 * CHANGED: microphone getRMS now uses numpy.std(); the change should have no effect on loudness values computed for .wav files
 * ADDED: builder demo for mental rotation task

@@ -11,7 +11,6 @@ import psychopy
 import cPickle, string, sys, platform, os, time, copy, csv
 import numpy
 from scipy import optimize, special
-from matplotlib import mlab    #used for importing csv files
 from contrib.quest import *    #used for QuestHandler
 import inspect #so that Handlers can find the script that called them
 import codecs, locale
@@ -1248,16 +1247,9 @@ def importConditions(fileName, returnFieldNames=False):
     if fileName.endswith('.csv'):
         #use csv import library to fetch the fieldNames
         f = open(fileName, 'rU')#the U converts line endings to os.linesep (not unicode!)
-        #lines = f.read().split(os.linesep)#csv module is temperamental with line endings
-        try:
-            reader = csv.reader(f)#.split(os.linesep))
-        except:
-            raise ImportError, 'Could not open %s as conditions' % fileName
-        fieldNames = reader.next() # first row
+        trialsArr = numpy.recfromcsv(f)
+        fieldNames = trialsArr.dtype.names
         _assertValidVarNames(fieldNames, fileName)
-        #use matplotlib to import data and intelligently check for data types
-        #all data in one column will be given a single type (e.g. if one cell is string, all will be set to string)
-        trialsArr = mlab.csv2rec(f) # data = non-header row x col
         f.close()
         #convert the record array into a list of dicts
         trialList = []
@@ -2038,8 +2030,12 @@ class QuestHandler(StairHandler):
             intensity = self._questNextIntensity
         else:
             intensity = self._intensity2scale(intensity)
-            #update the intensity
-            self.intensities.pop()#remove the one that had been auto-generated
+            # Update the intensity.
+            #
+            # During the first trial, self.intensities will be of length 0,
+            # so pop() would not work.
+            if len(self.intensities) != 0:
+                self.intensities.pop()  #remove the one that had been auto-generated
             self.intensities.append(intensity)
         # Update quest
         self._quest.update(intensity, result)
