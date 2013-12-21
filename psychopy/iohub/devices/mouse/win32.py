@@ -70,19 +70,21 @@ class Mouse(MouseDevice):
         self.getSystemCursorVisibility()
         self._original_system_cursor_clipping_rect=RECT()
         self._user32.GetClipCursor(ctypes.byref(self._original_system_cursor_clipping_rect))
+#        cr=self._original_system_cursor_clipping_rect
+#        print2err("MOUSE CLIP CURSOR BOUNDS: {0} {1} {2} {3}".format(cr.left,cr.top,cr.right,cr.bottom))
         
-    def _nativeLimitCursorToBoundingRect(self,clip_rect):
-        native_clip_rect=RECT()            
-        if clip_rect:
-            native_clip_rect.right=ctypes.c_long(clip_rect.right)
-            native_clip_rect.bottom=ctypes.c_long(clip_rect.bottom)
-            native_clip_rect.left=ctypes.c_long(clip_rect.left)
-            native_clip_rect.top=ctypes.c_long(clip_rect.top)
-            self._user32.ClipCursor(ctypes.byref(native_clip_rect))
-        else:
-            self._user32.ClipCursor(None)
-            self._user32.GetClipCursor(ctypes.byref(native_clip_rect))
-        return native_clip_rect
+#    def _nativeLimitCursorToBoundingRect(self,clip_rect):
+#        native_clip_rect=RECT()            
+#        if clip_rect:
+#            native_clip_rect.right=ctypes.c_long(clip_rect.right)
+#            native_clip_rect.bottom=ctypes.c_long(clip_rect.bottom)
+#            native_clip_rect.left=ctypes.c_long(clip_rect.left)
+#            native_clip_rect.top=ctypes.c_long(clip_rect.top)
+#            self._user32.ClipCursor(ctypes.byref(native_clip_rect))
+#        else:
+#            self._user32.ClipCursor(None)
+#            self._user32.GetClipCursor(ctypes.byref(native_clip_rect))
+#        return native_clip_rect
         
     def _nativeSetMousePos(self,px,py):
         self._user32.SetCursorPos(int(px),int(py))
@@ -100,7 +102,15 @@ class Mouse(MouseDevice):
     def _nativeEventCallback(self,event):
         if self.isReportingEvents():
             logged_time=currentSec()
-            #print2err("Received mouse event pos: ", event.Position)
+            report_system_wide_events=self.getConfiguration().get('report_system_wide_events',True)
+            pyglet_window_hnds=self._iohub_server._pyglet_window_hnds
+            if event.Window in pyglet_window_hnds:
+                pass
+            elif len(pyglet_window_hnds)>0 and report_system_wide_events is False:
+                # For the Mouse, always pass along events, but do not log
+                # events that occurred targeted for a non Psychopy win.
+                #
+                return True
             self._scrollPositionY+= event.Wheel
             event.WheelAbsolute=self._scrollPositionY
 
@@ -115,15 +125,15 @@ class Mouse(MouseDevice):
                     print2err("===============")
                     return True
             
-            result=self._validateMousePosition(event.Position,display_index)
+#            result=self._validateMousePosition(event.Position,display_index)
             #print2err("_validateMousePosition result: ", result)
             
-            if result != True:
+#            if result != True:
                 #ioHub.print2err("!!! _validateMousePosition made ajustment: {0} to {1}".format(
                 #                                   event.Position,result))
-                self._nativeSetMousePos(*result) 
-                event.Position=result
-                display_index=self.getDisplayIndexForMousePosition(event.Position)
+#                self._nativeSetMousePos(*result) 
+#                event.Position=result
+#                display_index=self.getDisplayIndexForMousePosition(event.Position)
                 
             mx,my=event.Position                
             event.DisplayIndex=display_index                
@@ -158,7 +168,6 @@ class Mouse(MouseDevice):
 
             self._last_callback_time=logged_time
             
-
         # pyHook require the callback to return True to inform the windows 
         # low level hook functionality to pass the event on.
         return True

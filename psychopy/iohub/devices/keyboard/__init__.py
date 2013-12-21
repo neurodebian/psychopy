@@ -80,6 +80,7 @@ class ioHubKeyboardDevice(Device):
         a KeyboardCharEvent is created using the KeyboardReleaseEvent as the basis for the Char event, and the
         KeyboardStartEvent that was stored in the dict for the startEvent, and duration calculated fields.
         '''
+
         press_events=[e for e in self.getEvents(event_type_id=EventConstants.KEYBOARD_PRESS,clearEvents=False) if e[DeviceEvent.EVENT_ID_INDEX] > self._lastProcessedEventID]
         release_events=[e for e in self.getEvents(event_type_id=EventConstants.KEYBOARD_RELEASE,clearEvents=False) if e[DeviceEvent.EVENT_ID_INDEX] > self._lastProcessedEventID]
 
@@ -122,6 +123,10 @@ class ioHubKeyboardDevice(Device):
                 charEvent=list(key_release)
                 charEvent[DeviceEvent.EVENT_TYPE_ID_INDEX]=KeyboardCharEvent.EVENT_TYPE_ID
                 charEvent[DeviceEvent.EVENT_ID_INDEX]=Computer._getNextEventID()
+                # Add .1 msec to the Char event time so that, when sorted, Char event follows
+                # the Release Event that generated it.
+                #
+                charEvent[DeviceEvent.EVENT_HUB_TIME_INDEX]=key_release[DeviceEvent.EVENT_HUB_TIME_INDEX]+0.0001
                 charEvent.append(tuple(key_press))
                 charEvent.append(key_release[DeviceEvent.EVENT_HUB_TIME_INDEX]-key_press[DeviceEvent.EVENT_HUB_TIME_INDEX])
                 charEvents.append(charEvent)

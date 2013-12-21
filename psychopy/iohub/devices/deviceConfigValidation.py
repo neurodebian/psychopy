@@ -202,9 +202,6 @@ def isValidRgb255Color(config_param_name,color,constraints):
         else:
             raise ColorValueError(config_param_name,color)
             
-        if len(color) == 3:
-            color=list(color)
-            color.append(255)
         return color
         
     raise ColorValueError(config_param_name,color)
@@ -307,6 +304,9 @@ def isValidList(config_param_name,value,constraints):
             return value
 
         valid_values=constraints.get('valid_values',[])
+        
+        if len(valid_values)==0:
+            return value
             
         if not isinstance(value,(list,tuple)):         
             if value not in valid_values:

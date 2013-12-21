@@ -18,9 +18,9 @@ _valid_var_re = re.compile(r"^[a-zA-Z_][\w]*$")  # filter for legal var names
 _nonalphanumeric_re = re.compile(r'\W') # will match all bad var name chars
 
 # used when writing scripts and in namespace:
-_numpy_imports = ['sin', 'cos', 'tan', 'log', 'log10', 'pi', 'average', 'sqrt', 'std',
+_numpyImports = ['sin', 'cos', 'tan', 'log', 'log10', 'pi', 'average', 'sqrt', 'std',
                   'deg2rad', 'rad2deg', 'linspace', 'asarray']
-_numpy_random_imports = ['random', 'randint', 'normal', 'shuffle']
+_numpyRandomImports = ['random', 'randint', 'normal', 'shuffle']
 
 """
 Exception thrown by a component when it is unable to generate its code.
@@ -95,7 +95,7 @@ class Experiment:
         #this can be checked by the builder that this is an experiment and a compatible version
         self.psychopyVersion=__version__ #imported from components
         self.psychopyLibs=['visual','core','data','event','logging','sound']
-        self.settings=getAllComponents()['SettingsComponent'](parentName='', exp=self)
+        self.settings=getComponents(fetchIcons=False)['SettingsComponent'](parentName='', exp=self)
         self._doc=None#this will be the xml.dom.minidom.doc object for saving
         self.namespace = NameSpace(self) # manage variable names
     def requirePsychopyLibs(self, libs=[]):
@@ -117,10 +117,10 @@ class Experiment:
             self.routines[routineName]=Routine(routineName, exp=self)#create a deafult routine with this name
         else:
             self.routines[routineName]=routine
-
     def writeScript(self, expPath=None):
         """Write a PsychoPy script for the experiment
         """
+        self.flow._prescreenValues()
         self.expPath = expPath
         script = IndentingBuffer(u'') #a string buffer object
 
@@ -142,8 +142,8 @@ class Experiment:
                     "from psychopy import %s\n" % ', '.join(self.psychopyLibs) +
                     "from psychopy.constants import *  # things like STARTED, FINISHED\n" +
                     "import numpy as np  # whole numpy lib is available, prepend 'np.'\n" +
-                    "from numpy import %s\n" % ', '.join(_numpy_imports) +
-                    "from numpy.random import %s\n" % ', '.join(_numpy_random_imports) +
+                    "from numpy import %s\n" % ', '.join(_numpyImports) +
+                    "from numpy.random import %s\n" % ', '.join(_numpyRandomImports) +
                     "import os  # handy system and path functions\n")
         if self.prefsApp['locale']:
             # if locale is set explicitly as a pref, add it to the script:
@@ -151,9 +151,10 @@ class Experiment:
             script.write("import locale\n" +
                      "locale.setlocale(locale.LC_ALL, '%s')\n" % localeValue)
         script.write("\n")
-        self.settings.writeStartCode(script) #present info dlg, make logfile, Window
-        #delegate rest of the code-writing to Flow
-        self.flow.writeCode(script)
+        self.settings.writeStartCode(script) #present info dlg, make logfile
+        self.flow.writeStartCode(script) #writes any components with a writeStartCode()
+        self.settings.writeWindowCode(script)#create our visual.Window()
+        self.flow.writeCode(script) #write the rest of the code for the components
         self.settings.writeEndCode(script) #close log file
 
         return script
@@ -270,6 +271,10 @@ class Experiment:
             params['stopType'].val =unicode('time (s)')
             params['stopVal'].val = unicode(times[1])
             return #times doesn't need to update its type or 'updates' rule
+        elif name in ['Begin Experiment', 'Begin Routine', 'Each Frame', 'End Routine', 'End Experiment']:
+            params[name].val = paramNode.get('val')
+            params[name].valType = 'extendedCode' #changed in 1.78.00
+            return #so that we don't update valTyp again below
         elif 'val' in paramNode.keys():
             if paramNode.get('val')=='window units':#changed this value in 1.70.00
                 params[name].val = 'from exp settings'
@@ -279,7 +284,9 @@ class Experiment:
         if 'valType' in paramNode.keys():
             params[name].valType = paramNode.get('valType')
             # compatibility checks:
-            if name in ['correctAns','text'] and paramNode.get('valType')=='code':
+            if name=='text' and paramNode.get('valType')=='code':
+                params[name].valType='str'# these components were changed in v1.60.01
+            elif name=='correctAns' and paramNode.get('valType')=='code' and paramNode.getparent().tag=="TextComponent":
                 params[name].valType='str'# these components were changed in v1.60.01
             elif name in ['allowedKeys'] and paramNode.get('valType')=='str':
                 params[name].valType='code'# these components were changed in v1.70.00
@@ -355,7 +362,18 @@ class Experiment:
                 self.namespace.add(comp_good_name)
                 component.params['name'].val = comp_good_name
                 routine.append(component)
-
+        # for each component that uses a Static for updates, we need to set that
+        for thisRoutine in self.routines.values():
+            for thisComp in thisRoutine:
+                for thisParamName in thisComp.params:
+                    thisParam = thisComp.params[thisParamName]
+                    if thisParamName=='advancedParams':
+                        continue#advanced isn't a normal param
+                    elif thisParam.updates and "during:" in thisParam.updates:
+                        updates = thisParam.updates.split(': ')[1] #remove the part that says 'during'
+                        routine, static =  updates.split('.')
+                        self.routines[routine].getComponentFromName(static).addComponentUpdate(
+                            routine, thisComp.params['name'], thisParamName)
         #fetch flow settings
         flowNode=root.find('Flow')
         loops={}
@@ -482,6 +500,7 @@ class Param:
         self.updates=updates
         self.allowedUpdates=allowedUpdates
         self.allowedVals=allowedVals
+        self.staticUpdater = None
     def __str__(self):
         if self.valType == 'num':
             try:
@@ -499,7 +518,7 @@ class Param:
                 else: # str wanted
                     return repr(re.sub(r"[\\]\$", '$', self.val)) # remove \ from all \$
             return repr(self.val)
-        elif self.valType == 'code':
+        elif self.valType in ['code', 'extendedCode']:
             if (type(self.val) in [str, unicode]) and self.val.startswith("$"):
                 return "%s" %(self.val[1:])#a $ in a code parameter is unecessary so remove it
             elif (type(self.val) in [str, unicode]) and self.val.startswith("\$"):
@@ -547,7 +566,6 @@ class TrialHandler:
             hint="The start and end of the loop (see flow timeline)")
         self.params['loopType']=Param(loopType, valType='str',
             allowedVals=['random','sequential','fullRandom','staircase','interleaved staircases'],
-                # should it be 'interleaved stairs' (to be consistent with stair and multistair handler)?
             hint="How should the next condition value(s) be chosen?")#NB staircase is added for the sake of the loop properties dialog
         #these two are really just for making the dialog easier (they won't be used to generate code)
         self.params['endPoints']=Param(endPoints,valType='num',
@@ -664,7 +682,7 @@ class StairHandler:
             hint="Minimum number of times the staircase must change direction before ending")
         #these two are really just for making the dialog easier (they won't be used to generate code)
         self.params['loopType']=Param('staircase', valType='str',
-            allowedVals=['random','sequential','fullRandom','staircase','interleaved stairs'],
+            allowedVals=['random','sequential','fullRandom','staircase','interleaved staircases'],
             hint="How should the next trial value(s) be chosen?")#NB this is added for the sake of the loop properties dialog
         self.params['endPoints']=Param(endPoints,valType='num',
             hint='Where to loop from and to (see values currently shown in the flow view)')
@@ -733,37 +751,40 @@ class MultiStairHandler:
             hint="How to select the next staircase to run")
         #these two are really just for making the dialog easier (they won't be used to generate code)
         self.params['loopType']=Param('staircase', valType='str',
-        allowedVals=['random','sequential','fullRandom','staircase','interleaved stairs'],
+        allowedVals=['random','sequential','fullRandom','staircase','interleaved staircases'],
             hint="How should the next trial value(s) be chosen?")#NB this is added for the sake of the loop properties dialog
         self.params['endPoints']=Param(endPoints,valType='num',
             hint='Where to loop from and to (see values currently shown in the flow view)')
         self.params['conditions']=Param(conditions, valType='str', updates=None, allowedUpdates=None,
-            hint="A list of dictionaries describing the differences between each condition")
+            hint="A list of dictionaries describing the differences between each staircase")
         self.params['conditionsFile']=Param(conditionsFile, valType='str', updates=None, allowedUpdates=None,
             hint="An xlsx or csv file specifying the parameters for each condition")
     def writeInitCode(self,buff):
         #also a 'thisName' for use in "for thisTrial in trials:"
         self.thisName = self.exp.namespace.makeLoopIndex(self.params['name'].val)
-        if self.params['N reversals'].val in ["", None, 'None']:
-            self.params['N reversals'].val='0'
         #write the code
         buff.writeIndentedLines("\n# set up handler to look after randomisation of trials etc\n")
         buff.writeIndentedLines("conditions = data.importConditions(%s)" %self.params['conditionsFile'])
-        buff.writeIndented("%(name)s = data.MultiStairHandler(startVal=%(start value)s, extraInfo=expInfo,\n" %(self.params))
+        buff.writeIndented("%(name)s = data.MultiStairHandler(stairType=%(stairType)s, name='%(name)s',\n" %(self.params))
         buff.writeIndented("    nTrials=%(nReps)s,\n" %self.params)
         buff.writeIndented("    conditions=conditions,\n")
         buff.writeIndented("    originPath=%s" %repr(self.exp.expPath))
-        buff.write(", name='%(name)s')\n"%self.params)
+        buff.write(")\n"%self.params)
         buff.writeIndented("thisExp.addLoop(%(name)s)  # add the loop to the experiment\n" %self.params)
-        buff.writeIndented("# initialise values for first condition\n" %repr(self.exp.expPath))
-        buff.writeIndented("level = %s._nextIntensity  # initialise some vals\n" %(self.thisName))
-        buff.writeIndented("condition = %s.currentStaircase.condition\n" %(self.thisName))
+        buff.writeIndented("# initialise values for first condition\n")
+        buff.writeIndented("level = %(name)s._nextIntensity  # initialise some vals\n" %(self.params))
+        buff.writeIndented("condition = %(name)s.currentStaircase.condition\n" %(self.params))
     def writeLoopStartCode(self,buff):
         #work out a name for e.g. thisTrial in trials:
         buff.writeIndented("\n")
-        buff.writeIndented("for level, condition in %s:\n" %(self.thisName, self.params['name']))
+        buff.writeIndented("for level, condition in %(name)s:\n" %(self.params))
         buff.setIndentLevel(1, relative=True)
-        buff.writeIndented("currentLoop = %s\n" %(self.params['name']))
+        buff.writeIndented("currentLoop = %(name)s\n" %(self.params))
+        #create additional names (e.g. rgb=thisTrial.rgb) if user doesn't mind cluttered namespace
+        if not self.exp.prefsBuilder['unclutteredNamespace']:
+            buff.writeIndented("# abbreviate parameter names if possible (e.g. rgb=condition.rgb)\n")
+            buff.writeIndented("for paramName in condition.keys():\n")
+            buff.writeIndented(buff.oneIndent+"exec(paramName + '= condition[paramName]')\n")
     def writeLoopEndCode(self,buff):
         buff.writeIndentedLines("thisExp.nextEntry()\n\n")
         buff.setIndentLevel(-1, relative=True)
@@ -771,7 +792,7 @@ class MultiStairHandler:
         buff.writeIndented("\n")
         #save data
         if self.exp.settings.params['Save excel file'].val:
-            buff.writeIndented("%(name)s.saveAsExcel(filename + '.xlsx', sheetName='%(name)s')\n" %self.params)
+            buff.writeIndented("%(name)s.saveAsExcel(filename + '.xlsx')\n" %self.params)
         if self.exp.settings.params['Save csv file'].val:
             buff.writeIndented("%(name)s.saveAsText(filename + '%(name)s.csv', delim=',')\n" %self.params)
     def getType(self):
@@ -869,7 +890,11 @@ class Flow(list):
         denoted as code by $ are constant.
         """
         warnings = []
-        keywords = self.exp.namespace.nonUserBuilder[:] + ['expInfo']
+        # treat expInfo as likely to be constant; also treat its keys as constant
+        # because its handy to make a short-cut in code: exec(key+'=expInfo[key]')
+        e = eval(self.exp.settings.params['Experiment info'].val)  # dict
+        expInfo = e.keys()
+        keywords = self.exp.namespace.nonUserBuilder[:] + ['expInfo'] + expInfo
         ignore = set(keywords).difference(set(['random', 'rand']))
         for key in component.params:
             field = component.params[key]
@@ -937,15 +962,20 @@ class Flow(list):
                                 component.params['name'], key.capitalize()) )
             print 'Note: Dynamic code seems intended but updating is "constant":\n ',
             print '\n  '.join(list(set(warnings)))  # non-redundant, order unknown
-
-    def writeCode(self, script):
-        self._prescreenValues()
-        # writeStartCode and writeInitCode:
+    def writeStartCode(self, script):
+        """Write the code that comes before the Window is created
+        """
+        script.writeIndentedLines("\n# Start Code - component code to be run before the window creation\n")
         for entry in self:  #NB each entry is a routine or LoopInitiator/Terminator
             self._currentRoutine=entry
             # very few components need writeStartCode:
             if hasattr(entry, 'writeStartCode'):
                 entry.writeStartCode(script)
+
+    def writeCode(self, script):
+        """Write the rest of the code
+        """
+        # writeStartCode and writeInitCode:
         for entry in self: #NB each entry is a routine or LoopInitiator/Terminator
             self._currentRoutine=entry
             entry.writeInitCode(script)
@@ -987,6 +1017,21 @@ class Routine(list):
     def removeComponent(self,component):
         """Remove a component from the end of the routine"""
         self.remove(component)
+        #check if the component was using any Static Components for updates
+        for thisParamName, thisParam in component.params.items():
+            if hasattr(thisParam,'updates') and thisParam.updates and 'during:' in thisParam.updates:
+                updates = thisParam.updates.split(': ')[1] #remove the part that says 'during'
+                routine, static =  updates.split('.')
+                self.exp.routines[routine].getComponentFromName(static).remComponentUpdate(
+                    routine, component.params['name'], thisParamName)
+    def getStatics(self):
+        """Return a list of Static components
+        """
+        statics=[]
+        for comp in self:
+            if comp.type=='Static':
+                statics.append(comp)
+        return statics
     def writeStartCode(self,buff):
         # few components will have this
         for thisCompon in self:
@@ -1000,7 +1045,6 @@ class Routine(list):
         buff.writeIndented('%s = core.Clock()\n' %(self._clockName))
         for thisCompon in self:
             thisCompon.writeInitCode(buff)
-
     def writeMainCode(self,buff):
         """This defines the code for the frames of a single routine
         """
@@ -1011,7 +1055,7 @@ class Routine(list):
         buff.writeIndented('%s.reset()  # clock \n' %(self._clockName))
         buff.writeIndented('frameN = -1\n')
         #can we use non-slip timing?
-        maxTime, useNonSlip = self.getMaxTime()
+        maxTime, useNonSlip, onlyStaticComps = self.getMaxTime()
         if useNonSlip:
             buff.writeIndented('routineTimer.add(%f)\n' %(maxTime))
 
@@ -1023,7 +1067,7 @@ class Routine(list):
         buff.writeIndented('# keep track of which components have finished\n')
         buff.writeIndented('%sComponents = []\n' %(self.name))
         for thisCompon in self:
-            if thisCompon.params.has_key('startType'):
+            if 'startType' in thisCompon.params:
                 buff.writeIndented('%sComponents.append(%s)\n' %(self.name, thisCompon.params['name']))
         buff.writeIndented("for thisComponent in %sComponents:\n"%(self.name))
         buff.writeIndented("    if hasattr(thisComponent, 'status'):\n")
@@ -1044,7 +1088,13 @@ class Routine(list):
 
         #write the code for each component during frame
         buff.writeIndentedLines('# update/draw components on each frame\n')
+        #just 'normal' components
         for event in self:
+            if event.type=='Static':
+                continue #we'll do those later
+            event.writeFrameCode(buff)
+        #update static component code last
+        for event in self.getStatics():
             event.writeFrameCode(buff)
 
         #are we done yet?
@@ -1102,8 +1152,9 @@ class Routine(list):
         """
         maxTime=0
         nonSlipSafe = True # if possible
+        onlyStaticComps = True
         for n, component in enumerate(self):
-            if component.params.has_key('startType'):
+            if 'startType' in component.params:
                 start, duration, nonSlip = component.getStartAndDuration()
                 if not nonSlip:
                     nonSlipSafe=False
@@ -1116,11 +1167,13 @@ class Routine(list):
                 except:
                     thisT=0
                 maxTime=max(maxTime,thisT)
+                #update onlyStaticComps if needed
+                if component.type != 'Static':
+                    onlyStaticComps = False
         if maxTime==0:#if there are no components
             maxTime=10
             nonSlipSafe=False
-        return maxTime, nonSlipSafe
-
+        return maxTime, nonSlipSafe, onlyStaticComps
 
 class ExpFile(list):
     """An ExpFile is similar to a Routine except that it generates its code
@@ -1131,7 +1184,7 @@ class ExpFile(list):
         self.name=name
         self.exp=exp #the exp we belong to
         self.expObject = None #the experiment we represent on disk (see self.loadExp)
-        self.filename-filename
+        self.filename = filename
         self._clockName=None#this is used for script-writing e.g. "t=trialClock.GetTime()"
         self.type='ExpFile'
         list.__init__(self, components)
@@ -1146,7 +1199,7 @@ class ExpFile(list):
     def loadExp(self):
         #fetch the file
         self.expObject = Experiment()
-        self.expObject.loadFromXML(sel.filename)
+        self.expObject.loadFromXML(self.filename)
         self.flow = self.expObject.flow #extract the flow, which is the key part for us
     def writeInitCode(self,buff):
         #tell each object on our flow to write its init code
@@ -1173,7 +1226,8 @@ class ExpFile(list):
         there are no components or they have code-based times then will default
         to 10secs
         """
-        #todo
+        pass
+        #todo?: currently only Routines perform this action
 
 class NameSpace():
     """class for managing variable names in builder-constructed experiments.
@@ -1206,7 +1260,7 @@ class NameSpace():
         self.exp = exp
         #deepcopy fails if you pre-compile regular expressions and stash here
 
-        self.numpy = _numpy_imports + _numpy_random_imports + ['np']
+        self.numpy = _numpyImports + _numpyRandomImports + ['np']
         self.keywords = ['and', 'del', 'from', 'not', 'while', 'as', 'elif',
             'with', 'assert', 'else', 'if', 'pass', 'yield', 'break', 'except',
             'import', 'print', 'class', 'exec', 'in', 'raise', 'continue', 'or',
@@ -1331,18 +1385,14 @@ class NameSpace():
             if n in sublist:
                 del sublist[sublist.index(n)]
 
-    def makeValid(self, name, prefix='var', add_to_space=None):
+    def makeValid(self, name, prefix='var'):
         """given a string, return a valid and unique variable name.
         replace bad characters with underscore, add an integer suffix until its unique
 
-        >>> makeValid('t')
-        't_1'
         >>> makeValid('Z Z Z')
         'Z_Z_Z'
         >>> makeValid('a')
         'a'
-        >>> makeValid('a')
-        'a_1'
         >>> makeValid('a')
         'a_2'
         >>> makeValid('123')
@@ -1358,39 +1408,37 @@ class NameSpace():
         name = _nonalphanumeric_re.sub('_', name) # replace all bad chars with _
 
         # try to make it unique; success depends on accuracy of self.exists():
-        i = 2
-        if self.exists(name) and name.find('_') > -1: # maybe it already has _\d+? if so, increment from there
+        i = 2  # skip _1 so that user can rename the first one to be _1 if desired
+        if self.exists(name) and '_' in name: # maybe it already has _\d+? if so, increment from there
             basename, count = name.rsplit('_', 1)
             try:
-                i = int(count)
+                i = int(count) + 1
                 name = basename
             except:
                 pass
-        name_orig = name + '_'
+        nameStem = name + '_'
         while self.exists(name): # brute-force a unique name
-            name = name_orig + str(i)
+            name = nameStem + str(i)
             i += 1
-        if add_to_space:
-            self.add(name, add_to_space)
         return name
 
     def makeLoopIndex(self, name):
         """return a valid, readable loop-index name: 'this' + (plural->singular).capitalize() [+ (_\d+)]"""
-        try: new_name = str(name)
-        except: new_name = name
+        try: newName = str(name)
+        except: newName = name
         prefix = 'this'
         irregular = {'stimuli': 'stimulus', 'mice': 'mouse', 'people': 'person'}
         for plural, singular in irregular.items():
             nn = re.compile(plural, re.IGNORECASE)
-            new_name = nn.sub(singular, new_name)
-        if new_name.endswith('s') and not new_name.lower() in irregular.values():
-            new_name = new_name[:-1] # trim last 's'
+            newName = nn.sub(singular, newName)
+        if newName.endswith('s') and not newName.lower() in irregular.values():
+            newName = newName[:-1] # trim last 's'
         else: # might end in s_2, so delete that s; leave S
-            match = re.match(r"^(.*)s(_\d+)$", new_name)
-            if match: new_name = match.group(1) + match.group(2)
-        new_name = prefix + new_name[0].capitalize() + new_name[1:] # retain CamelCase
-        new_name = self.makeValid(new_name)
-        return new_name
+            match = re.match(r"^(.*)s(_\d+)$", newName)
+            if match: newName = match.group(1) + match.group(2)
+        newName = prefix + newName[0].capitalize() + newName[1:] # retain CamelCase
+        newName = self.makeValid(newName)
+        return newName
 
 def _XMLremoveWhitespaceNodes(parent):
     """Remove all text nodes from an xml document (likely to be whitespace)
@@ -1407,5 +1455,3 @@ def getCodeFromParamStr(val):
     tmp = re.sub(r"^(\$)+", '', val)  # remove leading $, if any
     tmp2 = re.sub(r"([^\\])(\$)+", r"\1", tmp)  # remove all nonescaped $, squash $$$$$
     return re.sub(r"[\\]\$", '$', tmp2)  # remove \ from all \$
-
-
