@@ -913,6 +913,8 @@ class Device(ioObject):
             clearEvents=args[1]
         else:
             eventTypeID=kwargs.get('event_type_id',None)
+            if eventTypeID is None:
+                eventTypeID=kwargs.get('event_type',None)    
             clearEvents=kwargs.get('clearEvents',True)
 
         currentEvents=[]
@@ -926,7 +928,7 @@ class Device(ioObject):
                 self.clearEvents()
 
         if len(currentEvents)>0:
-            sorted(currentEvents, key=itemgetter(DeviceEvent.EVENT_HUB_TIME_INDEX))
+            currentEvents=sorted(currentEvents, key=itemgetter(DeviceEvent.EVENT_HUB_TIME_INDEX))
         return currentEvents
 
 
@@ -974,11 +976,7 @@ class Device(ioObject):
         return self._is_reporting_events
 
     def _handleEvent(self,e):
-        etypelist=self._iohub_event_buffer.get(e[DeviceEvent.EVENT_TYPE_ID_INDEX],None)
-        if etypelist is None:
-            self._iohub_event_buffer[e[DeviceEvent.EVENT_TYPE_ID_INDEX]]=[e,]
-        else:
-            etypelist.append(e)
+        self._iohub_event_buffer.setdefault(e[DeviceEvent.EVENT_TYPE_ID_INDEX],[]).append(e)
         
     def _getNativeEventBuffer(self):
         return self._native_event_buffer
@@ -988,16 +986,8 @@ class Device(ioObject):
             self._native_event_buffer.append(e)
 
     def _addEventListener(self,l,eventTypeIDs):
-        lca=0
         for ei in eventTypeIDs:
-            if ei not in self._event_listeners:
-                self._event_listeners[ei]=[l,]
-                lca+1
-            else:
-                if l not in self._event_listeners[ei]:
-                    self._event_listeners[ei].append(l)
-                    lca+1
-        return lca == len(eventTypeIDs)
+            self._event_listeners.setdefault(ei,[]).append(l)
     
     def _removeEventListener(self,l):
         for etypelisteners in self._event_listeners.values():

@@ -9,7 +9,6 @@ from collections import Iterable
 
 from exception_tools import ioHubConnectionException, ioHubServerError, printExceptionDetailsToStdErr, print2err, createErrorResult, ioHubError
 from psychopy.clock import MonotonicClock, monotonicClock
-getTime = monotonicClock.getTime
 
 # Path Update / Location functions
 
@@ -75,8 +74,8 @@ else:
 
 ########################
 #
-# Resursive updating of values from one dict into another if the key foes not key exist.
-# Supported nexted dicts and uses deep copy when setting values in thge target dict.
+# Resursive updating of values from one dict into another if the key does not key exist.
+# Supported nested dicts and uses deep copy when setting values in the target dict.
     
 import copy
 def updateDict(add_to,add_from):
@@ -109,7 +108,7 @@ else:
 
 from variableProvider import ExperimentVariableProvider
 
-from visualUtil import FullScreenWindow, SinusoidalMotion
+from visualUtil import SinusoidalMotion
 from visualUtil import TimeTrigger,DeviceEventTrigger
 from visualUtil import ScreenState,ClearScreen,InstructionScreen,ImageScreen
 
@@ -362,7 +361,7 @@ def rotate2D(pts,origin,ang=pi/4):
 
 from variableProvider import ExperimentVariableProvider
 
-from visualUtil import FullScreenWindow, SinusoidalMotion
+from visualUtil import SinusoidalMotion
 from visualUtil import TimeTrigger,DeviceEventTrigger
 from visualUtil import ScreenState,ClearScreen,InstructionScreen,ImageScreen
 from dialogs import ProgressBarDialog, MessageDialog, FileDialog, ioHubDialog

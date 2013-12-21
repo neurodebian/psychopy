@@ -87,7 +87,8 @@ class SettingsComponent:
             buff.writeIndented("expName = %s  # from the Builder filename that created this script\n" %(self.params['expName']))
         expInfo = self.params['Experiment info'].val.strip()
         if not len(expInfo): expInfo = '{}'
-        try: eval('dict('+expInfo+')')
+        try:
+            expInfoDict = eval('dict(' + expInfo + ')')
         except SyntaxError, err:
             logging.error('Builder Expt: syntax error in "Experiment info" settings (expected a dict)')
             raise SyntaxError, 'Builder: error in "Experiment info" settings (expected a dict)'
@@ -103,13 +104,13 @@ class SettingsComponent:
         buff.writeIndentedLines("\n# Setup files for saving\n")
         buff.writeIndented("if not os.path.isdir('%s'):\n" % saveToDir)
         buff.writeIndented("    os.makedirs('%s')  # if this fails (e.g. permissions) we will get error\n" % saveToDir)
-        if 'participant' in self.params['Experiment info'].val:
+        if 'participant' in expInfoDict:
             buff.writeIndented("filename = '" + saveToDir + "' + os.path.sep + '%s_%s' %(expInfo['participant'], expInfo['date'])\n")
-        elif 'Participant' in self.params['Experiment info'].val:
+        elif 'Participant' in expInfoDict:
             buff.writeIndented("filename = '" + saveToDir + "' + os.path.sep + '%s_%s' %(expInfo['Participant'], expInfo['date'])\n")
-        elif 'Subject' in self.params['Experiment info'].val:
+        elif 'Subject' in expInfoDict:
             buff.writeIndented("filename = '" + saveToDir + "' + os.path.sep + '%s_%s' %(expInfo['Subject'], expInfo['date'])\n")
-        elif 'Observer' in self.params['Experiment info'].val:
+        elif 'Observer' in expInfoDict:
             buff.writeIndented("filename = '" + saveToDir + "' + os.path.sep + '%s_%s' %(expInfo['Observer'], expInfo['date'])\n")
         else:
             buff.writeIndented("filename = '" + saveToDir + "' + os.path.sep + '%s' %(expInfo['date'])\n")
@@ -127,6 +128,9 @@ class SettingsComponent:
         buff.writeIndented("    savePickle=%(Save psydat file)s, saveWideText=%(Save wide csv file)s,\n" %self.params)
         buff.writeIndented("    dataFileName=filename)\n")
 
+    def writeWindowCode(self,buff):
+        """ setup the window code
+        """
         buff.writeIndentedLines("\n# Setup the Window\n")
         #get parameters for the Window
         fullScr = self.params['Full-screen window'].val
@@ -136,15 +140,14 @@ class SettingsComponent:
            for thisComp in thisRoutine: #a single routine is a list of components
                if thisComp.type=='Aperture': allowStencil = True
                if thisComp.type=='RatingScale': allowGUI = True # to have a mouse; BUT might not want it shown in other routines
-
-        
+               
         requestedScreenNumber = int(self.params['Screen'].val)
         if requestedScreenNumber > wx.Display.GetCount():
             logging.warn("Requested screen can't be found. Writing script using first available screen.")
             screenNumber = 0
         else:
             screenNumber = requestedScreenNumber-1 #computer has 1 as first screen
-        
+
         if fullScr:
             size = wx.Display(screenNumber).GetGeometry()[2:4]
         else:
@@ -160,6 +163,14 @@ class SettingsComponent:
         if 'microphone' in self.exp.psychopyLibs: # need a pyo Server
             buff.writeIndentedLines("\n# Enable sound input/output:\n"+
                                 "microphone.switchOn()\n")
+
+        buff.writeIndented("# store frame rate of monitor if we can measure it successfully\n")
+        buff.writeIndented("expInfo['frameRate']=win.getActualFrameRate()\n")
+        buff.writeIndented("if expInfo['frameRate']!=None:\n")
+        buff.writeIndented("    frameDur = 1.0/round(expInfo['frameRate'])\n")
+        buff.writeIndented("else:\n")
+        buff.writeIndented("    frameDur = 1.0/60.0 # couldn't get a reliable measure so guess\n")
+
     def writeEndCode(self,buff):
         """write code for end of experiment (e.g. close log file)
         """

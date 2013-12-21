@@ -67,6 +67,10 @@ try:
             cls._names.update(dict([(v,k) for k,v in cls._names.iteritems()]))
             cls._initialized=True
      
+        @classmethod
+        def getConstants(cls):
+            return cls._names
+            
     class EventConstants(Constants):
         """
         EventConstants provides access to the ioHub Device Event type constants, 
@@ -109,6 +113,11 @@ try:
         MOUSE_MOVE=36
         MOUSE_DRAG=37
         
+        TOUCH=40
+        TOUCH_MOVE=41
+        TOUCH_PRESS=42
+        TOUCH_RELEASE=43
+        
         EYETRACKER=50
         MONOCULAR_EYE_SAMPLE=51
         BINOCULAR_EYE_SAMPLE=52
@@ -121,7 +130,7 @@ try:
     
         GAMEPAD_STATE_CHANGE=81
         GAMEPAD_DISCONNECT=82
-    
+        
         MULTI_CHANNEL_ANALOG_INPUT=122
     
         MESSAGE=151
@@ -160,6 +169,15 @@ try:
 
             #: Constant for a Mouse Drag Event.
             MOUSE_DRAG=37
+
+            #: Constant for a Touch motion Event.
+            TOUCH_MOVE=41
+
+            #: Constant for an initial Touch press Event.
+            TOUCH_PRESS=42
+
+            #: Constant for a Touch release Event.
+            TOUCH_RELEASE=43
             
             #: Constant for an Eye Tracker Monocular Sample Event.
             MONOCULAR_EYE_SAMPLE=51
@@ -187,7 +205,7 @@ try:
         
             #: Constant for a Gamepad Event.
             GAMEPAD_STATE_CHANGE=81
-        
+
             #: Constant for an Eight Channel Analog Input Sample Event.
             MULTI_CHANNEL_ANALOG_INPUT=122
         
@@ -216,6 +234,7 @@ try:
                         break
                 
                 if event_id not in cls._classes.keys():
+                        from psychopy.iohub import print2err
                         print2err("\t*** ERROR ADDING EVENT CLASSS MAPPING: Could not find class: ",event_constant_string, " = ",event_id)
     
     EventConstants.initialize()
@@ -248,7 +267,12 @@ try:
         OTHER = 1
         KEYBOARD = 20
         MOUSE = 30
+        TOUCH=40
         EYETRACKER = 50
+        NETWORK=60
+        EVENTPUBLISHER=61
+        REMOTEEVENTSUBSCRIBER=62
+        
         XINPUT= 70
         GAMEPAD=80
         ANALOGINPUT = 120
@@ -267,9 +291,18 @@ try:
 
             #: Constant for a Mouse Device.
             MOUSE = 30
+            
+            #: Constant for a Touch Device.
+            TOUCH = 40
 
             #: Constant for an EyeTracker Device.
             EYETRACKER = 50
+
+            #: Constant for a Network Device
+            EVENTPUBLISHER=61
+            
+            #: Constant for a Network Device
+            REMOTEEVENTSUBSCRIBER=62
 
             XINPUT= 70
 
