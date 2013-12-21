@@ -1,3 +1,9 @@
+psychopy (1.79.00+git16-g30c9343.dfsg-1) unstable; urgency=low
+
+  * New release (+ post-release fixes)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sat, 21 Dec 2013 10:54:21 -0500
+
 psychopy (1.77.02.dfsg-1) unstable; urgency=low
 
   * New upstream bugfix release
