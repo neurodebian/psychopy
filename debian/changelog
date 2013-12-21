@@ -4,6 +4,8 @@ psychopy (1.79.00+git16-g30c9343.dfsg-1) unstable; urgency=low
   * debian/patches
     - deb_no_post_inst -- upstream does it correctly now
     - update_matplotlib_test (from Mike Hymers) to address missing nxutils
+  * debian/control
+    - add python-pytest to build-depends (thanks Mark again)
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Sat, 21 Dec 2013 10:54:21 -0500
 
