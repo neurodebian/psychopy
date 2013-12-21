@@ -1,2 +1,3 @@
 deb_do_not_regenerate_init
 deb_use_system_serial
+update_matplotlib_test

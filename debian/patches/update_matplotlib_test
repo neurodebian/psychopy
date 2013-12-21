@@ -1,0 +1,75 @@
+From: Yaroslav Halchenko <debian@onerussian.com>
+Author: Mark Hymers <mhy@debian.org>
+Subject: no more nxutils in recent matplotlib
+
+Last-Update: 2013-12-21
+
+diff --git a/psychopy/tests/test_all_visual/test_contains_overlaps.py b/psychopy/tests/test_all_visual/test_contains_overlaps.py
+index c57e861..ac8da75 100644
+--- a/psychopy/tests/test_all_visual/test_contains_overlaps.py
++++ b/psychopy/tests/test_all_visual/test_contains_overlaps.py
+@@ -99,9 +99,6 @@ def contains_overlaps(testType):
+ 
+         win.close()
+ 
+-mpl_version = matplotlib.__version__
+-from matplotlib import nxutils
+-
+ @pytest.mark.polygon
+ def test_point():
+     poly1 = [(1,1), (1,-1), (-1,-1), (-1,1)]
+@@ -110,36 +107,38 @@ def test_point():
+     assert helpers.pointInPolygon(12, 12, poly1) == False
+     assert helpers.pointInPolygon(0, 0, [(0,0), (1,1)]) == False
+ 
+-    helpers.nxutils = nxutils
+-    matplotlib.__version__ = '1.1'  # matplotlib.nxutils
++    # matplotlib
++    helpers.haveMatplotlib = True
+     assert helpers.polygonsOverlap(poly1, poly2)
+-    del(helpers.nxutils)
+ 
+-    matplotlib.__version__ = '0.0'    # pure python
++    # pure python
++    helpers.haveMatplotlib = False
+     assert helpers.polygonsOverlap(poly1, poly2)
+-    matplotlib.__version__ = mpl_version
++    helpers.haveMatplotlib = True
+ 
+ @pytest.mark.polygon
+ def test_contains():
+     contains_overlaps('contains')  # matplotlib.path.Path
+-    helpers.nxutils = nxutils
+-    matplotlib.__version__ = '1.1'  # matplotlib.nxutils
++
++    # matplotlib
++    helpers.haveMatplotlib = True
+     contains_overlaps('overlaps')
+-    del(helpers.nxutils)
+-    matplotlib.__version__ = '0.0'  # pure python
++
++    # pure python
++    helpers.haveMatplotlib = False
+     contains_overlaps('contains')
+-    matplotlib.__version__ = mpl_version
++    helpers.haveMatplotlib = True
+ 
+ @pytest.mark.polygon
+ def test_overlaps():
+-    contains_overlaps('overlaps')  # matplotlib.path.Path
+-    helpers.nxutils = nxutils
+-    matplotlib.__version__ = '1.1'  # matplotlib.nxutils
++    # matplotlib version
++    helpers.haveMatplotlib = True
+     contains_overlaps('overlaps')
+-    del(helpers.nxutils)
+-    matplotlib.__version__ = '0.0'  # pure python
++
++    # python version
++    helpers.haveMatplotlib = False
+     contains_overlaps('overlaps')
+-    matplotlib.__version__ = mpl_version
++    helpers.haveMatplotlib = True
+ 
+ if __name__=='__main__':
+     test_contains_overlaps('contains')
