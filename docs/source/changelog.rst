@@ -20,11 +20,25 @@ Changelog
 PsychoPy 1.80
 ------------------------------
 
+PsychoPy 1.80.02
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Released April 2014
+
+* FIXED: ImageStim did not use its mask on some machines (nVidia and ATI?) or did not render at all on others (intel graphics?)
+* CHANGED: Sound object now checks if the sound is a note name before checking for file names (only affects cases where the file name was something like A.wav)
+* ADDED: Aperture now supports contains() and overlaps() methods
+* ADDED: Image/Grating masks can now also be 'cross' (Suddha Sourav)
+* FIXED: Unicode problem for microphone on non-English installs of win32
+* FIXED: StairHandler first reversal now changes step size correctly and added option not to use the initial 1-up,1-down regime (Jon maintains that you should though!) (thanks Nathanael Larigaldie)
+* FIXED: emulator LaunchScan uses new RatingScale syntax
+
 PsychoPy 1.80.01
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Released Mar 2014
 
+* FIXED: buglet with movie glPopAttrib() on Intel gfx cards (thanks Bryan Cort)
 * FIXED: problem trying to use FrameBufferObject (FBO) on Intel GMA graphics cards
 * FIXED: problem with ImageStim not respecting setColor() and setContrast()
 * FIXED: some stimuli were failing to switch to a second window when requested
