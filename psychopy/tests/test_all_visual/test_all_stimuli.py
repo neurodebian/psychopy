@@ -80,6 +80,43 @@ class _baseVisualTest:
         imageStim.draw()
         utils.compareScreenshot('greyscale_%s.png' %(self.contextName), win)
         str(imageStim) #check that str(xxx) is working
+        win.flip()
+        imageStim.setColor([0.1,0.1,0.1])
+        imageStim.draw()
+        utils.compareScreenshot('greyscaleLowContr_%s.png' %(self.contextName), win)
+        win.flip()
+        imageStim.color = 1
+        imageStim.contrast = 0.1#should have identical effect to color=0.1
+        imageStim.draw()
+        utils.compareScreenshot('greyscaleLowContr_%s.png' %(self.contextName), win)
+
+    def test_numpyTexture(self):
+        win = self.win
+        grating = filters.makeGrating(res=64, ori=20.0,
+                                     cycles=3.0, phase=0.5,
+                                     gratType='sqr', contr=1.0)
+        imageStim = visual.ImageStim(win, image=grating, autoLog=False,
+                                     size = 3*self.scaleFactor,
+                                     interpolate=True)
+        imageStim.draw()
+
+        if self.win.winType=='pygame':
+            pytest.xfail("Numpy texture is wrong polarity on pygame?")
+        utils.compareScreenshot('numpyImage_%s.png' %(self.contextName), win)
+        str(imageStim) #check that str(xxx) is working
+        win.flip()
+        #set lowcontrast using color
+        imageStim.setColor([0.1,0.1,0.1])
+        imageStim.draw()
+        utils.compareScreenshot('numpyLowContr_%s.png' %(self.contextName), win)
+        win.flip()
+        #now try low contrast using contr
+        imageStim.color = 1
+        imageStim.contrast = 0.1#should have identical effect to color=0.1
+        imageStim.draw()
+        utils.compareScreenshot('numpyLowContr_%s.png' %(self.contextName), win)
+        win.flip()
+
     def test_gabor(self):
         win = self.win
         #using init
@@ -306,7 +343,7 @@ class _baseVisualTest:
             "dots.verticesPix failed to change after dots.setPos()"
     def test_element_array(self):
         win = self.win
-        if not win._haveShaders or utils._under_xvfb:
+        if not win._haveShaders:
             pytest.skip("ElementArray requires shaders, which aren't available")
         #using init
         thetas = numpy.arange(0,360,10)
@@ -335,8 +372,6 @@ class _baseVisualTest:
         grating.setOri(90, log=False)
         grating.setColor('black', log=False)
         grating.draw()
-        if utils._under_xvfb:
-            pytest.xfail("not clear why fails under Xvfb") # skip late so we smoke test t
         utils.compareScreenshot('aperture1_%s.png' %(self.contextName), win)
         #aperture should automatically disable on exit
     def test_rating_scale(self):
@@ -350,8 +385,6 @@ class _baseVisualTest:
                         marker='glow', markerStart=0.7, markerColor='darkBlue', autoLog=False)
         str(rs) #check that str(xxx) is working
         rs.draw()
-        if self.win.winType=='pyglet' and utils._under_xvfb:
-            pytest.xfail("not clear why fails under Xvfb") # skip late so we smoke test the code
         utils.compareScreenshot('ratingscale1_%s.png' %(self.contextName), win, crit=30.0)
         win.flip()#AFTER compare screenshot
     def test_refresh_rate(self):
@@ -359,7 +392,7 @@ class _baseVisualTest:
             pytest.skip("getMsPerFrame seems to crash the testing of pygame")
         #make sure that we're successfully syncing to the frame rate
         msPFavg, msPFstd, msPFmed = visual.getMsPerFrame(self.win,nFrames=60, showVisual=True)
-        utils.skip_under_xvfb()             # skip late so we smoke test the code
+        utils.skip_under_travis()             # skip late so we smoke test the code
         assert (1000/150.0 < msPFavg < 1000/40.0), \
             "Your frame period is %.1fms which suggests you aren't syncing to the frame" %msPFavg
 
@@ -422,6 +455,28 @@ class TestPygletDeg(_baseVisualTest):
             units='deg', autoLog=False)
         self.contextName='deg'
         self.scaleFactor=2#applied to size/pos values
+class TestPygletDegFlat(_baseVisualTest):
+    @classmethod
+    def setup_class(self):
+        mon = monitors.Monitor('testMonitor')
+        mon.setDistance(10.0) #exagerate the effect of flatness by setting the monitor close
+        mon.setWidth(40.0)
+        mon.setSizePix([1024,768])
+        self.win = visual.Window([128,128], monitor=mon, winType='pyglet', pos=[50,50], allowStencil=True,
+            units='degFlat', autoLog=False)
+        self.contextName='degFlat'
+        self.scaleFactor=4#applied to size/pos values
+class TestPygletDegFlatPos(_baseVisualTest):
+    @classmethod
+    def setup_class(self):
+        mon = monitors.Monitor('testMonitor')
+        mon.setDistance(10.0) #exagerate the effect of flatness by setting the monitor close
+        mon.setWidth(40.0)
+        mon.setSizePix([1024,768])
+        self.win = visual.Window([128,128], monitor=mon, winType='pyglet', pos=[50,50], allowStencil=True,
+            units='degFlatPos', autoLog=False)
+        self.contextName='degFlatPos'
+        self.scaleFactor=4#applied to size/pos values
 class TestPygameNorm(_baseVisualTest):
     @classmethod
     def setup_class(self):
