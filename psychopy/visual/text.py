@@ -1,10 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 '''Class of text stimuli to be displayed in a :class:`~psychopy.visual.Window`
 '''
 
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 import os
@@ -20,13 +20,15 @@ import ctypes
 GL = pyglet.gl
 
 import psychopy  # so we can get the __path__
-from psychopy import logging
+from psychopy import logging, core
 import psychopy.event
 
 # tools must only be imported *after* event or MovieStim breaks on win32
 # (JWP has no idea why!)
-from psychopy.tools.monitorunittools import cm2pix, deg2pix
+from psychopy.tools.monitorunittools import cm2pix, deg2pix, convertToPix
+from psychopy.tools.attributetools import logAttrib
 from psychopy.visual.basevisual import BaseVisualStim
+from psychopy.visual.basevisual import ColorMixin
 
 import numpy
 
@@ -36,8 +38,28 @@ try:
 except:
     havePygame = False
 
+defaultLetterHeight = {'cm': 1.0,
+                     'deg': 1.0,
+                     'degs': 1.0,
+                     'degFlatPos': 1.0,
+                     'degFlat': 1.0,
+                     'norm': 0.1,
+                     'height': 0.2,
+                     'pix': 20,
+                     'pixels': 20,
+                     }
+defaultWrapWidth = {'cm': 15.0,
+                     'deg': 15.0,
+                     'degs': 15.0,
+                     'degFlatPos': 15.0,
+                     'degFlat': 15.0,
+                     'norm': 1,
+                     'height': 1,
+                     'pix': 500,
+                     'pixels': 500,
+                     }
 
-class TextStim(BaseVisualStim):
+class TextStim(BaseVisualStim, ColorMixin):
     """Class of text stimuli to be displayed in a :class:`~psychopy.visual.Window`
     """
     def __init__(self, win,
@@ -89,7 +111,12 @@ class TextStim(BaseVisualStim):
             flipVert : boolean
                 Mirror-reverse the text in the up-down direction
         """
-        BaseVisualStim.__init__(self, win, units=units, name=name, autoLog=autoLog)
+
+        #what local vars are defined (these are the init params) for use by __repr__
+        self._initParams = dir()
+        self._initParams.remove('self')
+
+        super(TextStim, self).__init__(win, units=units, name=name, autoLog=False)
 
         self.useShaders = win._haveShaders  #use shaders if available by default, this is a good thing
         self._needUpdate = True
@@ -101,7 +128,6 @@ class TextStim(BaseVisualStim):
         self.text='' #NB just a placeholder - real value set below
         self.depth=depth
         self.ori=ori
-        self.wrapWidth=wrapWidth
         self.flipHoriz = flipHoriz
         self.flipVert = flipVert
         self._pygletTextObj=None
@@ -109,38 +135,20 @@ class TextStim(BaseVisualStim):
         self.pos= numpy.array(pos, float)
 
         #height in pix (needs to be done after units which is done during _Base.__init__)
-        if self.units=='cm':
-            if height==None: self.height = 1.0#default text height
-            else: self.height = height
-            self.heightPix = cm2pix(self.height, win.monitor)
-        elif self.units in ['deg', 'degs']:
-            if height==None: self.height = 1.0
-            else: self.height = height
-            self.heightPix = deg2pix(self.height, win.monitor)
-        elif self.units=='norm':
-            if height==None: self.height = 0.1
-            else: self.height = height
-            self.heightPix = self.height*win.size[1]/2
-        elif self.units=='height':
-            if height==None: self.height = 0.2
-            else: self.height = height
-            self.heightPix = self.height*win.size[1]
-        else: #treat units as pix
-            if height==None: self.height = 20
-            else: self.height = height
-            self.heightPix = self.height
+        if height==None:
+            if self.units in defaultLetterHeight:
+                height = defaultLetterHeight[self.units]
+            else:
+                raise AttributeError, "TextStim does now know a default letter height for units %s" %(repr(self.units))
+        if wrapWidth==None:
+            if self.units in defaultWrapWidth:
+                wrapWidth = defaultWrapWidth[self.units]
+            else:
+                raise AttributeError, "TextStim does now know a default wrap width for units %s" %(repr(self.units))
 
-        if self.wrapWidth ==None:
-            if self.units in ['height','norm']: self.wrapWidth=1
-            elif self.units in ['deg', 'degs']: self.wrapWidth=15
-            elif self.units=='cm': self.wrapWidth=15
-            elif self.units in ['pix', 'pixels']: self.wrapWidth=500
-        if self.units=='norm': self._wrapWidthPix= self.wrapWidth*win.size[0]/2
-        elif self.units=='height': self._wrapWidthPix= self.wrapWidth*win.size[0]
-        elif self.units in ['deg', 'degs']: self._wrapWidthPix= deg2pix(self.wrapWidth, win.monitor)
-        elif self.units=='cm': self._wrapWidthPix= cm2pix(self.wrapWidth, win.monitor)
-        elif self.units in ['pix', 'pixels']: self._wrapWidthPix=self.wrapWidth
-
+        #treat letter height and wrapWidth as vertices (in degFlatPos they should not be 'corrected')
+        wh = convertToPix(pos = numpy.array([0,0]), vertices=numpy.array([wrapWidth,height]), units=self.units, win=self.win)
+        self._wrapWidthPix, self.heightPix = wh
         #generate the texture and list holders
         self._listID = GL.glGenLists(1)
         if not self.win.winType=="pyglet":#pygame text needs a surface to render to
@@ -154,14 +162,18 @@ class TextStim(BaseVisualStim):
         else:
             self.setColor(color, log=False)
 
-        self._calcPosRendered()
         for thisFont in fontFiles:
             pyglet.font.add_file(thisFont)
         self.setFont(font, log=False)
         self.opacity = float(opacity)
         self.contrast = float(contrast)
-        self.setText(text, log=False) #self.width and self.height get set with text and calcSizeRednered is called
+        self.setText(text, log=False) #self.width and self.height get set with text and calcSizeRendered is called
         self._needUpdate = True
+
+        #set autoLog (now that params have been initialised)
+        self.autoLog= autoLog
+        if autoLog:
+            logging.exp("Created %s = %s" %(self.name, str(self)))
 
     def __del__(self):
         GL.glDeleteLists(self._listID, 1)
@@ -170,32 +182,12 @@ class TextStim(BaseVisualStim):
         """Set the height of the letters (including the entire box that surrounds the letters
         in the font). The width of the letters is then defined by the font.
         """
-        #height in pix (needs to be done after units)
-        if self.units=='cm':
-            if height==None: self.height = 1.0#default text height
-            else: self.height = height
-            self.heightPix = cm2pix(self.height, self.win.monitor)
-        elif self.units in ['deg', 'degs']:
-            if height==None: self.height = 1.0
-            else: self.height = height
-            self.heightPix = deg2pix(self.height, self.win.monitor)
-        elif self.units=='norm':
-            if height==None: self.height = 0.1
-            else: self.height = height
-            self.heightPix = self.height*self.win.size[1]/2
-        elif self.units=='height':
-            if height==None: self.height = 0.2
-            else: self.height = height
-            self.heightPix = self.height*self.win.size[1]
-        else: #treat units as pix
-            if height==None: self.height = 20
-            else: self.height = height
-            self.heightPix = self.height
+        self.heightPix = convertToPix(pos = numpy.array([0,0]),
+                                      vertices=numpy.array([0,height]),
+                                      units=self.units, win=self.win)[1]
         #need to update the font to reflect the change
         self.setFont(self.fontname, log=False)
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s height=%.2f" %(self.name, height),
-                level=logging.EXP,obj=self)
+        logAttrib(self, log, 'height', height)
     def setFont(self, font, log=True):
         """Set the font to be used for text rendering.
         font should be a string specifying the name of the font (in system resources)
@@ -238,9 +230,7 @@ class TextStim(BaseVisualStim):
                     self._font = pygame.font.SysFont(self.fontname, int(self.heightPix), italic=self.italic, bold=self.bold)
         #re-render text after a font change
         self._needSetText=True
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s font=%s" %(self.name, self.fontname),
-                level=logging.EXP,obj=self)
+        logAttrib(self, log, 'font', self.fontname)
 
     def setText(self,text=None, log=True):
         """Set the text to be rendered using the current font
@@ -252,9 +242,7 @@ class TextStim(BaseVisualStim):
         else:
             self._setTextNoShaders(text)
         self._needSetText=False
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s text=%s" %(self.name, text),
-                level=logging.EXP,obj=self)
+        logAttrib(self, log, 'text', text)
     def setRGB(self, text, operation='', log=True):
         self._set('rgb', text, operation, log=log)
         if not self.useShaders:
@@ -307,8 +295,8 @@ class TextStim(BaseVisualStim):
                 thisStim.setColor(-1, 'rgb', '*') #multiply the color by -1 (which in this space inverts the contrast)
                 thisStim.setColor([10,0,0], 'dkl', '+')#raise the elevation from the isoluminant plane by 10 deg
         """
-        #call setColor from super class
-        BaseVisualStim.setColor(self, color, colorSpace=colorSpace,
+        #call setColor from super class to avoid recursion:
+        ColorMixin.setColor(self, color, colorSpace=colorSpace,
             operation=operation, log=log)
         #but then update text objects if necess
         if not self.useShaders:
@@ -511,23 +499,32 @@ class TextStim(BaseVisualStim):
         Note that this is relative to the original, not relative to the current state.
         """
         self.flipHoriz = newVal
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s flipHoriz=%s" % (self.name, newVal),
-                level=logging.EXP, obj=self)
+        logAttrib(self, log, 'flipHoriz')
     def setFlipVert(self, newVal=True, log=True):
         """If set to True then the text will be flipped vertically (top-to-bottom).
         Note that this is relative to the original, not relative to the current state.
         """
         self.flipVert = newVal
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s flipVert=%s" % (self.name, newVal),
-                level=logging.EXP, obj=self)
+        logAttrib(self, log, 'flipVert')
     def setFlip(self, direction, log=True):
         """(used by Builder to simplify the dialog)"""
         if direction == 'vert':
             self.setFlipVert(True, log=log)
         elif direction == 'horiz':
             self.setFlipHoriz(True, log=log)
+
+    @property
+    def posPix(self):
+        """This determines the coordinates in pixels of the position for the
+        current stimulus, accounting for pos and units. This property should
+        automatically update if `pos` is changed
+        """
+        #because this is a property getter we can check /on-access/ if it needs updating :-)
+        if self._needVertexUpdate:
+            self.__dict__['posPix'] = convertToPix(vertices = [0,0], pos = self.pos, units=self.units, win = self.win)
+        self._needVertexUpdate = False
+        return self.__dict__['posPix']
+
     def draw(self, win=None):
         """
         Draw the stimulus in its relevant window. You must call
@@ -543,8 +540,9 @@ class TextStim(BaseVisualStim):
         GL.glPushMatrix()
         GL.glLoadIdentity()#for PyOpenGL this is necessary despite pop/PushMatrix, (not for pyglet)
         #scale and rotate
-        prevScale = win.setScale(self._winScale)#to units for translations
-        GL.glTranslatef(self._posRendered[0],self._posRendered[1],0)#NB depth is set already
+        prevScale = win.setScale('pix')#to units for translations
+        posPix = self.posPix
+        GL.glTranslatef(posPix[0], posPix[1],0)#NB depth is set already
         GL.glRotatef(-self.ori,0.0,0.0,1.0)
         win.setScale('pix', None, prevScale)#back to pixels for drawing surface
         GL.glScalef((1,-1)[self.flipHoriz], (1,-1)[self.flipVert], 1)  # x,y,z; -1=flipped

@@ -4,15 +4,9 @@ PsychoPy is an open-source application to allow the presentation of stimuli and 
 News
 ====================
 
-**Latest stable version**: 1.77.02 was released July 2013, with several performance improvements. See complete :doc:`changelog`
+**Latest version**: 1.80.05 was released June 2014, with many improvements to the user interface (e.g. dialog boxes), more precise degrees of visual angle (optionally correct for flat panels) and many bug fixes
 
-**Cutting edge version**: 1.78.00 was released Aug 2013. Adds :ref:`static` to allow pre-loading of images, and Shape Component for standard geometric shapes
-
-**Upcoming Workshops**:
-        
-    :ref:`P4N`
-    
-        There will be a 3-day Python Workshop in April 2014 at Nottingham University, with **novice** and **intermediate** streams. We'll follow that with 2 days of a 'code sprint' for developers of PsychoPy. Limited spaces, so book now at `Nottingham's online store <http://store.nottingham.ac.uk/browse/extra_info.asp?compid=1&modid=2&catid=49&prodid=323>`_. 
+See complete :doc:`changelog` for complete list of additions and fixes
 
 .. title:: Home
 

@@ -1,11 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 '''This stimulus class defines a field of elements whose behaviour can be
 independently controlled. Suitable for creating 'global form' stimuli or more
 detailed random dot stimuli.'''
 
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 # Ensure setting pyglet.options['debug_gl'] to False is done prior to any
@@ -23,17 +23,15 @@ from psychopy import logging
 # tools must only be imported *after* event or MovieStim breaks on win32
 # (JWP has no idea why!)
 from psychopy.tools.arraytools import val2array
-from psychopy.tools.attributetools import setWithOperation
-from psychopy.tools.monitorunittools import cm2pix, deg2pix
-from psychopy.visual.helpers import setColor, createTexture
-
-global currWindow
-currWindow = None
+from psychopy.tools.attributetools import setWithOperation, logAttrib
+from psychopy.tools.monitorunittools import convertToPix
+from psychopy.visual.helpers import setColor
+from psychopy.visual.basevisual import MinimalStim, TextureMixin
+from . import glob_vars
 
 import numpy
 
-
-class ElementArrayStim(object):
+class ElementArrayStim(MinimalStim, TextureMixin):
     """
     This stimulus class defines a field of elements whose behaviour can be independently
     controlled. Suitable for creating 'global form' stimuli or more detailed random dot
@@ -120,7 +118,10 @@ class ElementArrayStim(object):
                 elements)
 
             oris :
-                the orientations of the elements (Nx1 or a single value)
+                the orientations of the elements (Nx1 or a single value). oris
+                are in degrees, and can be greater than 360 and smaller than 0.
+                An ori of 0 is vertical, and increasing ori values are
+                increasingly clockwise.
 
             sfs :
                 the spatial frequencies of the elements (Nx1, Nx2 or a single
@@ -151,28 +152,31 @@ class ElementArrayStim(object):
                 this stim
 
         """
+        #what local vars are defined (these are the init params) for use by __repr__
+        self._initParams = dir()
+        self._initParams.remove('self')
+        super(ElementArrayStim, self).__init__(name=name, autoLog=False)
+
+        self.autoLog=False #until all params are set
         self.win=win
         self.name=name
-        self.autoLog=autoLog
 
         #unit conversions
         if units!=None and len(units): self.units = units
         else: self.units = win.units
-        if self.units in ['norm','height']: self._winScale=self.units
-        else: self._winScale='pix' #set the window to have pixels coords
         self.fieldPos = fieldPos
         self.fieldSize = fieldSize
         self.fieldShape = fieldShape
         self.nElements = nElements
         #info for each element
         self.sizes = sizes
-        self.xys= xys
+        self.xys = self.verticesBase = xys
         self.opacities = opacities
         self.oris = oris
         self.contrs = contrs
         self.phases = phases
-        self.needVertexUpdate=True
-        self.needColorUpdate=True
+        self._needVertexUpdate=True
+        self._needColorUpdate=True
         self.useShaders=True
         self.interpolate=interpolate
         self.fieldDepth=fieldDepth
@@ -209,17 +213,17 @@ class ElementArrayStim(object):
         self.setSizes(sizes, log=False) #set sizes before sfs (sfs may need it formatted)
         self.setSfs(sfs, log=False)
         self.setPhases(phases, log=False)
+        self._updateVertices()
 
-        self._calcFieldCoordsRendered()
-        self._calcSizesRendered()
-        self._calcXYsRendered()
+        self.autoLog= autoLog
+        if autoLog:
+            logging.exp("Created %s = %s" %(self.name, str(self)))
 
     def _selectWindow(self, win):
-        global currWindow
         #don't call switch if it's already the curr window
-        if win!=currWindow and win.winType=='pyglet':
+        if win!=glob_vars.currWindow and win.winType=='pyglet':
             win.winHandle.switch_to()
-            currWindow = win
+            glob_vars.currWindow = win
 
     def setXYs(self,value=None, operation='', log=True):
         """Set the xy values of the element centres (relative to the centre of the field).
@@ -259,10 +263,8 @@ class ElementArrayStim(object):
                 raise ValueError("New value for setXYs should be either None or Nx2")
             #set value
             setWithOperation(self, 'xys', value, operation)
-        self.needVertexUpdate=True
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s XYs=%s" %(self.name, type(value)),
-                level=logging.EXP,obj=self)
+        self._needVertexUpdate=True
+        logAttrib(self, log, 'XYs', type(value))
     def setOris(self,value,operation='', log=True):
         """Set the orientation for each element.
         Should either be a single value or an Nx1 array/list
@@ -281,11 +283,8 @@ class ElementArrayStim(object):
 
         #set value
         setWithOperation(self, 'oris', value, operation)
-
-        self.needVertexUpdate=True
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s oris=%s" %(self.name, type(value)),
-                level=logging.EXP,obj=self)
+        logAttrib(self, log, 'oris', type(value))
+        self._needVertexUpdate=True
     #----------------------------------------------------------------------
     def setSfs(self, value,operation='', log=True):
         """Set the spatial frequency for each element.
@@ -318,9 +317,7 @@ class ElementArrayStim(object):
 
         # Set value and log
         setWithOperation(self, 'sfs', value, operation)
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s sfs=%s" %(self.name, type(value)),
-                level=logging.EXP,obj=self)
+        logAttrib(self, log, 'sfs', type(value))
 
     def setOpacities(self,value,operation='', log=True):
         """Set the opacity for each element.
@@ -340,10 +337,7 @@ class ElementArrayStim(object):
 
         #set value and log
         setWithOperation(self, 'opacities', value, operation)
-        self.needColorUpdate =True
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s opacities=%s" %(self.name, type(value)),
-                level=logging.EXP,obj=self)
+        logAttrib(self, log, 'opacities', type(value))
     def setSizes(self,value,operation='', log=True):
         """Set the size for each element.
         Should either be:
@@ -368,13 +362,9 @@ class ElementArrayStim(object):
 
         #set value and log
         setWithOperation(self, 'sizes', value, operation)
-        self._calcSizesRendered()
-        self.needVertexUpdate=True
-        self.needTexCoordUpdate=True
-
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s sizes=%s" %(self.name, type(value)),
-                level=logging.EXP,obj=self)
+        logAttrib(self, log, 'sizes', type(value))
+        self._needVertexUpdate=True
+        self._needTexCoordUpdate=True
     def setPhases(self,value,operation='', log=True):
         """Set the phase for each element.
         Should either be:
@@ -400,11 +390,8 @@ class ElementArrayStim(object):
 
         #set value and log
         setWithOperation(self, 'phases', value, operation)
-        self.needTexCoordUpdate=True
-
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s phases=%s" %(self.name, type(value)),
-                level=logging.EXP,obj=self)
+        logAttrib(self, log, 'phases', type(value))
+        self._needTexCoordUpdate=True
     def setRgbs(self,value,operation='', log=True):
         """DEPRECATED (as of v1.74.00). Please use setColors() instead
         """
@@ -460,7 +447,7 @@ class ElementArrayStim(object):
             pass#all is good
         else:
             raise ValueError("New value for setRgbs should be either Nx1, Nx3 or a single value")
-        self.needColorUpdate=True
+        self._needColorUpdate=True
     def setContrs(self,value,operation='', log=True):
         """Set the contrast for each element.
         Should either be:
@@ -481,11 +468,8 @@ class ElementArrayStim(object):
 
         #set value and log
         setWithOperation(self, 'contrs', value, operation)
-        self.needColorUpdate=True
-
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s contrs=%s" %(self.name, type(value)),
-                level=logging.EXP,obj=self)
+        logAttrib(self, log, 'contrs', type(value))
+        self._needColorUpdate=True
     def setFieldPos(self,value,operation='', log=True):
         """Set the centre of the array (X,Y)
         """
@@ -498,15 +482,12 @@ class ElementArrayStim(object):
 
         #set value and log
         setWithOperation(self, 'fieldPos', value, operation)
-        self._calcFieldCoordsRendered()
-
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s fieldPos=%s" %(self.name, type(value)),
-                level=logging.EXP,obj=self)
+        logAttrib(self, log, 'fieldPos', type(value))
+        self._needVertexUpdate = True
     def setPos(self, newPos=None, operation='', units=None, log=True):
         """Obselete - users should use setFieldPos or instead of setPos
         """
-        logging.error("User called ElementArrayStim.setPos(pos). Use ElementArrayStim.SetFieldPos(pos) instead.")
+        logging.error("User called ElementArrayStim.setPos(pos). Use ElementArrayStim.setFieldPos(pos) instead.")
 
     def setFieldSize(self,value,operation='', log=True):
         """Set the size of the array on the screen (will override
@@ -521,11 +502,8 @@ class ElementArrayStim(object):
 
         #set value and log
         setWithOperation(self, 'fieldSize', value, operation)
+        logAttrib(self, log, 'fieldSize')
         self.setXYs(log=False)#to reflect new settings, overriding individual xys
-
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s fieldSize=%s" %(self.name,value),
-                level=logging.EXP,obj=self)
     def draw(self, win=None):
         """
         Draw the stimulus in its relevant window. You must call
@@ -536,11 +514,11 @@ class ElementArrayStim(object):
         if win==None: win=self.win
         self._selectWindow(win)
 
-        if self.needVertexUpdate:
-            self.updateElementVertices()
-        if self.needColorUpdate:
+        if self._needVertexUpdate:
+            self._updateVertices()
+        if self._needColorUpdate:
             self.updateElementColors()
-        if self.needTexCoordUpdate:
+        if self._needTexCoordUpdate:
             self.updateTextureCoords()
 
         #scale the drawing frame and get to centre of field
@@ -548,12 +526,10 @@ class ElementArrayStim(object):
         GL.glPushClientAttrib(GL.GL_CLIENT_ALL_ATTRIB_BITS)#push the data for client attributes
 
         #GL.glLoadIdentity()
-        self.win.setScale(self._winScale)
-
-        GL.glTranslatef(self._fieldPosRendered[0],self._fieldPosRendered[1],0)
+        self.win.setScale('pix')
 
         GL.glColorPointer(4, GL.GL_DOUBLE, 0, self._RGBAs.ctypes.data_as(ctypes.POINTER(ctypes.c_double)))
-        GL.glVertexPointer(3, GL.GL_DOUBLE, 0, self._visXYZvertices.ctypes.data_as(ctypes.POINTER(ctypes.c_double)))
+        GL.glVertexPointer(3, GL.GL_DOUBLE, 0, self.verticesPix.ctypes.data_as(ctypes.POINTER(ctypes.c_double)))
 
         #setup the shaderprogram
         GL.glUseProgram(self.win._progSignedTexMask)
@@ -578,7 +554,7 @@ class ElementArrayStim(object):
 
         GL.glEnableClientState(GL.GL_COLOR_ARRAY)
         GL.glEnableClientState(GL.GL_VERTEX_ARRAY)
-        GL.glDrawArrays(GL.GL_QUADS, 0, self._visXYZvertices.shape[0]*4)
+        GL.glDrawArrays(GL.GL_QUADS, 0, self.verticesPix.shape[0]*4)
 
         #unbind the textures
         GL.glActiveTexture(GL.GL_TEXTURE1)
@@ -597,50 +573,47 @@ class ElementArrayStim(object):
         GL.glPopClientAttrib()
         GL.glPopMatrix()
 
-    def _calcSizesRendered(self):
-        if self.units in ['norm','pix', 'height']: self._sizesRendered=self.sizes
-        elif self.units in ['deg', 'degs']: self._sizesRendered=deg2pix(self.sizes, self.win.monitor)
-        elif self.units=='cm': self._sizesRendered=cm2pix(self.sizes, self.win.monitor)
-    def _calcXYsRendered(self):
-        if self.units in ['norm','pix','height']: self._XYsRendered=self.xys
-        elif self.units in ['deg', 'degs']: self._XYsRendered=deg2pix(self.xys, self.win.monitor)
-        elif self.units=='cm': self._XYsRendered=cm2pix(self.xys, self.win.monitor)
-    def _calcFieldCoordsRendered(self):
-        if self.units in ['norm', 'pix','height']:
-            self._fieldSizeRendered=self.fieldSize
-            self._fieldPosRendered=self.fieldPos
-        elif self.units in ['deg', 'degs']:
-            self._fieldSizeRendered=deg2pix(self.fieldSize, self.win.monitor)
-            self._fieldPosRendered=deg2pix(self.fieldPos, self.win.monitor)
-        elif self.units=='cm':
-            self._fieldSizeRendered=cm2pix(self.fieldSize, self.win.monitor)
-            self._fieldPosRendered=cm2pix(self.fieldPos, self.win.monitor)
+    def _updateVertices(self):
+        """Sets Stim.verticesPix from fieldPos and
+        """
 
-    def updateElementVertices(self):
-        self._calcXYsRendered()
+        #Handle the orientation, size and location of each element in native units
+        #
+        radians = 0.017453292519943295
 
-        self._visXYZvertices=numpy.zeros([self.nElements , 4, 3],'d')
-        wx = self._sizesRendered[:,0]*numpy.cos(self.oris[:]*numpy.pi/180)/2
-        wy = self._sizesRendered[:,0]*numpy.sin(self.oris[:]*numpy.pi/180)/2
-        hx = self._sizesRendered[:,1]*numpy.sin(self.oris[:]*numpy.pi/180)/2
-        hy = -self._sizesRendered[:,1]*numpy.cos(self.oris[:]*numpy.pi/180)/2
+        #so we can do matrix rotation of coords we need shape=[n*4,3]
+        #but we'll convert to [n,4,3] after matrix math
+        verts=numpy.zeros([self.nElements*4, 3],'d')
+        wx = -self.sizes[:,0]*numpy.cos(self.oris[:]*radians)/2
+        wy = self.sizes[:,0]*numpy.sin(self.oris[:]*radians)/2
+        hx = self.sizes[:,1]*numpy.sin(self.oris[:]*radians)/2
+        hy = self.sizes[:,1]*numpy.cos(self.oris[:]*radians)/2
 
-        #X
-        self._visXYZvertices[:,0,0] = self._XYsRendered[:,0] -wx + hx#TopL
-        self._visXYZvertices[:,1,0] = self._XYsRendered[:,0] +wx + hx#TopR
-        self._visXYZvertices[:,2,0] = self._XYsRendered[:,0] +wx - hx#BotR
-        self._visXYZvertices[:,3,0] = self._XYsRendered[:,0] -wx - hx#BotL
+        #X vals of each vertex relative to the element's centroid
+        verts[0::4,0] = -wx - hx
+        verts[1::4,0] = +wx - hx
+        verts[2::4,0] = +wx + hx
+        verts[3::4,0] = -wx + hx
 
-        #Y
-        self._visXYZvertices[:,0,1] = self._XYsRendered[:,1] -wy + hy
-        self._visXYZvertices[:,1,1] = self._XYsRendered[:,1] +wy + hy
-        self._visXYZvertices[:,2,1] = self._XYsRendered[:,1] +wy - hy
-        self._visXYZvertices[:,3,1] = self._XYsRendered[:,1] -wy - hy
+        #Y vals of each vertex relative to the element's centroid
+        verts[0::4,1] = -wy - hy
+        verts[1::4,1] = +wy - hy
+        verts[2::4,1] = +wy + hy
+        verts[3::4,1] = -wy + hy
+
+        positions = self.xys+self.fieldPos #set of positions across elements
 
         #depth
-        self._visXYZvertices[:,:,2] = numpy.tile(self.depths,(1,4)) + self.fieldDepth
+        verts[:,2] = self.depths + self.fieldDepth
+        #rotate, translate, scale by units
+        if positions.shape[0]*4 == verts.shape[0]:
+            positions = positions.repeat(4,0)
+        verts[:,:2] = convertToPix(vertices = verts[:,:2], pos = positions, units=self.units, win=self.win)
+        verts = verts.reshape([self.nElements,4,3])
 
-        self.needVertexUpdate=False
+        #assign to self attrbute
+        self.__dict__['verticesPix'] = numpy.require(verts,requirements=['C'])#make sure it's contiguous
+        self._needVertexUpdate = False
 
     #----------------------------------------------------------------------
     def updateElementColors(self):
@@ -659,13 +632,13 @@ class ElementArrayStim(object):
         self._RGBAs[:,-1] = self.opacities.reshape([N,])
         self._RGBAs=self._RGBAs.reshape([N,1,4]).repeat(4,1)#repeat for the 4 vertices in the grid
 
-        self.needColorUpdate=False
+        self._needColorUpdate=False
 
     def updateTextureCoords(self):
         """Create a new array of self._maskCoords"""
 
         N=self.nElements
-        self._maskCoords=numpy.array([[0,1],[1,1],[1,0],[0,0]],'d').reshape([1,4,2])
+        self._maskCoords=numpy.array([[1,0],[0,0],[0,1],[1,1]],'d').reshape([1,4,2])
         self._maskCoords = self._maskCoords.repeat(N,0)
 
         #for the main texture
@@ -681,10 +654,10 @@ class ElementArrayStim(object):
             B = -self.sfs[:,1]*self.sizes[:,1]/2 - self.phases[:,1]+0.5
 
         #self._texCoords=numpy.array([[1,1],[1,0],[0,0],[0,1]],'d').reshape([1,4,2])
-        self._texCoords=numpy.concatenate([[L,T],[R,T],[R,B],[L,B]]) \
+        self._texCoords=numpy.concatenate([[R,B],[L,B],[L,T],[R,T]]) \
             .transpose().reshape([N,4,2]).astype('d')
         self._texCoords = numpy.ascontiguousarray(self._texCoords)
-        self.needTexCoordUpdate=False
+        self._needTexCoordUpdate=False
 
     def setTex(self,value, log=True):
         """Change the texture (all elements have the same base texture). Avoid this
@@ -692,19 +665,15 @@ class ElementArrayStim(object):
         graphics card can be time-consuming.
         """
         self.tex = value
-        createTexture(value, id=self._texID, pixFormat=GL.GL_RGB, stim=self, res=self.texRes)
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s tex=%s" %(self.name, value),
-                level=logging.EXP,obj=self)
+        self.createTexture(value, id=self._texID, pixFormat=GL.GL_RGB, stim=self, res=self.texRes)
+        logAttrib(self, log, 'tex')
     def setMask(self,value, log=True):
         """Change the mask (all elements have the same mask). Avoid doing this
         during time-critical points in your script. Uploading new textures to the
         graphics card can be time-consuming."""
         self.mask = value
-        createTexture(value, id=self._maskID, pixFormat=GL.GL_ALPHA, stim=self, res=self.texRes)
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s mask=%s" %(self.name, value),
-                level=logging.EXP,obj=self)
+        self.createTexture(value, id=self._maskID, pixFormat=GL.GL_ALPHA, stim=self, res=self.texRes)
+        logAttrib(self, log, 'mask')
     def __del__(self):
         self.clearTextures()#remove textures from graphics card to prevent crash
     def clearTextures(self):

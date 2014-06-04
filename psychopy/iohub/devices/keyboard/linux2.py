@@ -26,6 +26,15 @@ class Keyboard(ioHubKeyboardDevice):
             if self.isReportingEvents():             
                 logged_time=getTime()
                 event_array=event[0]
+        
+                psychowins=self._iohub_server._pyglet_window_hnds
+                report_all=self.getConfiguration().get('report_system_wide_events',True)
+                if psychowins and event_array[-1] not in psychowins and report_all is False:
+                    # For keyboard, when report_system_wide_events is false
+                    # do not record kb events that are not targeted for
+                    # a PsychoPy window, still allow them to pass to the desktop 
+                    # apps.
+                    return True
                 
                 if event_array[4] == EventConstants.KEYBOARD_PRESS:
                     repeat_pressed_count=event_array[-7]
@@ -45,6 +54,26 @@ class Keyboard(ioHubKeyboardDevice):
                         ioHubKeyboardDevice._modifier_value-=KeyboardConstants._modifierCodes.getID(mod_key)
         
                 event_array[-2]=ioHubKeyboardDevice._modifier_value
+
+		found=False
+                report_system_wide_events=self.getConfiguration().get('report_system_wide_events',True)
+            	if report_system_wide_events is False:
+			pyglet_window_hnds=self._iohub_server._pyglet_window_hnds
+			event_win=event_array[-1]
+			for pwin in pyglet_window_hnds:
+			    if pwin == event_win:
+				self._addNativeEventToBuffer(event_array)
+				found=True
+				break
+			#if found is False:		    	
+			#	print2err('KB_Event Filtered:',event_array[15],' ',logged_time)
+		else:
+			self._addNativeEventToBuffer(event_array)
+                # For the Mouse, always pass along events, but do not log
+                # events that occurred targeted for a non Psychopy win.
+                #
+                return True
+
 
                 self._addNativeEventToBuffer(event_array)
                 

@@ -1,9 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 '''Create geometric (vector) shapes by defining vertex locations.'''
 
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL)
 
 # Ensure setting pyglet.options['debug_gl'] to False is done prior to any
@@ -20,14 +20,15 @@ from psychopy import logging
 # tools must only be imported *after* event or MovieStim breaks on win32
 # (JWP has no idea why!)
 from psychopy.tools.monitorunittools import cm2pix, deg2pix
-from psychopy.tools.attributetools import attributeSetter, setWithOperation
+from psychopy.tools.attributetools import attributeSetter, setWithOperation, logAttrib
 from psychopy.visual.basevisual import BaseVisualStim
+from psychopy.visual.basevisual import ColorMixin, ContainerMixin
 from psychopy.visual.helpers import setColor
 
 import numpy
 
 
-class ShapeStim(BaseVisualStim):
+class ShapeStim(BaseVisualStim, ColorMixin, ContainerMixin):
     """Create geometric (vector) shapes by defining vertex locations.
 
     Shapes can be outlines or filled, by setting lineRGB and fillRGB to
@@ -75,9 +76,12 @@ class ShapeStim(BaseVisualStim):
             interpolate : True or False
                 If True the edge of the line will be antialiased.
                 """
+        #what local vars are defined (these are the init params) for use by __repr__
+        self._initParams = dir()
+        self._initParams.remove('self')
 
         # Initialize inheritance and remove unwanted methods
-        BaseVisualStim.__init__(self, win, units=units, name=name, autoLog=autoLog)
+        super(ShapeStim, self).__init__(win, units=units, name=name, autoLog=False) #autoLog is set later
         self.__dict__['setColor'] = None
         self.__dict__['color'] = None
         self.__dict__['colorSpace'] = None
@@ -112,7 +116,11 @@ class ShapeStim(BaseVisualStim):
         self.size = numpy.array([0.0,0.0])
         self.setSize(size, log=False)
         self.setVertices(vertices, log=False)
-        self._calcVerticesRendered()
+
+        #set autoLog (now that params have been initialised)
+        self.autoLog= autoLog
+        if autoLog:
+            logging.exp("Created %s = %s" %(self.name, str(self)))
 
     @attributeSetter
     def fillColor(self, color):
@@ -136,24 +144,14 @@ class ShapeStim(BaseVisualStim):
     @attributeSetter
     def fillColorSpace(self, value):
         """
-        Sets color space for fill color. See documentation for lineColorSpace
+        Sets color space for fill color. See documentation for fillColorSpace
         """
         self.__dict__['fillColorSpace'] = value
 
     @attributeSetter
     def lineColorSpace(self, value):
         """
-        String or None
-
-            defining which of the :ref:`colorspaces` to use. For strings and hex
-            values this is not needed. If None the default colorSpace for the stimulus is
-            used
-
-            Example::
-
-                stim.lineColor = (1, 0, 0)  # lines are red in the default 'rgb' colorSpace
-                stim.lineColorSpace = 'rgb255'  # lines are now almost-black
-                stim.lineColor = (128, 255, 128) # lines are pale blue
+        Sets color space for line color. See documentation for lineColorSpace
         """
         self.__dict__['lineColorSpace'] = value
 
@@ -196,7 +194,7 @@ class ShapeStim(BaseVisualStim):
         Use a tuple or list of two values to scale asymmetrically.
         """
         self._set('size', numpy.asarray(value), operation, log=log)
-        self.needVertexUpdate=True
+        self._needVertexUpdate=True
 
     def setVertices(self,value=None, operation='', log=True):
         """Set the xy values of the vertices (relative to the centre of the field).
@@ -215,29 +213,25 @@ class ShapeStim(BaseVisualStim):
                 raise ValueError("New value for setXYs should be 2x1 or Nx2")
         #set value and log
         setWithOperation(self, 'vertices', value, operation)
-        self.needVertexUpdate=True
+        logAttrib(self, log, 'vertices', value)
+        self._needVertexUpdate=True
 
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s vertices=%s" %(self.name, value),
-                level=logging.EXP,obj=self)
-    def draw(self, win=None):
+    def draw(self, win=None, keepMatrix=False): #keepMatrix option is needed by Aperture
         """
         Draw the stimulus in its relevant window. You must call
         this method after every MyWin.flip() if you want the
         stimulus to appear on that frame and then update the screen
         again.
         """
-        if self.needVertexUpdate: self._calcVerticesRendered()
         if win==None: win=self.win
         self._selectWindow(win)
 
-        nVerts = self.vertices.shape[0]
-
+        vertsPix = self.verticesPix #will check if it needs updating (check just once)
+        nVerts = vertsPix.shape[0]
         #scale the drawing frame etc...
-        GL.glPushMatrix()#push before drawing, pop after
-        win.setScale(self._winScale)
-        GL.glTranslatef(self._posRendered[0],self._posRendered[1],0)
-        GL.glRotatef(-self.ori,0.0,0.0,1.0)
+        if not keepMatrix:
+            GL.glPushMatrix()#push before drawing, pop after
+            win.setScale('pix')
         #load Null textures into multitexteureARB - or they modulate glColor
         GL.glActiveTexture(GL.GL_TEXTURE0)
         GL.glEnable(GL.GL_TEXTURE_2D)
@@ -248,11 +242,11 @@ class ShapeStim(BaseVisualStim):
 
         if self.interpolate:
             GL.glEnable(GL.GL_LINE_SMOOTH)
-            GL.glEnable(GL.GL_POLYGON_SMOOTH)
+            GL.glEnable(GL.GL_MULTISAMPLE)
         else:
             GL.glDisable(GL.GL_LINE_SMOOTH)
-            GL.glDisable(GL.GL_POLYGON_SMOOTH)
-        GL.glVertexPointer(2, GL.GL_DOUBLE, 0, self._verticesRendered.ctypes)#.data_as(ctypes.POINTER(ctypes.c_float)))
+            GL.glDisable(GL.GL_MULTISAMPLE)
+        GL.glVertexPointer(2, GL.GL_DOUBLE, 0, vertsPix.ctypes)#.data_as(ctypes.POINTER(ctypes.c_float)))
 
         GL.glEnableClientState(GL.GL_VERTEX_ARRAY)
         if nVerts>2: #draw a filled polygon first
@@ -270,17 +264,5 @@ class ShapeStim(BaseVisualStim):
             if self.closeShape: GL.glDrawArrays(GL.GL_LINE_LOOP, 0, nVerts)
             else: GL.glDrawArrays(GL.GL_LINE_STRIP, 0, nVerts)
         GL.glDisableClientState(GL.GL_VERTEX_ARRAY)
-        GL.glPopMatrix()
-
-    def _calcVerticesRendered(self):
-        self.needVertexUpdate=False
-        if self.units in ['norm', 'pix', 'height']:
-            self._verticesRendered=self.vertices
-            self._posRendered=self.pos
-        elif self.units in ['deg', 'degs']:
-            self._verticesRendered=deg2pix(self.vertices, self.win.monitor)
-            self._posRendered=deg2pix(self.pos, self.win.monitor)
-        elif self.units=='cm':
-            self._verticesRendered=cm2pix(self.vertices, self.win.monitor)
-            self._posRendered=cm2pix(self.pos, self.win.monitor)
-        self._verticesRendered = self._verticesRendered * self.size
+        if not keepMatrix:
+            GL.glPopMatrix()

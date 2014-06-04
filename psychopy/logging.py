@@ -21,7 +21,7 @@ messages, (which PsychoPy doesn't use) using the commands::
 
 """
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 #Much of the code below is based conceptually, if not syntactically, on the
@@ -224,7 +224,10 @@ class _Logger:
                     if not thisEntry in formatted:
                         #convert the entry into a formatted string
                         formatted[thisEntry]= self.format %thisEntry.__dict__
-                    target.write(formatted[thisEntry]+'\n')
+                    if type(formatted[thisEntry])==unicode:
+                        target.write((formatted[thisEntry]+'\n').encode('utf-8'))
+                    else:
+                        target.write(formatted[thisEntry]+'\n')
             if hasattr(target.stream, 'flush'):
                 target.stream.flush()
         #finished processing entries - move them to self.flushed
