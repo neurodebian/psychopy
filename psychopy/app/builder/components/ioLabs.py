@@ -1,5 +1,5 @@
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 from _base import *
@@ -23,7 +23,7 @@ class ioLabsButtonBoxComponent(BaseComponent):
     More than one component in a routine will produce conflicts between
     components over which active buttons (for responses and lights).
     """
-    categories = ['Custom']  # which section(s) in the components panel
+    categories = ['Responses']  # which section(s) in the components panel
     def __init__(self, exp, parentName, name='bbox',
                 active="(0,1,2,3,4,5,6,7)", store='first button',
                 forceEndRoutine=True, storeCorrect=False, correctAns="0",
@@ -199,12 +199,12 @@ class ioLabsButtonBoxComponent(BaseComponent):
         # some shortcuts
         name = self.params['name']
         store = self.params['store'].val
+        if store == 'nothing':
+            return
         if len(self.exp.flow._loopList):
             currLoop = self.exp.flow._loopList[-1]  # last (outer-most) loop
         else:
-            currLoop = None
-        if store == 'nothing' or not currLoop:  # need a loop to store any data!
-            return
+            currLoop = self.exp._expHandler
 
         # write the actual code
         lines = ''
@@ -231,6 +231,8 @@ class ioLabsButtonBoxComponent(BaseComponent):
                 buff.writeIndented("%s.addData('%s.corr', %s.corr)\n" % loopnamename)
             buff.writeIndented("if %(name)s.btns != None:  # add RTs if there are responses\n" % self.params)
             buff.writeIndented("    %s.addData('%s.rt', %s.rt)\n" % loopnamename)
+        if currLoop.params['name'].val == self.exp._expHandler.name:
+            buff.writeIndented("%s.nextEntry()\n" % self.exp._expHandler.name)
 
     def writeExperimentEndCode(self, buff):
         buff.writeIndented('%(name)s.standby()  # lights out etc\n' % self.params)

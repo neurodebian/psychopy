@@ -16,35 +16,166 @@ Changelog
 
 :blue:`Changes in blue typically indicate things that alter the PsychoPy behaviour in a way that could break compatibility. Be especially wary of those!`
 
+
+PsychoPy 1.81
+------------------------------
+
+PsychoPy 1.81.00
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+(in repository)
+
+* FIXED: MovieStim was right-left flipping movies and this has been corrected. If you had been working around that by setting flipVertical=True then you'll need to undo that correction
+* IMPROVED: better unit tests for visual stimuli to prevent further regressions of the issues above
+* IMPROVED: All stimulus attributes now support new syntax, e.g. stim.pos = [0,0] as well as the previous stim.setPos([0,0])
+* ADDED: Support for CRS devices:
+    * both Bits# and Bits++ now supported and using advanced rendering modes (mono++ and color++)
+    * Bits# also supports use of the infra-red button box
+
+PsychoPy 1.80
+------------------------------
+
+PsychoPy 1.80.05
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Released June 2014
+
+* FIXED: further fixes to greyscale coloring (some images were not correctly detected as greyscale by PIL so tests weren't working)
+* FIXED: machines that didn't support shaders or framebuffer objects were raising an error on win.flip() if the useFBO argument was not manually set to False. Machines that don't support the new rendering methods are now handled more gracefully
+* FIXED: named colors were not interpreted correctly by the visual.Window (but worked fine for stimuli)
+* FIXED: the error message about TextBox/FontManager not working doesn't show up any more
+* FIXED: reinstated the requirement that wx is version 2.8.x only until we get time to check 3.0 compatibility more deeply 
+
+PsychoPy 1.80.04
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Released April 2014
+
+* FIXED: buglets in logging. Logging wasn't encoding unicode correctly for console targets (but file targets were OK) and some duplicate messages were occurring for stimulus autologs
+* FIXED: buglet with GratingStim/PatchStim when texture was not a square power of two (was crashing due to incorrect global variable)
+* FIXED: ElementArrayStim was not updating its position using .setFieldPos()
+
+PsychoPy 1.80.03
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Released April 2014
+
+* FIXED: Shader code was ignoring opacity setting for ImageStim
+* FIXED: Mouse clock was not the same as PsychoPy's general events clock (so out of sync) (Sol & Jeremy)
+
+PsychoPy 1.80.02
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Released April 2014
+
+* FIXED: ImageStim did not use its mask on some machines (nVidia and ATI?) or did not render at all on others (intel graphics?)
+* CHANGED: Sound object now checks if the sound is a note name before checking for file names (only affects cases where the file name was something like A.wav)
+* ADDED: Aperture now supports contains() and overlaps() methods
+* ADDED: Image/Grating masks can now also be 'cross' (Suddha Sourav)
+* FIXED: Unicode problem for microphone on non-English installs of win32
+* FIXED: StairHandler first reversal now changes step size correctly and added option not to use the initial 1-up,1-down regime (Jon maintains that you should though!) (thanks Nathanael Larigaldie)
+* FIXED: emulator LaunchScan uses new RatingScale syntax
+
+PsychoPy 1.80.01
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Released Mar 2014
+
+* FIXED: buglet with movie glPopAttrib() on Intel gfx cards (thanks Bryan Cort)
+* FIXED: problem trying to use FrameBufferObject (FBO) on Intel GMA graphics cards
+* FIXED: problem with ImageStim not respecting setColor() and setContrast()
+* FIXED: some stimuli were failing to switch to a second window when requested
+* FIXED: some rendering glitches with ShapeStim caused by interpolation settings (thanks to Soyogu Matsushita for finding this fix)
+* FIXED: automated import of gamma for known monitors, which was failing on some monitor calibration files
+* FIXED: a single-line conditions file is now imported correctly by Builder (Jeremy Gray)
+* IMPROVED: a Routine not included in a loop now saves its data to a default 'loop' (Jeremy Gray)
+* IMPROVED: Coder checks for consistency of end-of-line options (thanks Wilbert van Ham)
+
+PsychoPy 1.80.00
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Released Mar 2014
+
+* Improvements to user interface:
+    * the glitch that prevented scrolling the Routine view is gone (win32)
+    * dialog boxes in the Builder now have tabs for categories of controls
+    * Code Components have much more space for each piece of code (again due to tabs)
+* ADDED: In Builder you can now customise the data filename/path in the Experiment Settings. Any variables in the `expInfo` dialog box can be used to create this path. See :ref:`dataFileName` for further info
+* ADDED: support for advanced rendering modes. Can now 'add' rather than average when using transparency. This is better for visual compound stimuli like plaids, and essential for colored anaglyph stimuli where the resulting image needs to be the sum of the left and right eye images.
+* ADDED: new visual unit options: 'degFlatPos' and 'degFlat' provide more accurate conversions from degrees to pixels for drawing stimuli (although they're more accurate, accounting for the flat screen, they may look strange because 1 degree gets larger with greater eccentricity on a flat screen). The previous unit 'deg' still exists and remains default as, for many studies, these are expected
+* ADDED: wider support for the functions `contains` and `overlaps`. Most stimuli now have these methods. Also they can now be used irrespective of whether the stimulus and other object have the same units (they used only to work for units of pix)
+* ADDED: support for other shapes in the Aperture stimulus (and its Builder Component). You can either specify the number of vertices `nVert` and a `size` to get a regular polygon aperture, or you can provide a set of arbitrary vertices as your `shape` argument
+* :blue:`CHANGED: Size of 'square' or 'triangle' apertures used to represent the radius of the circle on which their vertices lay. It is now a height/width as you would more likely expect. This means aperture code in scripts may need rewriting to be smaller.`
+* IMPROVED: stimulus duration is now more precise when using `duration (s)` or `time (s)` although using `nFrames` option is still advised for brief stimuli
+* IMPROVED: there are now fewer irrelevant lines in the log file as stimuli are initially created
+* IMPROVED: Staircase loops in Builder now initialise just before the staircase is run, rather than at the start of the experiment. This means they can be controlled by an outer loop and, effectively, restarted
+* FIXED: ElementArrayStim can take Nx3 or 1x3 values for colors again
+* FIXED: variable names in Builder are now case-sensitive again (they were being forced to lower case when importing csv files)
+* FIXED: incorrect equation for the Cumulative Normal fitting function
+* FIXED: If your variable had a new line character in it this was causing a new line to be started in the csv data file. These are now handled correctly
+
+* ADDED: RatingScale markerStart position can be arbitrary, e.g., can start between items or beyond the end of scale
+* ADDED: RatingScale tickHeight can be used to control the height of tickMarks, including no tick marks (tickHeight=0)
+* ADDED: RatingScale marker='hover' is similar to HTML-style hovering over clickable elements
+
+*psychopy.visual.RatingScale Changes* :
+
+* :blue:`CHANGED: Builder: remove option: choiceLabelsAboveLine; change lowAnchorText, highAnchorText -> labels`
+* :blue:`CHANGED: skipping a rating now adds None as the final element in the history`
+* :blue:`CHANGED: the default minTime is shorter, now 0.4s`
+* :blue:`CHANGED: more info in the log when creating a rating scale object`
+* :blue:`CHANGED: removed showAnchors: now use labels=None (instead of showAnchors=False)`
+* :blue:`CHANGED: removed lowAnchorText & highAnchorText: now use labels=['leftAnchor', 'rightAnchor'] or with optional 3rd midpoint label`
+* :blue:`CHANGED: renamed several parameters: stretchHoriz -> stretch, textSizeFactor -> textSize, ticksAboveLine -> tickHeight, displaySizeFactor -> size, markerStyle -> marker, customMarker -> marker`
+* :blue:`CHANGED: removed showScale: now use scale=None (instead of showScale=False)`
+* :blue:`CHANGED: removed allowSkip: now use skipKeys=None (instead of allowSkip=False)`
+* :blue:`CHANGED: removed escapeKeys; no longer supported but it's easy to implement (as now done in the coder demo)`
+
 PsychoPy 1.79
 ------------------------------
 
 PsychoPy 1.79.01
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-FIXED: startup crash in 1.79.00
-FIXED: long-standing memory leak in MovieStim
-FIXED: fixed problem with MovieStim not displaying the image but playing the audio
-ADDED: volume attribute to MovieStim (Frank Papenmeier)
-FIXED: experiments were crashing if first line of a conditions file contained a float but the rest were integers
-FIXED: QuestHandler.addResponse() should not try to replace existing intensity on first trial (Richard Höchenberger)
-FIXED: Window's viewPos and viewScale attributes could not be changed
-FIXED: Builder code generation for Cedrus Box when user provided a limited set of available buttons
-FIXED: multiple issues causing fatal errors when setting stimulus parameters (Pieter Moors and Damien Mannion)
-FIXED: Builder experiments would crash under certain conditions when there was no 'participant' in the info dialog box (Philipp Wiesemann)
-FIXED: bug toggling readme file window in Builder (Philipp Wiesemann)
-FIXED: further fix to the Coder raising excessive 'this file has changed' warnings
-FIXED: Component names now update on the Routine panel after being changed in a dialog (Philipp Wiesemann)
+Released Dec 2013
+
+* FIXED: startup crash in 1.79.00
+* FIXED: long-standing memory leak in MovieStim
+* FIXED: fixed problem with MovieStim not displaying the image but playing the audio
+* ADDED: volume attribute to MovieStim (Frank Papenmeier)
+* FIXED: experiments were crashing if first line of a conditions file contained a float but the rest were integers
+* FIXED: QuestHandler.addResponse() should not try to replace existing intensity on first trial (Richard Höchenberger)
+* FIXED: Window's viewPos and viewScale attributes could not be changed
+* FIXED: Builder code generation for Cedrus Box when user provided a limited set of available buttons
+* FIXED: multiple issues causing fatal errors when setting stimulus parameters (Pieter Moors and Damien Mannion)
+* FIXED: Builder experiments would crash under certain conditions when there was no 'participant' in the info dialog box (Philipp Wiesemann)
+* FIXED: bug toggling readme file window in Builder (Philipp Wiesemann)
+* FIXED: further fix to the Coder raising excessive 'this file has changed' warnings
+* FIXED: Component names now update on the Routine panel after being changed in a dialog (Philipp Wiesemann)
+* FIXED: bug importing conditions if the first row of numbers was the only float. (importFromConditions now uses numpy instead of matplotlib)
+* FIXED: further fix to the extra "file close" queries during shut-down
 
 PsychoPy 1.79.00
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* NEW: attributes for stimuli can now be updated using e.g. `stim.pos = newPos` rather than using `stim.setPos(newPos)` to make things more like standard Python (thanks Jonas Lindeløv). This version also involved some major restructuring behind the scenes that should not be visible to users (thanks Todd Jennings)
+Released Dec 2013
+
+* ADDED: attributes for some stimuli can now be updated using e.g. `stim.pos = newPos` rather than using `stim.setPos(newPos)` to make things more like standard Python (thanks Jonas Lindeløv). This version also involved some major restructuring behind the scenes that should not be visible to users (thanks Todd Jennings)
 * ADDED: Builder Components for
     * ioLab Systems button-box; refactor PsychoPy's ioLabs code (Jeremy)
     * Cedrus button-box (tested on RB730)
     * parallel port output component
 * ADDED: option for sounds to `loop`
+* ADDED: volume argument for MovieStim so that sound can be muted (Frank Papenmeier)
+* ADDED: window now prevents system from sleep/screensaver on windows and OS X
+* ADDED: builder demo for mental rotation task
+* ADDED: Alternative Text stimulus, psychopy.visual.TextBox (Sol Simpson)
+        * Two demos in psychopy.coder.visual.textbox
+        * Requires: freetype lib (included in Standalone)
+        * Advantages: Very fast update following text change; very precise character placement.
+        * Disadvantages: Supports monospace fonts only.
+        * IMPORTANT: TextBox is still being finalized and completed; expect to find (and please report) issues. API changes guaranteed.
+* FIXED: misaligned responses in csv output for QuestHandler (Zhili Zheng)
 * FIXED: bug when using ElementArrayStim with numpy 1.7.1. Most elements were receiving SF=0
 * FIXED: 'semi-automatic' calibration (thanks Flip Phillips)
 * FIXED: shut-down issues. Builder now remembers its last experiment and you don't get multiple messages about the scripts that have changed
@@ -57,15 +188,9 @@ PsychoPy 1.79.00
     * pandas on win32 is now v1.3 (was already this version on OS X)
     * pyxid now includes Jared's upstream bug-fix
 * FIXED: many user interface tweaks, documentation and help string corrections (Philip Wiesemann)
-* FIXED: bug importing conditions if the first row of numbers was the only float. (importFromConditions now uses numpy instead of matplotlib)
+* FIXED: PsychoPy Coder view now closes the iohub process when the experiment script is terminated using 'Stop'. (Sol Simpson)
+* FIXED: Builder use of single staircase loops now respects the min/max values
 * CHANGED: data curve fitting functions are now using scipy.optimise.curve_fit and should hopefully be more robust to local minima(?)
-* CHANGED: microphone getRMS now uses numpy.std(); the change should have no effect on loudness values computed for .wav files
-* ADDED: builder demo for mental rotation task
-* ADDED: Alternative Text stimulus, psychopy.visual.TextBox:
-        * Requires: freetype lib and freetype python wrapper (included in Standalone)
-        * Advantages: text that changes each frame (very fast updating)
-        * Disadvantages: slow to set up font initially. Supports monospace TTF files only. 
-        * IMPORTANT: TextBox is still being finalized and completed; expect to find issues. API changes guaranteed.
 
 *psychopy.iohub Changes* :
 
@@ -76,6 +201,7 @@ PsychoPy 1.79.00
     * Touch and Mouse device events are independent of each other, so both devices can be used in parallel without interference
     * Touch screen calibration routine provided; calibration state can be saved to device hardware for persistence
     * See the demos.coder.iohub_extended Touch script for example of calibration graphics front end.
+* ADDED: Keyboard and Mouse events can be restricted to those events targeted at a PsychoPy Window. Currently supported on Windows and Linux only.
 * NEW: PsychoPy TrialHandler can now be used to feed experiment condition variables to the ioDataStore.
 * NEW: Device configuration file can now be specified to the launchHubServer() function when starting the ioHub Process.
 * NEW: Simple examples of how to use iohub within a Builder project using a Custom Code Component.
@@ -99,7 +225,7 @@ PsychoPy 1.79.00
             * filter Mouse, Eye Tracker, and Touch device events based on screen location.
             * circle, ellipse, rectangle, and general polygon ROI shapes supported. (ROI functionality is dependent on the shapely python package)
         * IMPORTANT: The ioDataStore->DataFrame API is still being designed and developed. Expect to find issues. API changes guaranteed.
-                  
+
 PsychoPy 1.78
 ------------------------------
 

@@ -13,7 +13,7 @@ Distributed under the terms of the GNU General Public License (GPL version 3 or 
 """
 
 
-from ...... import printExceptionDetailsToStdErr, print2err, createErrorResult
+from ...... import printExceptionDetailsToStdErr, print2err
 from ......constants import EventConstants, EyeTrackerConstants
 from ..... import Computer
 from .... import EyeTrackerDevice
@@ -23,6 +23,9 @@ import pEyeGaze
 
 import sys
 from ctypes import byref, sizeof
+
+def localfunc():
+    pass
 
 class EyeTracker(EyeTrackerDevice):
     """The EyeGaze EyeTracker class implements support of the LC Technologies
@@ -115,9 +118,9 @@ class EyeTracker(EyeTrackerDevice):
                     self._eyegaze_control=None
                     return False
             else:
-                return createErrorResult("INVALID_METHOD_ARGUMENT_VALUE",error_message="The enable arguement value provided is not recognized",method="EyeTracker.setConnectionState",arguement='enable', value=enable)            
+                return print2err("INVALID_METHOD_ARGUMENT_VALUE. ","EyeTracker.setConnectionState: ",enable)
         except Exception,e:
-                return createErrorResult("IOHUB_DEVICE_EXCEPTION",error_message="An unhandled exception occurred on the ioHub Server Process.",method="EyeTracker.setConnectionState",arguement='enable', value=enable, error=e)            
+                return printExceptionDetailsToStdErr()#("IOHUB_DEVICE_EXCEPTION",error_message="An unhandled exception occurred on the ioHub Server Process.",method="EyeTracker.setConnectionState",arguement='enable', value=enable, error=e)            
             
     def isConnected(self):
         """
@@ -134,9 +137,9 @@ class EyeTracker(EyeTrackerDevice):
         try:
             return self._eyegaze_control != None
         except Exception, e:
-            return createErrorResult("IOHUB_DEVICE_EXCEPTION",
-                    error_message="An unhandled exception occurred on the ioHub Server Process.",
-                    method="EyeTracker.isConnected", error=e)            
+            return printExceptionDetailsToStdErr()#("IOHUB_DEVICE_EXCEPTION",
+                    #error_message="An unhandled exception occurred on the ioHub Server Process.",
+                    #method="EyeTracker.isConnected", error=e)            
             
     def sendCommand(self, key, value=None):
         """
@@ -173,9 +176,9 @@ class EyeTracker(EyeTrackerDevice):
                 else:
                     print2err('WARNING: EyeGaze command not handled: {0} = {1}.'.format())
         except Exception, e:
-            return createErrorResult("IOHUB_DEVICE_EXCEPTION",
-                    error_message="An unhandled exception occurred on the ioHub Server Process.",
-                    method="EyeTracker.sendCommand", key=key,value=value, error=e)            
+            return printExceptionDetailsToStdErr()#("IOHUB_DEVICE_EXCEPTION",
+                    #error_message="An unhandled exception occurred on the ioHub Server Process.",
+                    #method="EyeTracker.sendCommand", key=key,value=value, error=e)            
         
     def sendMessage(self,message_contents,time_offset=None):
         """
@@ -186,9 +189,9 @@ class EyeTracker(EyeTrackerDevice):
                 print2err("EyeGaze sendMessage not yet implemented")
                 return EyeTrackerConstants.FUNCTIONALITY_NOT_SUPPORTED
         except Exception, e:
-            return createErrorResult("IOHUB_DEVICE_EXCEPTION",
-                    error_message="An unhandled exception occurred on the ioHub Server Process.",
-                    method="EyeTracker.sendMessage", message_contents=message_contents,time_offset=time_offset, error=e)            
+            return printExceptionDetailsToStdErr()#("IOHUB_DEVICE_EXCEPTION",
+                    #error_message="An unhandled exception occurred on the ioHub Server Process.",
+                    #method="EyeTracker.sendMessage", message_contents=message_contents,time_offset=time_offset, error=e)            
 
     def runSetupProcedure(self,starting_state=EyeTrackerConstants.DEFAULT_SETUP_PROCEDURE):
         """
@@ -216,12 +219,23 @@ class EyeTracker(EyeTrackerDevice):
                 # and reconnect after calibration is done.
                 self.setConnectionState(False)
                 
-                import subprocess,gevent
+                import subprocess,gevent,os
                 #p = subprocess.Popen(('calibrate.exe', ''), env={"PATH": "/usr/bin"})
-                p = subprocess.Popen(('calibrate.exe', ''))
+                #from psychopy.iohub import module_directory
+                #runthis=os.path.join(module_directory(localfunc),'calibrate_lc.bat')
+                #runthis=os.path.join(module_directory(localfunc),'calibrate_lc.bat')
+                org_cwd = os.getcwdu()
+                print2err("==========")
+                print2err("CWD Prior to calibrate.exe launch: ",org_cwd)
+                p = subprocess.Popen((u'calibrate.exe', u''), cwd = u'c:\\eyegaze\\' )
                 while p.poll() is None:
                     gevent.sleep(0.05)
                 self.setConnectionState(True)
+                new_cwd=os.getcwdu()
+                print2err("CWD after calibrate.exe: ",new_cwd)
+                print2err("==========")
+
+
           
 #            circle_attributes=calibration_properties.get('circle_attributes')
 #            targetForegroundColor=circle_attributes.get('outer_color') # [r,g,b] of outer circle of targets
@@ -231,11 +245,11 @@ class EyeTracker(EyeTrackerDevice):
 #            targetInnerDiameter=circle_attributes.get('inner_diameter')     # diameter of inner target circle (in px)
             
         except Exception,e:
-            return createErrorResult("IOHUB_DEVICE_EXCEPTION",
-                    error_message="An unhandled exception occurred on the ioHub Server Process.",
-                    method="EyeTracker.runSetupProcedure", 
-                    starting_state=starting_state,
-                    error=e)            
+            return printExceptionDetailsToStdErr()#("IOHUB_DEVICE_EXCEPTION",
+                    #error_message="An unhandled exception occurred on the ioHub Server Process.",
+                    #method="EyeTracker.runSetupProcedure", 
+                    #starting_state=starting_state,
+                    #error=e)            
 
     def isRecordingEnabled(self):
         """
@@ -251,9 +265,9 @@ class EyeTracker(EyeTrackerDevice):
         try:
             return self._eyegaze_control is not None and self._eyegaze_control.bTrackingActive in [1,True]
         except Exception, e:
-            return createErrorResult("IOHUB_DEVICE_EXCEPTION",
-                    error_message="An unhandled exception occurred on the ioHub Server Process.",
-                    method="EyeTracker.isRecordingEnabled", error=e)
+            return printExceptionDetailsToStdErr()#("IOHUB_DEVICE_EXCEPTION",
+                    #error_message="An unhandled exception occurred on the ioHub Server Process.",
+                    #method="EyeTracker.isRecordingEnabled", error=e)
 
     def enableEventReporting(self,enabled=True):
         """
@@ -265,9 +279,9 @@ class EyeTracker(EyeTrackerDevice):
                 enabled=self.setRecordingState(self,enabled)
             return self.setRecordingState(enabled)
         except Exception, e:
-            return createErrorResult("IOHUB_DEVICE_EXCEPTION",
-                    error_message="An unhandled exception occurred on the ioHub Server Process.",
-                    method="EyeTracker.enableEventReporting", error=e)            
+            return printExceptionDetailsToStdErr()#("IOHUB_DEVICE_EXCEPTION",
+                    #error_message="An unhandled exception occurred on the ioHub Server Process.",
+                    #method="EyeTracker.enableEventReporting", error=e)            
 
     def setRecordingState(self,recording):
         """
@@ -282,9 +296,9 @@ class EyeTracker(EyeTrackerDevice):
         """
         try:
             if not isinstance(recording,bool):
-                return createErrorResult("INVALID_METHOD_ARGUMENT_VALUE",
-                    error_message="The recording arguement value provided is not a boolean.",
-                    method="EyeTracker.setRecordingState",arguement='recording', value=recording)
+                return printExceptionDetailsToStdErr()#("INVALID_METHOD_ARGUMENT_VALUE",
+                    #error_message="The recording arguement value provided is not a boolean.",
+                    #method="EyeTracker.setRecordingState",arguement='recording', value=recording)
              
             if self._eyegaze_control and recording is True and not self.isRecordingEnabled():                
                 self._last_poll_time=0.0                
@@ -297,9 +311,9 @@ class EyeTracker(EyeTrackerDevice):
                 self._latest_gaze_position=None
             return self.isRecordingEnabled()
         except Exception, e:
-            return createErrorResult("IOHUB_DEVICE_EXCEPTION",
-                    error_message="An unhandled exception occurred on the ioHub Server Process.",
-                    method="EyeTracker.setRecordingState", error=e)            
+            return printExceptionDetailsToStdErr()#("IOHUB_DEVICE_EXCEPTION",
+                    #error_message="An unhandled exception occurred on the ioHub Server Process.",
+                    #method="EyeTracker.setRecordingState", error=e)            
 
     def getLastSample(self):
         """
@@ -320,9 +334,9 @@ class EyeTracker(EyeTrackerDevice):
         try:
             return self._latest_sample
         except Exception, e:
-            return createErrorResult("IOHUB_DEVICE_EXCEPTION",
-                    error_message="An unhandled exception occurred on the ioHub Server Process.",
-                    method="EyeTracker.getLastSample", error=e)            
+            return printExceptionDetailsToStdErr()#("IOHUB_DEVICE_EXCEPTION",
+                    #error_message="An unhandled exception occurred on the ioHub Server Process.",
+                    #method="EyeTracker.getLastSample", error=e)            
 
     def getLastGazePosition(self):
         """
@@ -348,9 +362,9 @@ class EyeTracker(EyeTrackerDevice):
         try:
             return self._latest_gaze_position
         except Exception, e:
-            return createErrorResult("IOHUB_DEVICE_EXCEPTION",
-                    error_message="An unhandled exception occurred on the ioHub Server Process.",
-                    method="EyeTracker.getLastGazePosition", error=e)             
+            return printExceptionDetailsToStdErr()#("IOHUB_DEVICE_EXCEPTION",
+                    #error_message="An unhandled exception occurred on the ioHub Server Process.",
+                    #method="EyeTracker.getLastGazePosition", error=e)             
     
     def _poll(self):
         try:
@@ -386,9 +400,16 @@ class EyeTracker(EyeTrackerDevice):
                 if self._camera_count == 1: #monocular
                     event_type=EventConstants.MONOCULAR_EYE_SAMPLE
                     eye = EyeTrackerConstants.UNKNOWN_MONOCULAR
-                    gaze_x, gaze_y = self._eyeTrackerToDisplayCoords((sample_data0.iIGaze, sample_data0.iJGaze))
+                    gaze_x, gaze_y = sample_data0.iIGaze, sample_data0.iJGaze
                     pupil_measure1 = sample_data0.fPupilRadiusMm
-                    status = int(sample_data0.bGazeVectorFound)
+                    status=0
+                    if gaze_x != 0.0 and gaze_y != 0.0 and pupil_measure1 > 0.0:                   
+                        gaze_x, gaze_y = self._eyeTrackerToDisplayCoords((gaze_x, gaze_y))
+                    else:
+                        status=2
+                        gaze_x, gaze_y = EyeTrackerConstants.UNDEFINED, EyeTrackerConstants.UNDEFINED
+                        pupil_measure1=0
+                    #status = int(sample_data0.bGazeVectorFound)
 
                     monoSample=[
                                 0,                            # experiment_id (filled in by ioHub)
@@ -424,27 +445,44 @@ class EyeTracker(EyeTrackerDevice):
                                 EyeTrackerConstants.UNDEFINED,  # 2D sample velocity
                                 status
                                 ]
-                                
-                    self._latest_gaze_position=gaze_x,gaze_y
+                    
+                    if status==0:            
+                        self._latest_gaze_position=gaze_x,gaze_y
+                    else:
+                        self._latest_gaze_position=None
                     self._latest_sample=monoSample
                     self._addNativeEventToBuffer(monoSample)
 
 
                 elif self._camera_count == 2: #binocular
-                    event_type=EventConstants.MONOCULAR_EYE_SAMPLE
+                    event_type=EventConstants.BINOCULAR_EYE_SAMPLE
 
                     sample_data1=self._eyegaze_control.pstEgData[1]
                     sample_data4=self._eyegaze_control.pstEgData[4]
+                    
+                    status=0
 
-                    left_gaze_x, left_gaze_y = self._eyeTrackerToDisplayCoords(
-                                        (sample_data4.iIGaze,sample_data4.iJGaze))
-                    right_gaze_x, right_gaze_y = self._eyeTrackerToDisplayCoords(
-                                        (sample_data1.iIGaze,sample_data1.iJGaze))
-                                        
                     left_pupil_measure1 = sample_data4.fPupilRadiusMm
-                    right_pupil_measure1 = sample_data1.fPupilRadiusMm
+                    left_gaze_x, left_gaze_y = sample_data4.iIGaze,sample_data4.iJGaze     
+                    if left_gaze_x != 0.0 and left_gaze_y != 0.0 and left_pupil_measure1 > 0.0:
+                        left_gaze_x, left_gaze_y=self._eyeTrackerToDisplayCoords((left_gaze_x, left_gaze_y))
+                    else:
+                        status=20
+                        left_pupil_measure1=0
+                        left_gaze_x=EyeTrackerConstants.UNDEFINED
+                        left_gaze_y=EyeTrackerConstants.UNDEFINED
+                        
+                    right_gaze_x, right_gaze_y = sample_data1.iIGaze,sample_data1.iJGaze                                                            
+                    right_pupil_measure1 = sample_data1.fPupilRadiusMm                    
+                    if right_gaze_x != 0.0 and right_gaze_y != 0.0 and left_pupil_measure1 > 0.0:
+                        right_gaze_x, right_gaze_y=self._eyeTrackerToDisplayCoords((right_gaze_x, right_gaze_y))
+                    else:
+                        status+=2
+                        right_pupil_measure1=0
+                        right_gaze_x=EyeTrackerConstants.UNDEFINED
+                        right_gaze_y=EyeTrackerConstants.UNDEFINED
 
-                    status = int(sample_data4.bGazeVectorFound*2+sample_data1.bGazeVectorFound)
+                    #status = int(sample_data4.bGazeVectorFound*2+sample_data1.bGazeVectorFound)
                     binocSample=[
                                  0,                            # experiment_id (filled in by ioHub)
                                  0,                            # session_id (filled in by ioHub)
@@ -469,7 +507,7 @@ class EyeTracker(EyeTrackerDevice):
                                  EyeTrackerConstants.UNDEFINED, # uncalibrated x eye pos
                                  EyeTrackerConstants.UNDEFINED, # uncalibrated y eye pos
                                  left_pupil_measure1,
-                                 pupil_measure_type,
+                                 pupil_measure1_type,
                                  EyeTrackerConstants.UNDEFINED,  # pupil measure 2
                                  EyeTrackerConstants.UNDEFINED,  # pupil measure 2 type  
                                  EyeTrackerConstants.UNDEFINED,  # pixels per degree x
@@ -488,7 +526,7 @@ class EyeTracker(EyeTrackerDevice):
                                  EyeTrackerConstants.UNDEFINED, # uncalibrated x eye pos
                                  EyeTrackerConstants.UNDEFINED, # uncalibrated y eye pos
                                  right_pupil_measure1,
-                                 pupil_measure_type,
+                                 pupil_measure1_type,
                                  EyeTrackerConstants.UNDEFINED,  # pupil measure 2
                                  EyeTrackerConstants.UNDEFINED,  # pupil measure 2 type  
                                  EyeTrackerConstants.UNDEFINED,  # pixels per degree x
@@ -501,6 +539,7 @@ class EyeTracker(EyeTrackerDevice):
 
                     self._latest_sample=binocSample
 
+                    
                     g=[0.0,0.0]                    
                     if right_pupil_measure1>0.0 and left_pupil_measure1>0.0:
                         g=[(left_gaze_x+right_gaze_x)/2.0,(left_gaze_y+right_gaze_y)/2.0]

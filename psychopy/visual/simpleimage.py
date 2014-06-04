@@ -1,10 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 '''A simple stimulus for loading images from a file and presenting at exactly
 the resolution and color in the file (subject to gamma correction if set).'''
 
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 import os
@@ -22,8 +22,9 @@ from psychopy import core, logging
 
 # tools must only be imported *after* event or MovieStim breaks on win32
 # (JWP has no idea why!)
-from psychopy.tools.monitorunittools import cm2pix, deg2pix
-from psychopy.tools.attributetools import setWithOperation
+from psychopy.tools.monitorunittools import convertToPix
+from psychopy.tools.attributetools import setWithOperation, logAttrib
+from . import glob_vars
 
 try:
     from PIL import Image
@@ -32,11 +33,8 @@ except ImportError:
 
 import numpy
 
-global currWindow
-currWindow = None
 
-
-class SimpleImageStim:
+class SimpleImageStim(object):
     """A simple stimulus for loading images from a file and presenting at exactly
     the resolution and color in the file (subject to gamma correction if set).
 
@@ -80,17 +78,20 @@ class SimpleImageStim:
                 The name of the object to be using during logged messages about
                 this stim
         """
+        #what local vars are defined (these are the init params) for use by __repr__
+        self._initParams = dir()
+        self._initParams.remove('self')
+        super(SimpleImageStim, self).__init__()
+
         #NB most stimuli use BaseVisualStim for the _set method and for
         # setting up win, name, units and autolog in __init__ but SimpleImage
         # shares very little with _Base so we do it manually here
+        self.autoLog=False #this will be set later
         self.win=win
         self.name=name
-        self.autoLog=autoLog
         #unit conversions
         if units!=None and len(units): self.units = units
         else: self.units = win.units
-        if self.units in ['norm','height']: self._winScale=self.units
-        else: self._winScale='pix' #set the window to have pixels coords
 
         self.useShaders = win._haveShaders  #use shaders if available by default, this is a good thing
 
@@ -114,6 +115,12 @@ class SimpleImageStim:
         self.setFlipVert(flipVert)
 
         self._calcPosRendered()
+
+        #set autoLog (now that params have been initialised)
+        self.autoLog= autoLog
+        if autoLog:
+            logging.exp("Created %s = %s" %(self.name, repr(self)))
+
     def setFlipHoriz(self,newVal=True, log=True):
         """If set to True then the image will be flipped horiztonally (left-to-right).
         Note that this is relative to the original image, not relative to the current state.
@@ -121,10 +128,8 @@ class SimpleImageStim:
         if newVal!=self.flipHoriz: #we need to make the flip
             self.imArray = numpy.flipud(self.imArray)#numpy and pyglet disagree about ori so ud<=>lr
         self.flipHoriz=newVal
+        logAttrib(self, log, 'flipHoriz')
         self._needStrUpdate=True
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s flipHoriz=%s" %(self.name, newVal),
-                level=logging.EXP,obj=self)
     def setFlipVert(self,newVal=True, log=True):
         """If set to True then the image will be flipped vertically (top-to-bottom).
         Note that this is relative to the original image, not relative to the current state.
@@ -132,10 +137,8 @@ class SimpleImageStim:
         if newVal!=self.flipVert: #we need to make the flip
             self.imArray = numpy.fliplr(self.imArray)#numpy and pyglet disagree about ori so ud<=>lr
         self.flipVert=newVal
+        logAttrib(self, log, 'flipVert')
         self._needStrUpdate=True
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s flipVert=%s" %(self.name, newVal),
-                level=logging.EXP,obj=self)
     def setUseShaders(self, val=True):
         """Set this stimulus to use shaders if possible.
         """
@@ -149,11 +152,10 @@ class SimpleImageStim:
         self._imStr=self.imArray.tostring()
         self._needStrUpdate=False
     def _selectWindow(self, win):
-        global currWindow
         #don't call switch if it's already the curr window
-        if win!=currWindow and win.winType=='pyglet':
+        if win!=glob_vars.currWindow and win.winType=='pyglet':
             win.winHandle.switch_to()
-            currWindow = win
+            glob_vars.currWindow = win
     def draw(self, win=None):
         """
         Draw the stimulus in its relevant window. You must call
@@ -183,7 +185,7 @@ class SimpleImageStim:
         GL.glEnable(GL.GL_TEXTURE_2D)
         GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
 
-        #move to centre of stimulus and rotate
+        #move to centre of stimulus
         GL.glRasterPos2f(self.win.size[0]/2.0 - self.size[0]/2.0 + self._posRendered[0],
             self.win.size[1]/2.0 - self.size[1]/2.0 + self._posRendered[1])
 
@@ -214,20 +216,16 @@ class SimpleImageStim:
             val=numpy.array(val, float)
 
         setWithOperation(self, attrib, val, op)
-
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s %s=%s" %(self.name, attrib, getattr(self,attrib)),
-                level=logging.EXP,obj=self)
+        logAttrib(self, log, attrib)
     def setPos(self, newPos, operation='', units=None, log=True):
         self._set('pos', val=newPos, op=operation, log=log)
         self._calcPosRendered()
     def setDepth(self,newDepth, operation='', log=True):
         self._set('depth', newDepth, operation, log=log)
     def _calcPosRendered(self):
-        """Calculate the pos of the stimulus in coords of the :class:`~psychopy.visual.Window` (normalised or pixels)"""
-        if self.units in ['pix', 'pixels', 'height', 'norm']: self._posRendered=self.pos
-        elif self.units in ['deg', 'degs']: self._posRendered=deg2pix(self.pos, self.win.monitor)
-        elif self.units=='cm': self._posRendered=cm2pix(self.pos, self.win.monitor)
+        """Calculate the pos of the stimulus in pixels"""
+        self._posRendered = convertToPix(pos = self.pos, vertices=numpy.array([0,0]), units=self.units, win=self.win)
+
     def setImage(self,filename=None, log=True):
         """Set the image to be drawn.
 
@@ -268,7 +266,4 @@ class SimpleImageStim:
              self.internalFormat = GL.GL_RGB
         self.dataType = GL.GL_UNSIGNED_BYTE
         self._needStrUpdate = True
-
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s image=%s" %(self.name, filename),
-                level=logging.EXP,obj=self)
+        logAttrib(self, log, 'image', filename)

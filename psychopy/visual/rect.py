@@ -1,16 +1,17 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 '''Creates a rectangle of given width and height
 as a special case of a :class:`~psychopy.visual.ShapeStim`'''
 
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 import psychopy  # so we can get the __path__
 from psychopy import logging
 
 from psychopy.visual.shape import ShapeStim
+from psychopy.tools.attributetools import logAttrib
 
 import numpy
 
@@ -33,13 +34,20 @@ class Rect(ShapeStim):
                 Height of the Rectangle (in its respective units, if specified)
 
         """
+        #what local vars are defined (these are the init params) for use by __repr__
+        self._initParams = dir()
+        self._initParams.remove('self')
+        #kwargs isn't a parameter, but a list of params
+        self._initParams.remove('kwargs')
+        self._initParams.extend(kwargs)
+
         self.width = width
         self.height = height
         self._calcVertices()
         kwargs['closeShape'] = True # Make sure nobody messes around here
         kwargs['vertices'] = self.vertices
 
-        ShapeStim.__init__(self, win, **kwargs)
+        super(Rect, self).__init__(win, **kwargs)
 
     def _calcVertices(self):
         self.vertices = numpy.array([
@@ -54,15 +62,11 @@ class Rect(ShapeStim):
         self.width = width
         self._calcVertices()
         self.setVertices(self.vertices, log=False)
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s width=%s" %(self.name, width),
-                level=logging.EXP,obj=self)
+        logAttrib(self, log, 'width')
 
     def setHeight(self, height, log=True):
         """Changes the height of the Rectangle """
         self.height = height
         self._calcVertices()
         self.setVertices(self.vertices, log=False)
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s height=%s" %(self.name, height),
-                level=logging.EXP,obj=self)
+        logAttrib(self, log, 'height')

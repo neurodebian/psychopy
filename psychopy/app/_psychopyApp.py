@@ -1,16 +1,16 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 import sys, psychopy
 import copy
 
-# Ensure 2.8 version of wx
 if not hasattr(sys, 'frozen'):
     import wxversion
-    wxversion.ensureMinimal('2.8')
+    #wxversion.ensureMinimal('2.8') # because this version has agw
+    wxversion.select(['2.8.10', '2.8.11', '2.8.12'])
 import wx
 try:
     from agw import advancedsplash as AS
@@ -153,9 +153,9 @@ class PsychoPyApp(wx.App):
         #then override the prev files by command options and passed files
         if len(sys.argv)>1:
             if sys.argv[1]==__name__:
-                args = sys.argv[2:] # program was excecuted as "python.exe PsychoPyIDE.py %1'
+                args = sys.argv[2:] # program was executed as "python.exe PsychoPyIDE.py %1'
             else:
-                args = sys.argv[1:] # program was excecuted as "PsychoPyIDE.py %1'
+                args = sys.argv[1:] # program was executed as "PsychoPyIDE.py %1'
             #choose which frame to start with
             if args[0] in ['builder', '--builder', '-b']:
                     mainFrame='builder'
@@ -440,7 +440,7 @@ let me/us know at psychopy-users@googlegroups.com"""
         info.SetVersion('v'+psychopy.__version__)
         info.SetDescription(msg)
 
-        info.SetCopyright('(C) 2002-2013 Jonathan Peirce')
+        info.SetCopyright('(C) 2002-2014 Jonathan Peirce')
         info.SetWebSite('http://www.psychopy.org')
         info.SetLicence(license)
         info.AddDeveloper('Jonathan Peirce')
