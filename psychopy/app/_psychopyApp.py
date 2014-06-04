@@ -1,7 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 import sys, psychopy
@@ -10,7 +10,7 @@ import copy
 # Ensure 2.8 version of wx
 if not hasattr(sys, 'frozen'):
     import wxversion
-    wxversion.ensureMinimal('2.8')
+    wxversion.select(['2.8.10', '2.8.11', '2.8.12'])
 import wx
 try:
     from agw import advancedsplash as AS
@@ -440,7 +440,7 @@ let me/us know at psychopy-users@googlegroups.com"""
         info.SetVersion('v'+psychopy.__version__)
         info.SetDescription(msg)
 
-        info.SetCopyright('(C) 2002-2013 Jonathan Peirce')
+        info.SetCopyright('(C) 2002-2014 Jonathan Peirce')
         info.SetWebSite('http://www.psychopy.org')
         info.SetLicence(license)
         info.AddDeveloper('Jonathan Peirce')
