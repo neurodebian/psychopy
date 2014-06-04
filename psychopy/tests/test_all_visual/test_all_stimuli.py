@@ -112,7 +112,14 @@ class _baseVisualTest:
         imageStim.contrast = 0.1#should have identical effect to color=0.1
         imageStim.draw()
         utils.compareScreenshot('greyscaleLowContr_%s.png' %(self.contextName), win)
-
+        win.flip()
+        imageStim.contrast = 1.0
+        fileName = os.path.join(utils.TESTS_DATA_PATH, 'greyscale2.png')
+        imageStim.setImage(fileName)
+        imageStim.size *= 3
+        imageStim.draw()
+        utils.compareScreenshot('greyscale2_%s.png' %(self.contextName), win)
+        win.flip()
     def test_numpyTexture(self):
         win = self.win
         grating = filters.makeGrating(res=64, ori=20.0,
@@ -123,8 +130,6 @@ class _baseVisualTest:
                                      interpolate=True)
         imageStim.draw()
 
-        if self.win.winType=='pygame':
-            pytest.xfail("Numpy texture is wrong polarity on pygame?")
         utils.compareScreenshot('numpyImage_%s.png' %(self.contextName), win)
         str(imageStim) #check that str(xxx) is working
         win.flip()
@@ -151,12 +156,6 @@ class _baseVisualTest:
         utils.compareScreenshot('gabor1_%s.png' %(self.contextName), win)
         win.flip()#AFTER compare screenshot
 
-        #did buffer image also work?
-        #bufferImgStim = visual.BufferImageStim(self.win, stim=[gabor])
-        #bufferImgStim.draw()
-        #utils.compareScreenshot('gabor1_%s.png' %(self.contextName), win)
-        #win.flip()
-
         #using .set()
         gabor.setOri(45, log=False)
         gabor.setSize(0.2*self.scaleFactor, '-', log=False)
@@ -169,6 +168,22 @@ class _baseVisualTest:
         utils.compareScreenshot('gabor2_%s.png' %(self.contextName), win)
         win.flip()
         str(gabor) #check that str(xxx) is working
+
+    @pytest.mark.bufferimage
+    def test_bufferImage(self):
+        """BufferImage inherits from ImageStim, so test .ori. .pos etc there not here
+        """
+        win = self.win
+        gabor = visual.PatchStim(win, mask='gauss', ori=-45,
+            pos=[0.6*self.scaleFactor, -0.6*self.scaleFactor],
+            sf=2.0/self.scaleFactor, size=2*self.scaleFactor,
+            interpolate=True)
+
+        bufferImgStim = visual.BufferImageStim(self.win, stim=[gabor],
+            interpolate=True)
+        bufferImgStim.draw()
+        utils.compareScreenshot('bufferimg_gabor_%s.png' %(self.contextName), win)
+        win.flip()
 
     #def testMaskMatrix(self):
     #    #aims to draw the exact same stimulus as in testGabor, but using filters
