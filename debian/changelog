@@ -1,3 +1,11 @@
+psychopy (1.80.05.dfsg-1) unstable; urgency=medium
+
+  * New release
+  * debian/patches
+    - update_matplotlib_test removed (upstream handles the situation now)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 04 Jun 2014 13:08:20 -0400
+
 psychopy (1.79.00+git16-g30c9343.dfsg-1) unstable; urgency=low
 
   * New release (+ post-release fixes)
