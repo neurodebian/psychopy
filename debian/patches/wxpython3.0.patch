@@ -1,0 +1,430 @@
+Description: Update for wxPython 3.0
+ These changes should remain compatible with wxPython 2.8.
+Bug-Debian: https://bugs.debian.org/759090
+Forwarded: no
+Last-Update: 2014-09-11
+
+Index: psychopy-1.79.00+git16-g30c9343.dfsg/psychopy/app/builder/builder.py
+===================================================================
+--- psychopy-1.79.00+git16-g30c9343.dfsg.orig/psychopy/app/builder/builder.py
++++ psychopy-1.79.00+git16-g30c9343.dfsg/psychopy/app/builder/builder.py
+@@ -23,17 +23,17 @@ from psychopy.app.builder import validat
+ from psychopy.constants import *
+ 
+ canvasColor=[200,200,200]#in prefs? ;-)
+-routineTimeColor=wx.Color(50,100,200, 200)
+-staticTimeColor=wx.Color(200,50,50, 100)
+-nonSlipFill=wx.Color(150,200,150, 255)
+-nonSlipEdge=wx.Color(0,100,0, 255)
+-relTimeFill=wx.Color(200,150,150, 255)
+-relTimeEdge=wx.Color(200,50,50, 255)
+-routineFlowColor=wx.Color(200,150,150, 255)
+-darkgrey=wx.Color(65,65,65, 255)
+-white=wx.Color(255,255,255, 255)
+-darkblue=wx.Color(30,30,150, 255)
+-codeSyntaxOkay=wx.Color(220,250,220, 255)  # light green
++routineTimeColor=wx.Colour(50,100,200, 200)
++staticTimeColor=wx.Colour(200,50,50, 100)
++nonSlipFill=wx.Colour(150,200,150, 255)
++nonSlipEdge=wx.Colour(0,100,0, 255)
++relTimeFill=wx.Colour(200,150,150, 255)
++relTimeEdge=wx.Colour(200,50,50, 255)
++routineFlowColor=wx.Colour(200,150,150, 255)
++darkgrey=wx.Colour(65,65,65, 255)
++white=wx.Colour(255,255,255, 255)
++darkblue=wx.Colour(30,30,150, 255)
++codeSyntaxOkay=wx.Colour(220,250,220, 255)  # light green
+ 
+ # regular expression to check for unescaped '$' to indicate code:
+ _unescapedDollarSign_re = re.compile(r"^\$|[^\\]\$")
+@@ -282,9 +282,9 @@ class FlowPanel(wx.ScrolledWindow):
+         self.btnInsertRoutine = platebtn.PlateButton(self,-1,'Insert Routine ', pos=(10,10))
+         self.btnInsertLoop = platebtn.PlateButton(self,-1,'Insert Loop     ', pos=(10,30)) #spaces give size for CANCEL
+ 
+-        self.labelTextGray = {'normal': wx.Color(150,150,150, 20),'hlight':wx.Color(150,150,150, 20)}
+-        self.labelTextRed = {'normal': wx.Color(250,10,10, 250),'hlight':wx.Color(250,10,10, 250)}
+-        self.labelTextBlack = {'normal': wx.Color(0,0,0, 250),'hlight':wx.Color(250,250,250, 250)}
++        self.labelTextGray = {'normal': wx.Colour(150,150,150, 20),'hlight':wx.Colour(150,150,150, 20)}
++        self.labelTextRed = {'normal': wx.Colour(250,10,10, 250),'hlight':wx.Colour(250,10,10, 250)}
++        self.labelTextBlack = {'normal': wx.Colour(0,0,0, 250),'hlight':wx.Colour(250,250,250, 250)}
+ 
+         # use self.appData['flowSize'] to index a tuple to get a specific value, eg: (4,6,8)[self.appData['flowSize']]
+         self.flowMaxSize = 2 # upper limit on increaseSize
+@@ -724,7 +724,7 @@ class FlowPanel(wx.ScrolledWindow):
+             self.gapMidPoints.append(currX+gap/2)
+             self.gapNestLevels.append(nestLevel)
+             pdc.SetId(lineId)
+-            pdc.SetPen(wx.Pen(wx.Color(0,0,0, 255)))
++            pdc.SetPen(wx.Pen(wx.Colour(0,0,0, 255)))
+             pdc.DrawLine(x1=currX,y1=self.linePos[1],x2=currX+gap,y2=self.linePos[1])
+             currX+=gap
+         lineRect = wx.Rect(self.linePos[0]-2, self.linePos[1]-2, currX-self.linePos[0]+2, 4)
+@@ -750,7 +750,7 @@ class FlowPanel(wx.ScrolledWindow):
+         for ii, entry in enumerate(expFlow):
+             if entry.getType()=='Routine':
+                 currX = self.drawFlowRoutine(pdc,entry, id=ii,pos=[currX,self.linePos[1]-10])
+-            pdc.SetPen(wx.Pen(wx.Color(0,0,0, 255)))
++            pdc.SetPen(wx.Pen(wx.Colour(0,0,0, 255)))
+             pdc.DrawLine(x1=currX,y1=self.linePos[1],x2=currX+gap,y2=self.linePos[1])
+             currX += gap
+ 
+@@ -761,8 +761,8 @@ class FlowPanel(wx.ScrolledWindow):
+         #   font.SetPointSize(600/self.dpi)
+         #   self.SetFont(font); pdc.SetFont(font)
+         #   w,h = self.GetFullTextExtent(str(len(self.pointsToDraw)))[0:2]
+-        #   pdc.SetPen(wx.Pen(wx.Color(0,0,0, 255)))
+-        #   pdc.SetBrush(wx.Brush(wx.Color(0,0,0,255)))
++        #   pdc.SetPen(wx.Pen(wx.Colour(0,0,0, 255)))
++        #   pdc.SetBrush(wx.Brush(wx.Colour(0,0,0,255)))
+         #   pdc.DrawCircle(xPos,self.linePos[1], w+2)
+         #   pdc.SetTextForeground([255,255,255])
+         #   pdc.DrawText(str(n), xPos-w/2, self.linePos[1]-h/2)
+@@ -780,7 +780,7 @@ class FlowPanel(wx.ScrolledWindow):
+                 id = wx.NewId()
+                 self.entryPointIDlist.append(id)
+                 self.pdc.SetId(id)
+-                self.pdc.SetBrush(wx.Brush(wx.Color(0,0,0,255)))
++                self.pdc.SetBrush(wx.Brush(wx.Colour(0,0,0,255)))
+                 self.pdc.DrawCircle(pos,self.linePos[1], ptSize)
+                 r = self.pdc.GetIdBounds(id)
+                 self.OffsetRect(r)
+@@ -814,15 +814,15 @@ class FlowPanel(wx.ScrolledWindow):
+     def drawLineStart(self, dc, pos):
+         #draw bar at start of timeline; circle looked bad, offset vertically
+         ptSize = (3,3,4)[self.appData['flowSize']]
+-        dc.SetBrush(wx.Brush(wx.Color(0,0,0, 255)))
+-        dc.SetPen(wx.Pen(wx.Color(0,0,0, 255)))
++        dc.SetBrush(wx.Brush(wx.Colour(0,0,0, 255)))
++        dc.SetPen(wx.Pen(wx.Colour(0,0,0, 255)))
+         dc.DrawPolygon([[0,-ptSize],[1,-ptSize],[1,ptSize], [0,ptSize]], pos[0],pos[1])
+     def drawLineEnd(self, dc, pos):
+         #draws arrow at end of timeline
+         #tmpId = wx.NewId()
+         #dc.SetId(tmpId)
+-        dc.SetBrush(wx.Brush(wx.Color(0,0,0, 255)))
+-        dc.SetPen(wx.Pen(wx.Color(0,0,0, 255)))
++        dc.SetBrush(wx.Brush(wx.Colour(0,0,0, 255)))
++        dc.SetPen(wx.Pen(wx.Colour(0,0,0, 255)))
+         dc.DrawPolygon([[0,-3],[5,0],[0,3]], pos[0],pos[1])
+         #dc.SetIdBounds(tmpId,wx.Rect(pos[0],pos[1]+3,5,6))
+     def drawLoopEnd(self, dc, pos, downwards=True):
+@@ -830,8 +830,8 @@ class FlowPanel(wx.ScrolledWindow):
+         # idea: might want a wxID for grabbing and relocating the loop endpoint
+         tmpId = wx.NewId()
+         dc.SetId(tmpId)
+-        #dc.SetBrush(wx.Brush(wx.Color(0,0,0, 250)))
+-        #dc.SetPen(wx.Pen(wx.Color(0,0,0, 255)))
++        #dc.SetBrush(wx.Brush(wx.Colour(0,0,0, 250)))
++        #dc.SetPen(wx.Pen(wx.Colour(0,0,0, 255)))
+         size = (3,4,5)[self.appData['flowSize']]
+         #if downwards: dc.DrawPolygon([[size,0],[0,size],[-size,0]], pos[0],pos[1]+2*size)#points down
+         #else: dc.DrawPolygon([[size,size],[0,0],[-size,size]], pos[0],pos[1]-3*size)#points up
+@@ -841,8 +841,8 @@ class FlowPanel(wx.ScrolledWindow):
+         # draws direction arrow on left side of a loop
+         tmpId = wx.NewId()
+         dc.SetId(tmpId)
+-        dc.SetBrush(wx.Brush(wx.Color(0,0,0, 250)))
+-        dc.SetPen(wx.Pen(wx.Color(0,0,0, 255)))
++        dc.SetBrush(wx.Brush(wx.Colour(0,0,0, 250)))
++        dc.SetPen(wx.Pen(wx.Colour(0,0,0, 255)))
+         size = (3,4,5)[self.appData['flowSize']]
+         offset = (3,2,0)[self.appData['flowSize']]
+         if downwards:
+@@ -892,7 +892,7 @@ class FlowPanel(wx.ScrolledWindow):
+         endX = pos[0]+w+pad
+         #the edge should match the text
+         if draw:
+-            dc.SetPen(wx.Pen(wx.Color(rgbEdge[0],rgbEdge[1],rgbEdge[2], wx.ALPHA_OPAQUE)))
++            dc.SetPen(wx.Pen(wx.Colour(rgbEdge[0],rgbEdge[1],rgbEdge[2], wx.ALPHA_OPAQUE)))
+             dc.SetBrush(wx.Brush(rgbFill))
+             dc.DrawRoundedRectangleRect(rect, (4,6,8)[self.appData['flowSize']])
+             #draw text
+@@ -932,10 +932,10 @@ class FlowPanel(wx.ScrolledWindow):
+         curve = (6, 11, 15)[self.appData['flowSize']] #extra distance, in both h and w for curve
+         yy = [base,height+curve*up,height+curve*up/2,height] # for area
+         r,g,b=rgb
+-        dc.SetPen(wx.Pen(wx.Color(r, g, b, 200)))
++        dc.SetPen(wx.Pen(wx.Colour(r, g, b, 200)))
+         vertOffset=0 # 1 is interesting too
+         area = wx.Rect(startX, base+vertOffset, endX-startX, max(yy)-min(yy))
+-        dc.SetBrush(wx.Brush(wx.Color(0,0,0,0),style=wx.TRANSPARENT)) # transparent
++        dc.SetBrush(wx.Brush(wx.Colour(0,0,0,0),style=wx.TRANSPARENT)) # transparent
+         dc.DrawRoundedRectangleRect(area, curve) # draws outline
+         dc.SetIdBounds(tmpId, area)
+ 
+@@ -979,9 +979,9 @@ class FlowPanel(wx.ScrolledWindow):
+         #draw box
+         rect = wx.Rect(x, y, w+pad,h+pad)
+         #the edge should match the text
+-        dc.SetPen(wx.Pen(wx.Color(r, g, b, 100)))
++        dc.SetPen(wx.Pen(wx.Colour(r, g, b, 100)))
+         #try to make the loop fill brighter than the background canvas:
+-        dc.SetBrush(wx.Brush(wx.Color(235,235,235, 250)))
++        dc.SetBrush(wx.Brush(wx.Colour(235,235,235, 250)))
+ 
+         dc.DrawRoundedRectangleRect(rect, (4,6,8)[self.appData['flowSize']])
+         #draw text
+@@ -1198,7 +1198,7 @@ class RoutineCanvas(wx.ScrolledWindow):
+         xEnd=self.timeXposEnd
+ 
+         #dc.SetId(wx.NewId())
+-        dc.SetPen(wx.Pen(wx.Color(0, 0, 0, 150)))
++        dc.SetPen(wx.Pen(wx.Colour(0, 0, 0, 150)))
+         #draw horizontal lines on top and bottom
+         dc.DrawLine(x1=xSt,y1=yPosTop,
+                     x2=xEnd,y2=yPosTop)
+@@ -1243,7 +1243,7 @@ class RoutineCanvas(wx.ScrolledWindow):
+         if startTime!=None and duration!=None:#then we can draw a sensible time bar!
+             #calculate rectangle for component
+             xScale = self.getSecsPerPixel()
+-            dc.SetPen(wx.Pen(wx.Color(200, 100, 100, 0), style=wx.TRANSPARENT))
++            dc.SetPen(wx.Pen(wx.Colour(200, 100, 100, 0), style=wx.TRANSPARENT))
+             dc.SetBrush(wx.Brush(staticTimeColor))
+             xSt = self.timeXposStart + startTime/xScale
+             w = (duration)/xScale + 1  # +1 to compensate for border alpha=0 in dc.SetPen
+@@ -1296,7 +1296,7 @@ class RoutineCanvas(wx.ScrolledWindow):
+         #draw entries on timeline (if they have some time definition)
+         if startTime!=None and duration!=None:#then we can draw a sensible time bar!
+             xScale = self.getSecsPerPixel()
+-            dc.SetPen(wx.Pen(wx.Color(200, 100, 100, 0), style=wx.TRANSPARENT))
++            dc.SetPen(wx.Pen(wx.Colour(200, 100, 100, 0), style=wx.TRANSPARENT))
+             dc.SetBrush(wx.Brush(routineTimeColor))
+             hSize = (3.5,2.75,2)[self.drawSize]
+             yOffset = (3,3,0)[self.drawSize]
+@@ -2725,7 +2725,7 @@ class DlgLoopProperties(_BaseParamsDlg):
+         self.conditionsFileOrig = self.conditionsFile
+         self.conditionsOrig = self.conditions
+         expFolder,expName = os.path.split(self.frame.filename)
+-        dlg = wx.FileDialog(self, message="Open file ...", style=wx.OPEN,
++        dlg = wx.FileDialog(self, message="Open file ...", style=wx.FD_OPEN,
+                             defaultDir=expFolder)
+         if dlg.ShowModal() == wx.ID_OK:
+             newFullPath = dlg.GetPath()
+@@ -3031,9 +3031,14 @@ class DlgConditions(wx.Dialog):
+             self.madeApp = False
+             wx.Dialog.__init__(self, None,-1,title,pos,size,style)
+         except: # only needed during development?
++            class MySimpleApp(wx.App):
++                def OnInit(self):
++                    # Suppress WXDEBUG assertions, as happens by default with wx2.8.
++                    self.SetAssertMode(wx.PYAPP_ASSERT_SUPPRESS)
++                    return True
+             self.madeApp = True
+             global app
+-            app = wx.PySimpleApp()
++            app = MySimpleApp()
+             wx.Dialog.__init__(self, None,-1,title,pos,size,style)
+         self.trim = trim
+         self.warning = '' # updated to warn about eg, trailing whitespace
+@@ -3356,7 +3361,7 @@ class DlgConditions(wx.Dialog):
+             PREVIEW.Bind(wx.EVT_BUTTON, self.preview)
+             buttons.Add(PREVIEW)
+             buttons.AddSpacer(4)
+-            self.SAVEAS = wx.Button(self, wx.SAVE, "Save as")
++            self.SAVEAS = wx.Button(self, wx.FD_SAVE, "Save as")
+             self.SAVEAS.Bind(wx.EVT_BUTTON, self.saveAs)
+             buttons.Add(self.SAVEAS)
+             buttons.AddSpacer(8)
+@@ -3467,7 +3472,7 @@ class DlgConditions(wx.Dialog):
+             fullPathList = gui.fileOpenDlg(tryFileName=os.path.basename(fileName),
+                             allowed="All files (*.*)|*.*")
+             if fullPathList:
+-                fileName = fullPathList[0] # wx.MULTIPLE -> list
++                fileName = fullPathList[0] # wx.FD_MULTIPLE -> list
+         if os.path.isfile(fileName) and fileName.endswith('.pkl'):
+             f = open(fileName)
+             contents = cPickle.load(f)
+@@ -3917,7 +3922,7 @@ class BuilderFrame(wx.Frame):
+         returnVal=False
+         dlg = wx.FileDialog(
+             self, message="Save file as ...", defaultDir=initPath,
+-            defaultFile=filename, style=wx.SAVE, wildcard=wildcard)
++            defaultFile=filename, style=wx.FD_SAVE, wildcard=wildcard)
+         if dlg.ShowModal() == wx.ID_OK:
+             newPath = dlg.GetPath()
+             #update exp name
+Index: psychopy-1.79.00+git16-g30c9343.dfsg/psychopy/app/coder/coder.py
+===================================================================
+--- psychopy-1.79.00+git16-g30c9343.dfsg.orig/psychopy/app/coder/coder.py
++++ psychopy-1.79.00+git16-g30c9343.dfsg/psychopy/app/coder/coder.py
+@@ -1797,7 +1797,7 @@ class CoderFrame(wx.Frame):
+             initPath=''
+         dlg = wx.FileDialog(
+             self, message="Open file ...",
+-            defaultDir=initPath, style=wx.OPEN
++            defaultDir=initPath, style=wx.FD_OPEN
+             )
+ 
+         if dlg.ShowModal() == wx.ID_OK:
+@@ -1906,7 +1906,7 @@ class CoderFrame(wx.Frame):
+         #open dlg
+         dlg = wx.FileDialog(
+             self, message="Save file as ...", defaultDir=initPath,
+-            defaultFile=filename, style=wx.SAVE, wildcard=wildcard)
++            defaultFile=filename, style=wx.FD_SAVE, wildcard=wildcard)
+         if dlg.ShowModal() == wx.ID_OK:
+             newPath = dlg.GetPath()
+             # if the file already exists, query whether it should be overwritten (default = yes)
+Index: psychopy-1.79.00+git16-g30c9343.dfsg/psychopy/app/dialogs.py
+===================================================================
+--- psychopy-1.79.00+git16-g30c9343.dfsg.orig/psychopy/app/dialogs.py
++++ psychopy-1.79.00+git16-g30c9343.dfsg/psychopy/app/dialogs.py
+@@ -511,7 +511,12 @@ class ListWidget(GlobSizer):
+         """
+         pass
+ if __name__=='__main__':
+-    app = wx.PySimpleApp()
++    class MySimpleApp(wx.App):
++        def OnInit(self):
++            # Suppress WXDEBUG assertions, as happens by default with wx2.8.
++            self.SetAssertMode(wx.PYAPP_ASSERT_SUPPRESS)
++            return True
++    app = MySimpleApp()
+     dlg = wx.Dialog(None)
+     init = [{'Field':'Participant','Default':''},{'Field':'Session','Default':'001'}]
+     listCtrl = ListWidget(dlg, value = init, order=['Field','Default'])
+Index: psychopy-1.79.00+git16-g30c9343.dfsg/psychopy/app/preferencesDlg.py
+===================================================================
+--- psychopy-1.79.00+git16-g30c9343.dfsg.orig/psychopy/app/preferencesDlg.py
++++ psychopy-1.79.00+git16-g30c9343.dfsg/psychopy/app/preferencesDlg.py
+@@ -201,7 +201,12 @@ class PrefCtrls:
+ 
+ if __name__=='__main__':
+     import preferences
+-    app = wx.PySimpleApp()
++    class MySimpleApp(wx.App):
++        def OnInit(self):
++            # Suppress WXDEBUG assertions, as happens by default with wx2.8.
++            self.SetAssertMode(wx.PYAPP_ASSERT_SUPPRESS)
++            return True
++    app = MySimpleApp()
+     app.prefs=preferences.Preferences()#don't do this normally - use the existing psychopy.prefs instance
+     dlg = PreferencesDlg(app)
+     dlg.ShowModal()
+Index: psychopy-1.79.00+git16-g30c9343.dfsg/psychopy/gui.py
+===================================================================
+--- psychopy-1.79.00+git16-g30c9343.dfsg.orig/psychopy/gui.py
++++ psychopy-1.79.00+git16-g30c9343.dfsg/psychopy/gui.py
+@@ -11,6 +11,12 @@ import string, os
+ 
+ OK = wx.ID_OK
+ 
++class MySimpleApp(wx.App):
++    def OnInit(self):
++        # Suppress WXDEBUG assertions, as happens by default with wx2.8.
++        self.SetAssertMode(wx.PYAPP_ASSERT_SUPPRESS)
++        return True
++
+ class Dlg(wx.Dialog):
+     """A simple dialogue box. You can add text or input boxes
+     (sequentially) and then retrieve the values.
+@@ -42,7 +48,7 @@ class Dlg(wx.Dialog):
+             wx.Dialog.__init__(self, None,-1,title,pos,size,style)
+         except:
+             global app
+-            app = wx.PySimpleApp()
++            app = MySimpleApp()
+             wx.Dialog.__init__(self, None,-1,title,pos,size,style)
+         self.inputFields = []
+         self.inputFieldTypes= []
+@@ -207,7 +213,7 @@ class DlgFromDict(Dlg):
+             else:
+                 self.addField(field,self.dictionary[field], tip=tooltip)
+         #show it and collect data
+-        #tmp= wx.PySimpleApp()#this should have been done by Dlg ?
++        #tmp= MySimpleApp()#this should have been done by Dlg ?
+         self.show()
+         if self.OK:
+             for n,thisKey in enumerate(keys):
+@@ -244,11 +250,11 @@ def fileSaveDlg(initFilePath="", initFil
+             #"shelved files (*.shelf)|*.shelf"
+     try:
+         dlg = wx.FileDialog(None,prompt,
+-                          initFilePath, initFileName, allowed, wx.SAVE)
++                          initFilePath, initFileName, allowed, wx.FD_SAVE)
+     except:
+-        tmpApp = wx.PySimpleApp()
++        tmpApp = MySimpleApp()
+         dlg = wx.FileDialog(None,prompt,
+-                          initFilePath, initFileName, allowed, wx.SAVE)
++                          initFilePath, initFileName, allowed, wx.FD_SAVE)
+     if dlg.ShowModal() == OK:
+         #get names of images and their directory
+         outName = dlg.GetFilename()
+@@ -292,11 +298,11 @@ def fileOpenDlg(tryFilePath="",
+             "All files (*.*)|*.*"
+     try:
+         dlg = wx.FileDialog(None, prompt,
+-                          tryFilePath, tryFileName, allowed, wx.OPEN|wx.FILE_MUST_EXIST|wx.MULTIPLE)
++                          tryFilePath, tryFileName, allowed, wx.FD_OPEN|wx.FD_FILE_MUST_EXIST|wx.FD_MULTIPLE)
+     except:
+-        tmpApp = wx.PySimpleApp()
++        tmpApp = MySimpleApp()
+         dlg = wx.FileDialog(None, prompt,
+-                          tryFilePath, tryFileName, allowed, wx.OPEN|wx.FILE_MUST_EXIST|wx.MULTIPLE)
++                          tryFilePath, tryFileName, allowed, wx.FD_OPEN|wx.FD_FILE_MUST_EXIST|wx.FD_MULTIPLE)
+     if dlg.ShowModal() == OK:
+         #get names of images and their directory
+         fullPaths = dlg.GetPaths()
+Index: psychopy-1.79.00+git16-g30c9343.dfsg/psychopy/iohub/util/dialogs.py
+===================================================================
+--- psychopy-1.79.00+git16-g30c9343.dfsg.orig/psychopy/iohub/util/dialogs.py
++++ psychopy-1.79.00+git16-g30c9343.dfsg/psychopy/iohub/util/dialogs.py
+@@ -21,7 +21,12 @@ class ioHubDialog(object):
+         self.dialog=None
+         self.display_index=display_index
+         if ioHubDialog.wxapp is None:
+-            ioHubDialog.wxapp = wx.PySimpleApp()
++            class MySimpleApp(wx.App):
++                def OnInit(self):
++                    # Suppress WXDEBUG assertions, as happens by default with wx2.8.
++                    self.SetAssertMode(wx.PYAPP_ASSERT_SUPPRESS)
++                    return True
++            ioHubDialog.wxapp = MySimpleApp()
+ 
+         
+     def set_frame_display(self):
+@@ -168,11 +173,11 @@ class FileDialog(ioHubDialog):
+         dstyle=0
+         
+         if openFile is True:
+-            dstyle=dstyle | wx.OPEN
++            dstyle=dstyle | wx.FD_OPEN
+         if allowMultipleSelections is True:
+-            dstyle=dstyle | wx.MULTIPLE
++            dstyle=dstyle | wx.FD_MULTIPLE
+         if allowChangingDirectories is True:
+-            dstyle=dstyle | wx.CHANGE_DIR
++            dstyle=dstyle | wx.FD_CHANGE_DIR
+         
+         fileTypesCombined=""
+         if isinstance(fileTypes,(list,tuple)):    
+Index: psychopy-1.79.00+git16-g30c9343.dfsg/psychopy/app/_psychopyApp.py
+===================================================================
+--- psychopy-1.79.00+git16-g30c9343.dfsg.orig/psychopy/app/_psychopyApp.py
++++ psychopy-1.79.00+git16-g30c9343.dfsg/psychopy/app/_psychopyApp.py
+@@ -76,6 +76,11 @@ class PsychoPyApp(wx.App):
+         wx.App.__init__(self, arg)
+         self.onInit(**kwargs)
+ 
++    def OnInit(self):
++        # Suppress WXDEBUG assertions, as happens by default with wx2.8.
++        self.SetAssertMode(wx.PYAPP_ASSERT_SUPPRESS)
++        return True
++
+     def onInit(self, showSplash=True, testMode=False):
+         """
+         :Parameters:
+Index: psychopy-1.79.00+git16-g30c9343.dfsg/psychopy/monitors/MonitorCenter.py
+===================================================================
+--- psychopy-1.79.00+git16-g30c9343.dfsg.orig/psychopy/monitors/MonitorCenter.py
++++ psychopy-1.79.00+git16-g30c9343.dfsg/psychopy/monitors/MonitorCenter.py
+@@ -1092,6 +1092,8 @@ class GammaDlg(wx.Dialog):
+ 
+ class MonitorCenter(wx.App):
+     def OnInit(self):
++        # Suppress WXDEBUG assertions, as happens by default with wx2.8.
++        self.SetAssertMode(wx.PYAPP_ASSERT_SUPPRESS)
+         frame = MainFrame(None,'PsychoPy Monitor Center')
+         frame.Show(True)
+         self.SetTopWindow(frame)
