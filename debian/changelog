@@ -1,3 +1,9 @@
+psychopy (1.79.00+git16-g30c9343.dfsg-2) unstable; urgency=medium
+
+  * export HOME to be build directory to avoids tests failure (Closes: #718154)
+
+ --
+
 psychopy (1.79.00+git16-g30c9343.dfsg-1) unstable; urgency=low
 
   * New release (+ post-release fixes)
