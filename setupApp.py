@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 ################
 # see notes at bottom for requirements
-import glob, os, shutil
+import glob, os, shutil, sys
 from sys import platform
 from distutils.core import setup
 
@@ -25,7 +25,12 @@ if platform != 'darwin':
 import bdist_mpkg, py2app
 resources = glob.glob('psychopy/app/Resources/*')
 resources.append('/Library/Frameworks/Python.framework/Versions/2.7/include/python2.7/pyconfig.h')
-
+frameworks = ["libavbin.dylib","/usr/lib/libxml2.2.dylib", #"libyaml.dylib",
+            "libevent.dylib","libffi.dylib",
+            ]
+opencvLibs = glob.glob(os.path.join(sys.exec_prefix, 'lib', 'libopencv*.2.4.dylib'))
+frameworks.extend(opencvLibs)
+                  
 setup(app=['psychopy/app/psychopyApp.py'],
     options=dict(py2app=dict( includes=['Tkinter','FileDialog','tkFileDialog', 'imp', 'subprocess', 'shlex',
                                   'shelve',#for scipy.io
@@ -34,30 +39,31 @@ setup(app=['psychopy/app/psychopyApp.py'],
                                   'pp','ppauto','ppcommon','pptransport','ppworker',#annoying non-standard structure of pp
                                   'pyo','greenlet','vlc',
                                   'PyQt4','zmq','tornado',
+                                  'psutil',#for iohub
+                                  'pysoundcard','pysoundfile',
+                                  'cv2',
                                   ],
-                                  excludes=[],#anything we need to forcibly exclude?
-                                  frameworks = ["libavbin.dylib","/usr/lib/libxml2.2.dylib", #"libyaml.dylib",
-                                                "libevent.dylib"],
-                                  resources=resources,
-                                  argv_emulation=True,
-                                  site_packages=True,
-                                  packages=['wx','pyglet','pygame','OpenGL','psychopy','pytz',
-                                    'scipy','matplotlib','lxml','xml','openpyxl',
-                                    'coverage',#for unit testing
-                                    'serial','IPython',
-                                    'egi','labjack','pylink',#handy external science interfaces
-                                    'pyxid','pycrsltd',
-                                    #'PIL','Image',
-                                    'objc','Quartz','AppKit','QTKit','Cocoa','Foundation','CoreFoundation',
-                                    'pyolib',
-                                    'pandas','tables',#'cython',
-                                    'msgpack','yaml','gevent',#for ioHub
-                                    'cv2',
-                                    #these aren't needed, but liked
-                                    'psychopy_ext','pyfilesec','rusocsci',
-                                    ],
-                                  iconfile='psychopy/app/Resources/psychopy.icns',
-                                  plist=dict(
+                              packages=['wx','pyglet','pygame','OpenGL','psychopy','pytz',
+                                'scipy','matplotlib','lxml','xml','openpyxl',
+                                'coverage',#for unit testing
+                                'serial','IPython',
+                                'egi','labjack','pylink',#handy external science interfaces
+                                'pyxid','pycrsltd',
+                                #'PIL','Image',
+                                'objc','Quartz','AppKit','QTKit','Cocoa','Foundation','CoreFoundation',
+                                'pyolib',
+                                'pandas','tables',#'cython',
+                                'msgpack','yaml','gevent',#ioHub
+                                #these aren't needed, but liked
+                                'psychopy_ext','pyfilesec','rusocsci',
+                                ],
+                              excludes=[],#anything we need to forcibly exclude?
+                              resources=resources,
+                              argv_emulation=True,
+                              site_packages=True,
+                              frameworks=frameworks,
+                              iconfile='psychopy/app/Resources/psychopy.icns',
+                              plist=dict(
                                   CFBundleIconFile='psychopy.icns',
                                   CFBundleName               = "PsychoPy2",
                                   CFBundleShortVersionString = __version__,     # must be in X.X.X format
@@ -69,6 +75,23 @@ setup(app=['psychopy/app/psychopyApp.py'],
                                                              CFBundleTypeRole='Editor')],
                                   ),
                           )))
+
+
+#ugly hack for opencv2:
+#    As of opencv 2.4.5 the cv2.so binary used rpath to a fixed location to find libs and
+#    even more annoyingly it then appended 'lib' to the rpath as well. These were fine
+#    for the packaged framework python but the libs in an app bundle are different.
+#    We'll create some links so the appear in the same place as in the framework python
+rpath = "dist/PsychoPy2.app/Contents/Resources/"
+for libPath in opencvLibs:
+    libname = os.path.split(libPath)[-1]
+    realPath = "../../Frameworks/"+libname #relative path (w.r.t. the fake)
+    fakePath = os.path.join(rpath, "lib", libname)
+    os.symlink(realPath, fakePath)
+#they even did this for Python lib itself, which is in diff location
+realPath = "../Frameworks/Python.framework/Python" #relative path (w.r.t. the fake)
+fakePath = os.path.join(rpath, "Python")
+os.symlink(realPath, fakePath)
 
 if writeNewInit:
     #remove unwanted info about this system post-build

@@ -23,13 +23,13 @@ message = visual.TextStim(myWin,pos=(-0.95,-0.95),
 
 trialClock = core.Clock()
 t=lastFPSupdate=0
-myWin.setRecordFrameIntervals()
+myWin.recordFrameIntervals = True
 while True:
     t=trialClock.getTime()
     #Images can be manipulated on the fly
-    faceRGB.setOri(1,'+')#advance ori by 1 degree
+    faceRGB.ori += 1  #advance ori by 1 degree
     faceRGB.draw()
-    faceALPHA.setPhase(0.01,"+")#advance phase by 1/100th of a cycle
+    faceALPHA.phase += 0.01  #advance phase by 1/100th of a cycle
     faceALPHA.draw()
     beach.draw()
     
@@ -37,15 +37,14 @@ while True:
     if t-lastFPSupdate>1.0:
         lastFPS = myWin.fps()
         lastFPSupdate=t
-        message.setText("%ifps, [Esc] to quit" %lastFPS)
+        message.text = "%ifps, [Esc] to quit" %lastFPS
     message.draw()
 
     myWin.flip()
 
     #handle key presses each frame
-    for keys in event.getKeys():
-        if keys in ['escape','q']:
-            print myWin.fps()
-            myWin.close()
-            core.quit()
+    if event.getKeys(keyList=['escape','q']):
+        print myWin.fps()
+        myWin.close()
+        core.quit()
     event.clearEvents('mouse')#only really needed for pygame windows

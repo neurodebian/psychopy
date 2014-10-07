@@ -32,7 +32,7 @@ class Test_class_RatingScale:
 
         # defaults: ---------
         r = copy.copy(self.r)
-        assert len(repr(r).split(',')) == 48
+        assert len(repr(r).split(',')) == 49
         assert (r.low, r.high, r.precision) == (1, 7, 1)
         assert (r.markerStyle, r.markerStart, r.markerPlaced) == ('triangle', None, False)
 
@@ -60,7 +60,7 @@ class Test_class_RatingScale:
         r = RatingScale(self.win, textSize=3, textColor=0.3, autoLog=False)
 
         r = RatingScale(self.win, textFont=utils.TESTS_FONT, autoLog=False)
-        assert r.accept.fontname == r.scaleDescription.fontname == utils.TESTS_FONT
+        assert r.accept.font == r.scaleDescription.font == utils.TESTS_FONT
 
         r = RatingScale(self.win, showValue=False, showAccept=False, acceptKeys=[], autoLog=False)
         r = RatingScale(self.win, showAccept=False, mouseOnly=True, singleClick=False, autoLog=False)
