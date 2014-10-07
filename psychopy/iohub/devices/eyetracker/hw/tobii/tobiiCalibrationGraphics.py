@@ -6,8 +6,8 @@ Common Eye Tracker Interface
 Copyright (C) 2012-2013 iSolver Software Solutions
 Distributed under the terms of the GNU General Public License (GPL version 3 or any later version).
 
-.. moduleauthor:: ??
-.. fileauthor:: ??
+.. moduleauthor:: Sol Simpson <sol@isolver-software.com>
+.. fileauthor:: Sol Simpson <sol@isolver-software.com>
 
 """
 
@@ -35,7 +35,7 @@ class TobiiPsychopyCalibrationGraphics(object):
     TEXT_POS=[0,0]
     TEXT_COLOR=[0,0,0]
     TEXT_HEIGHT=36
-    
+    _keyboard_key_index = EventConstants.getClass(EventConstants.KEYBOARD_RELEASE).CLASS_ATTRIBUTE_NAMES.index('key')
     def __init__(self, eyetrackerInterface,screenColor=None,
                  calibrationPointList=None):
         self._eyetrackerinterface=eyetrackerInterface
@@ -124,15 +124,15 @@ class TobiiPsychopyCalibrationGraphics(object):
     def _unregisterEventMonitors(self):
         if self._ioKeyboard:
             self._ioKeyboard._removeEventListener(self)
-     
+            
     def _handleEvent(self,ioe):
         event=copy.deepcopy(ioe)
         event_type_index=DeviceEvent.EVENT_TYPE_ID_INDEX
-        if event[event_type_index] == EventConstants.KEYBOARD_CHAR:
-            if event[-5] == u' ':
+        if event[event_type_index] == EventConstants.KEYBOARD_RELEASE:
+            if event[self._keyboard_key_index] == u'space':
                 self._msg_queue.put("SPACE_KEY_ACTION")
                 self.clearAllEventBuffers()
-            elif event[-5] == u'ESCAPE':
+            elif event[self._keyboard_key_index] == u'escape':
                 self._msg_queue.put("QUIT")
                 self.clearAllEventBuffers()
 
@@ -552,12 +552,12 @@ class TobiiPsychopyCalibrationGraphics(object):
         """
         calibration_prefs=self._eyetrackerinterface.getConfiguration()['calibration']['target_attributes']
 
-        self.calibrationPointOUTER.setRadius(calibration_prefs['outer_diameter']/2.0)
+        self.calibrationPointOUTER.radius = calibration_prefs['outer_diameter'] / 2.0
         self.calibrationPointOUTER.setLineColor(calibration_prefs['outer_line_color'])
         self.calibrationPointOUTER.setFillColor(calibration_prefs['outer_fill_color'])
         self.calibrationPointOUTER.lineWidth=int(calibration_prefs['outer_stroke_width'])
 
-        self.calibrationPointINNER.setRadius(calibration_prefs['inner_diameter']/2.0)
+        self.calibrationPointINNER.radius = calibration_prefs['inner_diameter'] / 2.0
         self.calibrationPointINNER.setLineColor(calibration_prefs['inner_line_color'])
         self.calibrationPointINNER.setFillColor(calibration_prefs['inner_fill_color'])
         self.calibrationPointINNER.lineWidth=int(calibration_prefs['inner_stroke_width'])
@@ -595,7 +595,7 @@ class TobiiPsychopyCalibrationGraphics(object):
             EXPANSION_RATE=1.0
 
         stime=Computer.getTime()
-        self.calibrationPointOUTER.setRadius(orad)
+        self.calibrationPointOUTER.radius = orad
         self.calibrationPointOUTER.draw()          
         self.calibrationPointINNER.draw() 
         ftime=self.window.flip(clearBuffer=True)
@@ -606,7 +606,7 @@ class TobiiPsychopyCalibrationGraphics(object):
                 sec_dur=0.0
             stime=ftime
             current_size+= sec_dur*EXPANSION_RATE  
-            self.calibrationPointOUTER.setRadius(current_size)
+            self.calibrationPointOUTER.radius = current_size
             self.calibrationPointOUTER.draw()          
             self.calibrationPointINNER.draw()            
             ftime=self.window.flip(clearBuffer=True)
@@ -623,7 +623,7 @@ class TobiiPsychopyCalibrationGraphics(object):
             EXPANSION_RATE=1.0
 
         stime=Computer.getTime()
-        self.calibrationPointOUTER.setRadius(max_osize)
+        self.calibrationPointOUTER.radius = max_osize
         self.calibrationPointOUTER.draw()          
         self.calibrationPointINNER.draw() 
         ftime=self.window.flip(clearBuffer=True)
@@ -634,7 +634,7 @@ class TobiiPsychopyCalibrationGraphics(object):
                 sec_dur=0.0
             stime=ftime
             current_size-= sec_dur*EXPANSION_RATE  
-            self.calibrationPointOUTER.setRadius(current_size)
+            self.calibrationPointOUTER.radius = current_size
             self.calibrationPointOUTER.draw()          
             self.calibrationPointINNER.draw()            
             ftime=self.window.flip(clearBuffer=True)  
@@ -676,7 +676,11 @@ class TobiiPsychopyCalibrationGraphics(object):
                     spos=self.calibrationPointOUTER.pos
                     #self.calibrationPointOUTER.setPos(tp)            
                     #self.calibrationPointINNER.setPos(tp) 
-                    self.moveTarget(spos,tp,TARG_VELOCITY)
+                    if TARG_VELOCITY > 0.0:
+                        self.moveTarget(spos,tp,TARG_VELOCITY)
+                    else:
+                        self.calibrationPointOUTER.setPos(tp)          
+                        self.calibrationPointINNER.setPos(tp)                         
                     self.setTargetDefaults()
                     if CONTRACT_ONLY is False:
                         self.expandTarget(TARG_RAD_MULTIPLIER,EXPANSION_RATE)

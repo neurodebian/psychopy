@@ -1,27 +1,26 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 '''Container for all visual-related functions and classes'''
+
+from psychopy import logging
 
 # needed for backwards-compatibility
 from psychopy.constants import *
 
 # window, should always be loaded first
-from psychopy.visual.window import Window, getMsPerFrame
+from psychopy.visual.window import Window, getMsPerFrame, openWindows
 
 # non-private helpers
-from psychopy.visual.helpers import (createTexture,
-                                     pointInPolygon, polygonsOverlap)
+from psychopy.visual.helpers import pointInPolygon, polygonsOverlap
 
-# non-stimulus classes only derived from Object
+# stimuli derived from object or MinimalStim
+from psychopy.visual.basevisual import BaseVisualStim
 from psychopy.visual.aperture import Aperture
 from psychopy.visual.custommouse import CustomMouse
-
-# stimuli only derived from Object
-from psychopy.visual.basevisual import BaseVisualStim
 from psychopy.visual.elementarray import ElementArrayStim
 from psychopy.visual.ratingscale import RatingScale
 from psychopy.visual.simpleimage import SimpleImageStim
@@ -31,6 +30,12 @@ from psychopy.visual.dot import DotStim
 from psychopy.visual.grating import GratingStim
 from psychopy.visual.image import ImageStim
 from psychopy.visual.movie import MovieStim
+
+try:
+    from psychopy.visual.movie2 import MovieStim2
+except:
+    logging.warn("Movie2 stim could not be imported and won't be available")
+
 from psychopy.visual.shape import ShapeStim
 from psychopy.visual.text import TextStim
 
@@ -48,8 +53,18 @@ from psychopy.visual.rect import Rect
 from psychopy.visual.circle import Circle
 
 # TextBox alternative to TextStim
-try:
+try:    
+    # Ensure monospace Fonts are available ....
+    import textbox
+    font_names = []
+    from textbox import getFontManager
+    fm=getFontManager()
+    font_names = fm.getFontFamilyNames()
+    assert len(font_names) > 0
+
     from textbox import TextBox
-except:
-    pass
-    
+
+except Exception, e:
+    logging.warn("TextBox stim could not be imported and won't be available.")
+    if font_names is not None and len(font_names) == 0:
+        logging.warn("TextBox Font Manager Found No Fonts.")

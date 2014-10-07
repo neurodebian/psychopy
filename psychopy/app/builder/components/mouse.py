@@ -1,5 +1,5 @@
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 from _base import *
@@ -8,7 +8,13 @@ from psychopy.app.builder.experiment import Param
 
 thisFolder = path.abspath(path.dirname(__file__))#the absolute path to the folder containing this path
 iconFile = path.join(thisFolder,'mouse.png')
-tooltip = 'Mouse: query mouse position and buttons'
+tooltip = _translate('Mouse: query mouse position and buttons')
+
+# only use _localized values for label values, nothing functional:
+_localized = {'saveMouseState': _translate('Save mouse state'),
+              'forceEndRoutineOnPress': _translate('End Routine on press'),
+              'timeRelativeTo': _translate('Time relative to')
+              }
 
 class MouseComponent(BaseComponent):
     """An event class for checking the mouse location and buttons at given timepoints"""
@@ -18,46 +24,28 @@ class MouseComponent(BaseComponent):
                 stopType='duration (s)', stopVal=1.0,
                 startEstim='', durationEstim='',
                 save='final',forceEndRoutineOnPress=True, timeRelativeTo='routine'):
+        super(MouseComponent, self).__init__(exp, parentName, name=name,
+                    startType=startType, startVal=startVal,
+                    stopType=stopType, stopVal=stopVal,
+                    startEstim=startEstim, durationEstim=durationEstim)
         self.type='Mouse'
         self.url="http://www.psychopy.org/builder/components/mouse.html"
-        self.parentName=parentName
-        self.exp=exp#so we can access the experiment if necess
         self.exp.requirePsychopyLibs(['event'])
         self.categories=['Inputs']
         #params
-        self.params={}
-        self.order=[]
-        self.params['name']=Param(name, valType='code', allowedTypes=[],
-            hint="Even mice need names!",
-            label="Name")
-        self.params['startType']=Param(startType, valType='str',
-            allowedVals=['time (s)', 'frame N', 'condition'],
-            hint="How do you want to define your start point?")
-        self.params['stopType']=Param(stopType, valType='str',
-            allowedVals=['duration (s)', 'duration (frames)', 'time (s)', 'frame N', 'condition'],
-            hint="How do you want to define your end point?")
-        self.params['startVal']=Param(startVal, valType='code', allowedTypes=[],
-            hint="When does the mouse start being checked?")
-        self.params['stopVal']=Param(stopVal, valType='code', allowedTypes=[],
-            updates='constant', allowedUpdates=[],
-            hint="When does the mouse stop being checked?")
-        self.params['startEstim']=Param(startEstim, valType='code', allowedTypes=[],
-            hint="(Optional) expected start (s), purely for representing in the timeline")
-        self.params['durationEstim']=Param(durationEstim, valType='code', allowedTypes=[],
-            hint="(Optional) expected duration (s), purely for representing in the timeline")
         self.params['saveMouseState']=Param(save, valType='str',
             allowedVals=['final','on click', 'every frame', 'never'],
-            hint="How often should the mouse state (x,y,buttons) be stored? On every video frame, every click or just at the end of the Routine?",
-            label="Save mouse state")
+            hint=_translate("How often should the mouse state (x,y,buttons) be stored? On every video frame, every click or just at the end of the Routine?"),
+            label=_localized['saveMouseState'])
         self.params['forceEndRoutineOnPress']=Param(forceEndRoutineOnPress, valType='bool', allowedTypes=[],
             updates='constant', allowedUpdates=[],
-            hint="Should a button press force the end of the routine (e.g end the trial)?",
-            label="End Routine on press")
+            hint=_translate("Should a button press force the end of the routine (e.g end the trial)?"),
+            label=_localized['forceEndRoutineOnPress'])
         self.params['timeRelativeTo']=Param(timeRelativeTo, valType='str',
             allowedVals=['experiment','routine'],
             updates='constant', allowedUpdates=[],
-            hint="What should the values of mouse.time should be relative to?",
-            label="Time relative to")
+            hint=_translate("What should the values of mouse.time should be relative to?"),
+            label=_localized['timeRelativeTo'])
     def writeInitCode(self,buff):
         buff.writeIndented("%(name)s = event.Mouse(win=win)\n" %(self.params))
         buff.writeIndented("x, y = [None, None]\n" %(self.params))
@@ -135,15 +123,21 @@ class MouseComponent(BaseComponent):
         #some shortcuts
         name = self.params['name']
         store = self.params['saveMouseState'].val#do this because the param itself is not a string!
+        if store == 'nothing':
+            return
+
         forceEnd = self.params['forceEndRoutineOnPress'].val
-        #check if we're in a loop (so saving is possible)
         if len(self.exp.flow._loopList):
-            currLoop=self.exp.flow._loopList[-1]#last (outer-most) loop
-        else: currLoop=None
-        if store!='nothing' and currLoop and currLoop.type=='StairHandler':
-            buff.writeIndented("# NB PsychoPy doesn't handle a 'correct answer' for mouse events so doesn't know how to handle mouse with StairHandler")
-        if store == 'final' and currLoop!=None:
-            buff.writeIndented("# get info about the %(name)s\n" %(self.params))
+            currLoop=self.exp.flow._loopList[-1]  # last (outer-most) loop
+        else:
+            currLoop = self.exp._expHandler
+
+        if currLoop.type=='StairHandler':
+            buff.writeIndented("# NB PsychoPy doesn't handle a 'correct answer' for mouse events so doesn't know how to handle mouse with StairHandler\n")
+        else:
+            buff.writeIndented("# store data for %s (%s)\n" %(currLoop.params['name'], currLoop.type))
+        if store == 'final':
+            #buff.writeIndented("# get info about the %(name)s\n" %(self.params))
             buff.writeIndented("x, y = %(name)s.getPos()\n" %(self.params))
             buff.writeIndented("buttons = %(name)s.getPressed()\n" %(self.params))
             if currLoop.type!='StairHandler':
@@ -152,11 +146,13 @@ class MouseComponent(BaseComponent):
                 buff.writeIndented("%s.addData('%s.leftButton', buttons[0])\n" %(currLoop.params['name'], name))
                 buff.writeIndented("%s.addData('%s.midButton', buttons[1])\n" %(currLoop.params['name'], name))
                 buff.writeIndented("%s.addData('%s.rightButton', buttons[2])\n" %(currLoop.params['name'], name))
-        elif store != 'never' and currLoop!=None:
-            buff.writeIndented("# save %(name)s data\n" %(self.params))
+        elif store != 'never':
+            #buff.writeIndented("# save %(name)s data\n" %(self.params))
             for property in ['x','y','leftButton','midButton','rightButton','time']:
                 if store=='every frame' or not forceEnd:
                     buff.writeIndented("%s.addData('%s.%s', %s.%s)\n" %(currLoop.params['name'], name,property,name,property))
                 else:
                     #we only had one click so don't return a list
                     buff.writeIndented("%s.addData('%s.%s', %s.%s[0])\n" %(currLoop.params['name'], name,property,name,property))
+        if currLoop.params['name'].val == self.exp._expHandler.name:
+            buff.writeIndented("%s.nextEntry()\n" % self.exp._expHandler.name)

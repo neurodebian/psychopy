@@ -59,11 +59,19 @@ Run PsychoPy using your local copy
 Now that you've fetched the latest version of psychopy using git, you should run this version in order to try out yours/others latest improvements. See `this guide <http://www.ehow.com/how_8510325_set-python-path.html>`_ on how to permanently run your git version of psychopy instead of the version you previously installed.
 
 *Run git version for just one session (Linux and Mac only)*:
-If you want to switch between the latest-and-greatest development version from git and the stable version installed on your system, you can choose to only temporarily run the git version. Open a terminal and set a temporary python path to your psychopy git folder, then start your editor of choice::
+If you want to switch between the latest-and-greatest development version from git and the stable version installed on your system, you can choose to only temporarily run the git version. Open a terminal and set a temporary python path to your psychopy git folder::
 
 	$ export PYTHONPATH=/path/to/local/git/folder/
-	$ psychopy
 
+To check that worked you should open python in the terminal and try to import psychopy::
+
+	$ python
+	Python 2.7.6 (default, Mar 22 2014, 22:59:56) 
+	[GCC 4.8.2] on linux2
+	Type "help", "copyright", "credits" or "license" for more information.
+	>>> import psychopy
+
+PsychoPy depends on a lot of other packages and you may get a variety of failures to import them until you have them all installed in your custom environment!
 
 Fixing bugs and making minor improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -84,11 +92,14 @@ Commit messages
 Informative commit messages are really useful when we have to go back through the repository finding the time that a particular change to the code occurred. Precede your message with one or more of the following to help us spot easily if this is a bug fix (which might need pulling into other development branches) or new feature (which we might want to avoid pulling in if it might disrupt existing code).
 
   * *BF* : bug fix
+  * *FF* : 'feature' fix. This is for fixes to code that hasn't been released
   * *RF* : refactoring
   * *NF* : new feature
   * *ENH* : enhancement (improvement to existing code)
   * *DOC*: for all kinds of documentation related commits
   * *TEST*: for adding or changing tests
+  
+NB: The difference between BF and FF is that BF indicates a fix that is appropriate for back-porting to earlier versions, whereas FF indicates a fix to code that has not been released, and so cannot be back-ported.
 
 .. _pullRequest:
 

@@ -1,10 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 '''Stimulus object for drawing arbitrary bitmaps that can repeat (cycle) in either dimension
 One of the main stimuli for PsychoPy'''
 
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 # Ensure setting pyglet.options['debug_gl'] to False is done prior to any
@@ -21,14 +21,15 @@ from psychopy import logging
 
 from psychopy.tools.arraytools import val2array
 from psychopy.tools.attributetools import attributeSetter
-from psychopy.visual.basevisual import BaseVisualStim
-from psychopy.visual.helpers import createTexture
+from psychopy.visual.basevisual import (BaseVisualStim, ColorMixin,
+                                        ContainerMixin, TextureMixin)
 
 import numpy
 
 
-class GratingStim(BaseVisualStim):
-    """Stimulus object for drawing arbitrary bitmaps that can repeat (cycle) in either dimension
+class GratingStim(BaseVisualStim, TextureMixin, ColorMixin, ContainerMixin):
+    """Stimulus object for drawing arbitrary bitmaps that can repeat (cycle) in either dimension.
+
     One of the main stimuli for PsychoPy.
 
     Formally GratingStim is just a texture behind an optional
@@ -38,8 +39,8 @@ class GratingStim(BaseVisualStim):
 
     **Examples**::
 
-        myGrat = GratingStim(tex='sin',mask='circle') #gives a circular patch of grating
-        myGabor = GratingStim(tex='sin',mask='gauss') #gives a 'Gabor'
+        myGrat = GratingStim(tex='sin', mask='circle') #gives a circular patch of grating
+        myGabor = GratingStim(tex='sin', mask='gauss') #gives a 'Gabor'
 
     A GratingStim can be rotated scaled and shifted in position, its texture can
     be drifted in X and/or Y and it can have a spatial frequency in X and/or Y
@@ -48,12 +49,12 @@ class GratingStim(BaseVisualStim):
     Also since transparency can be controlled two GratingStims can combine e.g.
     to form a plaid.
 
-    **Using GratingStim with images from disk (jpg, tif, png...)**
+    **Using GratingStim with images from disk (jpg, tif, png, ...)**
 
     Ideally texture images to be rendered should be square with 'power-of-2' dimensions
     e.g. 16x16, 128x128. Any image that is not will be upscaled (with linear interpolation)
     to the nearest such texture by PsychoPy. The size of the stimulus should be
-    specified in the normal way using the appropriate units (deg, pix, cm...). Be
+    specified in the normal way using the appropriate units (deg, pix, cm, ...). Be
     sure to get the aspect ratio the same as the image (if you don't want it
     stretched!).
 
@@ -79,43 +80,33 @@ class GratingStim(BaseVisualStim):
                  depth=0,
                  rgbPedestal=(0.0, 0.0, 0.0),
                  interpolate=False,
-                 name='',
-                 autoLog=True,
+                 name=None,
+                 autoLog=None,
                  autoDraw=False,
                  maskParams=None):
-        """
-        :Parameters:
-
-            texRes:
-                resolution of the texture (if not loading from an image file)
-
-            maskParams: Various types of input. Default to None.
-                This is used to pass additional parameters to the mask if those
-                are needed.
-                - For the 'raisedCos' mask, pass a dict: {'fringeWidth':0.2},
-                where 'fringeWidth' is a parameter (float, 0-1), determining
-                the proportion of the patch that will be blurred by the raised
-                cosine edge.
-
-        """
-        BaseVisualStim.__init__(self, win, units=units, name=name, autoLog=autoLog)
-        self.useShaders = win._haveShaders  #use shaders if available by default, this is a good thing
-
+        """ """  # Empty docstring. All doc is in attributes
+        #what local vars are defined (these are the init params) for use by __repr__
+        self._initParams = dir()
+        for unecess in ['self', 'rgb', 'dkl', 'lms']:
+            self._initParams.remove(unecess)
+        #initialise parent class
+        super(GratingStim, self).__init__(win, units=units, name=name, autoLog=False)
+        self.__dict__['useShaders'] = win._haveShaders  #use shaders if available by default, this is a good thing
         # UGLY HACK: Some parameters depend on each other for processing.
         # They are set "superficially" here.
-        # TO DO: postpone calls to createTexture, setColor and _calcCyclesPerStim whin initiating stimulus
+        # TO DO: postpone calls to _createTexture, setColor and _calcCyclesPerStim whin initiating stimulus
         self.__dict__['contrast'] = 1
         self.__dict__['size'] = 1
         self.__dict__['sf'] = 1
         self.__dict__['tex'] = tex
+        self.__dict__['maskParams'] = maskParams
 
         #initialise textures and masks for stimulus
         self._texID = GL.GLuint()
         GL.glGenTextures(1, ctypes.byref(self._texID))
         self._maskID = GL.GLuint()
         GL.glGenTextures(1, ctypes.byref(self._maskID))
-        self.texRes = texRes  #must be power of 2
-        self.maskParams = maskParams
+        self.__dict__['texRes'] = texRes  #must be power of 2
         self.interpolate = interpolate
 
         #NB Pedestal isn't currently being used during rendering - this is a place-holder
@@ -151,23 +142,34 @@ class GratingStim(BaseVisualStim):
         self.autoDraw = autoDraw
 
         #fix scaling to window coords
-        self._calcPosRendered()
         self._calcCyclesPerStim()
 
         #generate a displaylist ID
         self._listID = GL.glGenLists(1)
-        self._updateList()#ie refresh display list
 
+        # JRG: doing self._updateList() here means MRO issues for RadialStim,
+        # which inherits from GratingStim but has its own _updateList code.
+        # So don't want to do the update here (= ALSO the init of RadialStim).
+        # Could potentially define a BaseGrating class without updateListShaders
+        # code, and have GratingStim and RadialStim inherit from it and add their
+        # own _updateList stuff. Seems unnecessary.
+        # Instead, simply defer the update to the first .draw(), should be fast:
+        #self._updateList()  #ie refresh display list
+        self._needUpdate = True
+
+        # set autoLog now that params have been initialised
+        self.__dict__['autoLog'] = autoLog or autoLog is None and self.win.autoLog
+        if self.autoLog:
+            logging.exp("Created %s = %s" %(self.name, str(self)))
 
     @attributeSetter
     def sf(self, value):
-        """
-        :ref:`x,y-pair <attrib-xy>` or :ref:`scalar <attrib-scalar>`
-        Where `units` == 'deg' or 'cm' units are in cycles per deg/cm.
-        If `units` == 'norm' then sf units are in cycles per stimulus (so scale with stimulus size).
-        If texture is an image loaded from a file then sf defaults to 1/stim size to give one cycle of the image.
+        """Spatial frequency of the grating texture
 
-        Spatial frequency.
+        Should be a :ref:`x,y-pair <attrib-xy>` or :ref:`scalar <attrib-scalar>` or None.
+        If `units` == 'deg' or 'cm' units are in cycles per deg or cm as appropriate.
+        If `units` == 'norm' then sf units are in cycles per stimulus (and so SF scales with stimulus size).
+        If texture is an image loaded from a file then sf=None defaults to 1/stimSize to give one cycle of the image.
         """
 
         # Recode phase to numpy array
@@ -188,10 +190,10 @@ class GratingStim(BaseVisualStim):
 
     @attributeSetter
     def phase(self, value):
-        """
-        :ref:`x,y-pair <attrib-xy>` or :ref:`scalar <attrib-scalar>`
+        """Phase of the stimulus in each dimension of the texture.
 
-        Phase of the stimulus in each direction.
+        Should be an :ref:`x,y-pair <attrib-xy>` or :ref:`scalar <attrib-scalar>`
+
         **NB** phase has modulus 1 (rather than 360 or 2*pi)
         This is a little unconventional but has the nice effect
         that setting phase=t*n drifts a stimulus at n Hz
@@ -203,45 +205,35 @@ class GratingStim(BaseVisualStim):
 
     @attributeSetter
     def tex(self, value):
-        """
-        + **'sin'**,'sqr', 'saw', 'tri', None (resets to default)
-        + or the name of an image file (most formats supported)
-        + or a numpy array (1xN or NxN) ranging -1:1
+        """Texture to used on the stimulus as a grating (aka carrier)
 
-        The texture forming the image
+        This can be one of various options:
+            + **'sin'**,'sqr', 'saw', 'tri', None (resets to default)
+            + the name of an image file (most formats supported)
+            + a numpy array (1xN or NxN) ranging -1:1
+
+        If specifying your own texture using an image or numpy array you should
+        ensure that the image has square power-of-two dimesnions (e.g. 256x256).
+        If not then PsychoPy will upsample your stimulus to the next larger
+        power of two.
         """
-        createTexture(value, id=self._texID, pixFormat=GL.GL_RGB, stim=self,
+        self._createTexture(value, id=self._texID, pixFormat=GL.GL_RGB, stim=self,
             res=self.texRes, maskParams=self.maskParams)
         #if user requested size=None then update the size for new stim here
         if hasattr(self, '_requestedSize') and self._requestedSize == None:
             self.size = None  # Reset size do default
         self.__dict__['tex'] = value
+        self._needTextureUpdate = False
 
-    @attributeSetter
-    def mask(self, value):
-        """
-        + 'circle', 'gauss', 'raisedCos', **None** (resets to default)
-        + or the name of an image file (most formats supported)
-        + or a numpy array (1xN or NxN) ranging -1:1
-
-            The alpha mask (forming the shape of the image)
-        """
-        createTexture(value, id=self._maskID, pixFormat=GL.GL_ALPHA, stim=self,
-            res=self.texRes, maskParams=self.maskParams)
-        self.__dict__['mask'] = value
-
-    def setSF(self, value, operation='', log=True):
-        """ Deprication Warning! Use 'stim.parameter = value' syntax instead"""
+    def setSF(self, value, operation='', log=None):
+        """DEPRECATED. Use 'stim.parameter = value' syntax instead"""
         self._set('sf', value, operation, log=log)
-    def setPhase(self, value, operation='', log=True):
-        """ Deprication Warning! Use 'stim.parameter = value' syntax instead"""
+    def setPhase(self, value, operation='', log=None):
+        """DEPRECATED. Use 'stim.parameter = value' syntax instead"""
         self._set('phase', value, operation, log=log)
-    def setTex(self, value, log=True):
-        """ Deprication Warning! Use 'stim.parameter = value' syntax instead"""
+    def setTex(self, value, log=None):
+        """DEPRECATED. Use 'stim.parameter = value' syntax instead"""
         self.tex = value
-    def setMask(self, value, log=True):
-        """ Deprication Warning! Use 'stim.parameter = value' syntax instead"""
-        self.mask = value
 
     def draw(self, win=None):
         """
@@ -255,15 +247,14 @@ class GratingStim(BaseVisualStim):
 
         #do scaling
         GL.glPushMatrix()#push before the list, pop after
-        win.setScale(self._winScale)
-        #move to centre of stimulus and rotate
-        GL.glTranslatef(self._posRendered[0],self._posRendered[1],0)
-        GL.glRotatef(-self.ori,0.0,0.0,1.0)
+        win.setScale('pix')
         #the list just does the texture mapping
 
         desiredRGB = self._getDesiredRGB(self.rgb, self.colorSpace, self.contrast)
         GL.glColor4f(desiredRGB[0],desiredRGB[1],desiredRGB[2], self.opacity)
 
+        if self._needTextureUpdate:
+            self.setTex(value=self.tex, log=False)
         if self._needUpdate:
             self._updateList()
         GL.glCallList(self._listID)
@@ -294,12 +285,6 @@ class GratingStim(BaseVisualStim):
         GL.glActiveTexture(GL.GL_TEXTURE0)
         GL.glBindTexture(GL.GL_TEXTURE_2D, self._texID)
         GL.glEnable(GL.GL_TEXTURE_2D)
-        #calculate coords in advance:
-        L = -self._sizeRendered[0]/2#vertices
-        R =  self._sizeRendered[0]/2
-        T =  self._sizeRendered[1]/2
-        B = -self._sizeRendered[1]/2
-        #depth = self.depth
 
         Ltex = -self._cycles[0]/2 - self.phase[0]+0.5
         Rtex = +self._cycles[0]/2 - self.phase[0]+0.5
@@ -307,23 +292,24 @@ class GratingStim(BaseVisualStim):
         Btex = -self._cycles[1]/2 - self.phase[1]+0.5
         Lmask=Bmask= 0.0; Tmask=Rmask=1.0#mask
 
+        vertsPix = self.verticesPix #access just once because it's slower than basic property
         GL.glBegin(GL.GL_QUADS)                  # draw a 4 sided polygon
         # right bottom
         GL.glMultiTexCoord2f(GL.GL_TEXTURE0,Rtex, Btex)
         GL.glMultiTexCoord2f(GL.GL_TEXTURE1,Rmask,Bmask)
-        GL.glVertex2f(R,B)
+        GL.glVertex2f(vertsPix[0,0], vertsPix[0,1])
         # left bottom
         GL.glMultiTexCoord2f(GL.GL_TEXTURE0,Ltex,Btex)
         GL.glMultiTexCoord2f(GL.GL_TEXTURE1,Lmask,Bmask)
-        GL.glVertex2f(L,B)
+        GL.glVertex2f(vertsPix[1,0], vertsPix[1,1])
         # left top
         GL.glMultiTexCoord2f(GL.GL_TEXTURE0,Ltex,Ttex)
         GL.glMultiTexCoord2f(GL.GL_TEXTURE1,Lmask,Tmask)
-        GL.glVertex2f(L,T)
+        GL.glVertex2f(vertsPix[2,0], vertsPix[2,1])
         # right top
         GL.glMultiTexCoord2f(GL.GL_TEXTURE0,Rtex,Ttex)
         GL.glMultiTexCoord2f(GL.GL_TEXTURE1,Rmask,Tmask)
-        GL.glVertex2f(R,T)
+        GL.glVertex2f(vertsPix[3,0], vertsPix[3,1])
         GL.glEnd()
 
         #unbind the textures
@@ -361,11 +347,7 @@ class GratingStim(BaseVisualStim):
         GL.glActiveTextureARB(GL.GL_TEXTURE0_ARB)
         GL.glEnable(GL.GL_TEXTURE_2D)
         GL.glBindTexture(GL.GL_TEXTURE_2D, self._texID)
-        #calculate coords in advance:
-        L = -self._sizeRendered[0]/2#vertices
-        R =  self._sizeRendered[0]/2
-        T =  self._sizeRendered[1]/2
-        B = -self._sizeRendered[1]/2
+
         #depth = self.depth
         Ltex = -self._cycles[0]/2 - self.phase[0]+0.5
         Rtex = +self._cycles[0]/2 - self.phase[0]+0.5
@@ -373,23 +355,24 @@ class GratingStim(BaseVisualStim):
         Btex = -self._cycles[1]/2 - self.phase[1]+0.5
         Lmask=Bmask= 0.0; Tmask=Rmask=1.0#mask
 
+        vertsPix = self.verticesPix #access just once because it's slower than basic property
         GL.glBegin(GL.GL_QUADS)                  # draw a 4 sided polygon
         # right bottom
-        GL.glMultiTexCoord2fARB(GL.GL_TEXTURE0_ARB,Rtex, Btex)
-        GL.glMultiTexCoord2fARB(GL.GL_TEXTURE1_ARB,Rmask,Bmask)
-        GL.glVertex2f(R,B)
+        GL.glMultiTexCoord2f(GL.GL_TEXTURE0,Rtex, Btex)
+        GL.glMultiTexCoord2f(GL.GL_TEXTURE1,Rmask,Bmask)
+        GL.glVertex2f(vertsPix[0,0], vertsPix[0,1])
         # left bottom
-        GL.glMultiTexCoord2fARB(GL.GL_TEXTURE0_ARB,Ltex,Btex)
-        GL.glMultiTexCoord2fARB(GL.GL_TEXTURE1_ARB,Lmask,Bmask)
-        GL.glVertex2f(L,B)
+        GL.glMultiTexCoord2f(GL.GL_TEXTURE0,Ltex,Btex)
+        GL.glMultiTexCoord2f(GL.GL_TEXTURE1,Lmask,Bmask)
+        GL.glVertex2f(vertsPix[1,0], vertsPix[1,1])
         # left top
-        GL.glMultiTexCoord2fARB(GL.GL_TEXTURE0_ARB,Ltex,Ttex)
-        GL.glMultiTexCoord2fARB(GL.GL_TEXTURE1_ARB,Lmask,Tmask)
-        GL.glVertex2f(L,T)
+        GL.glMultiTexCoord2f(GL.GL_TEXTURE0,Ltex,Ttex)
+        GL.glMultiTexCoord2f(GL.GL_TEXTURE1,Lmask,Tmask)
+        GL.glVertex2f(vertsPix[2,0], vertsPix[2,1])
         # right top
-        GL.glMultiTexCoord2fARB(GL.GL_TEXTURE0_ARB,Rtex,Ttex)
-        GL.glMultiTexCoord2fARB(GL.GL_TEXTURE1_ARB,Rmask,Tmask)
-        GL.glVertex2f(R,T)
+        GL.glMultiTexCoord2f(GL.GL_TEXTURE0,Rtex,Ttex)
+        GL.glMultiTexCoord2f(GL.GL_TEXTURE1,Rmask,Tmask)
+        GL.glVertex2f(vertsPix[3,0], vertsPix[3,1])
         GL.glEnd()
 
         #disable mask
@@ -405,27 +388,13 @@ class GratingStim(BaseVisualStim):
         #we're done!
         GL.glEndList()
 
-
     def __del__(self):
-        GL.glDeleteLists(self._listID, 1)
-        self.clearTextures()#remove textures from graphics card to prevent crash
-
-    def clearTextures(self):
-        """
-        Clear the textures associated with the given stimulus.
-        As of v1.61.00 this is called automatically during garbage collection of
-        your stimulus, so doesn't need calling explicitly by the user.
-        """
-        GL.glDeleteTextures(1, self._texID)
-        GL.glDeleteTextures(1, self._maskID)
+        if hasattr(self, '_listID'):
+            GL.glDeleteLists(self._listID, 1)
+            self.clearTextures()#remove textures from graphics card to prevent crash
 
     def _calcCyclesPerStim(self):
         if self.units in ['norm', 'height']:
             self._cycles = self.sf  #this is the only form of sf that is not size dependent
         else:
             self._cycles = self.sf * self.size
-
-    def contains(self, *args, **kwargs):
-        raise NotImplementedError("GratingStim do not have a contains() method")
-    def overlaps(self, *args, **kwargs):
-        raise NotImplementedError("GratingStim do not have an overlaps() method")

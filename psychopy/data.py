@@ -1,28 +1,28 @@
 # -*- coding: utf-8 -*-
 """Routines for handling data structures and analysis"""
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
-from psychopy import gui, logging
+from psychopy import logging
 from psychopy.tools.arraytools import extendArr, shuffleArray
 from psychopy.tools.fileerrortools import handleFileCollision
 import psychopy
-import cPickle, string, sys, platform, os, time, copy, csv
+import cPickle, string, sys, os, time, copy
 import numpy
 from scipy import optimize, special
-from contrib.quest import *    #used for QuestHandler
+from contrib.quest import QuestObject  # used for QuestHandler
 import inspect #so that Handlers can find the script that called them
-import codecs, locale
+import codecs
 import weakref
 import re
 
 try:
-    import openpyxl
+    #import openpyxl
     from openpyxl.cell import get_column_letter
     from openpyxl.reader.excel import load_workbook
     haveOpenpyxl=True
-except:
+except ImportError:
     haveOpenpyxl=False
 
 _experiments=weakref.WeakValueDictionary()
@@ -47,7 +47,8 @@ class ExperimentHandler(object):
                 originPath=None,
                 savePickle=True,
                 saveWideText=True,
-                dataFileName=''):
+                dataFileName='',
+                autoLog=True):
         """
         :parameters:
 
@@ -69,13 +70,18 @@ class ExperimentHandler(object):
                 If not provided this will be determined as the path of the
                 calling script.
 
-            dataFilename : string
+            dataFileName : string
                 This is defined in advance and the file will be saved at any
                 point that the handler is removed or discarded (unless .abort()
                 had been called in advance).
                 The handler will attempt to populate the file even in the
                 event of a (not too serious) crash!
 
+            savePickle : True (default) or False
+
+            saveWideText : True (default) or False
+
+            autoLog : True (default) or False
         """
         self.loops=[]
         self.loopsUnfinished=[]
@@ -94,11 +100,15 @@ class ExperimentHandler(object):
         self.entries=[]#chronological list of entries
         self._paramNamesSoFar=[]
         self.dataNames=[]#names of all the data (eg. resp.keys)
+        self.autoLog = autoLog
         if dataFileName in ['', None]:
             logging.warning('ExperimentHandler created with no dataFileName parameter. No data will be saved in the event of a crash')
+        else:
+            checkValidFilePath(dataFileName, makeValid=True) #fail now if we fail at all!
     def __del__(self):
         if self.dataFileName not in ['', None]:
-            logging.debug('Saving data for %s ExperimentHandler' %self.name)
+            if self.autoLog:
+                logging.debug('Saving data for %s ExperimentHandler' %self.name)
             if self.savePickle==True:
                 self.saveAsPickle(self.dataFileName)
             if self.saveWideText==True:
@@ -238,27 +248,28 @@ class ExperimentHandler(object):
         If `matrixOnly=True` then the file will not contain a header row, which can be handy if you want to append data
         to an existing file of the same format.
         """
-
         #create the file or print to stdout
-        if appendFile: writeFormat='a'
-        else: writeFormat='w' #will overwrite a file
+        if appendFile:
+            writeFormat = 'a'
+        else:
+            writeFormat = 'w' #will overwrite a file
         if os.path.exists(fileName) and writeFormat == 'w':
             logging.warning('Data file, %s, will be overwritten' %fileName)
 
         if fileName[-4:] in ['.csv', '.CSV']:
-            delim=','
+            delim = ','
         else:
-            delim='\t'
+            delim = '\t'
 
         if fileName=='stdout':
             f = sys.stdout
         elif fileName[-4:] in ['.csv', '.CSV','.dlm','.DLM', '.tsv','.TSV']:
-            f= codecs.open(fileName,writeFormat, encoding = "utf-8")
+            f = codecs.open(fileName, writeFormat, encoding="utf-8")
         else:
-            if delim==',':
-                f= codecs.open(fileName+'.csv',writeFormat, encoding = "utf-8")
+            if delim == ',':
+                f = codecs.open(fileName+'.csv', writeFormat, encoding="utf-8")
             else:
-                f=codecs.open(fileName+'.dlm',writeFormat, encoding = "utf-8")
+                f = codecs.open(fileName+'.dlm', writeFormat, encoding="utf-8")
 
         names = self._getAllParamNames()
         names.extend(self.dataNames)
@@ -274,7 +285,7 @@ class ExperimentHandler(object):
             for name in names:
                 entry.keys()
                 if name in entry.keys():
-                    if ',' in unicode(entry[name]):
+                    if ',' in unicode(entry[name]) or '\n' in unicode(entry[name]):
                         f.write(u'"%s"%s' %(entry[name],delim))
                     else:
                         f.write(u'%s%s' %(entry[name],delim))
@@ -282,8 +293,9 @@ class ExperimentHandler(object):
                     f.write(delim)
             f.write('\n')
         f.close()
+        print "saved data to %r" %f.name
         self.saveWideText=False
-    def saveAsPickle(self,fileName, fileCollisionMethod = 'rename'):
+    def saveAsPickle(self,fileName, fileCollisionMethod='rename'):
         """Basically just saves a copy of self (with data) to a pickle file.
 
         This can be reloaded if necessary and further analyses carried out.
@@ -325,7 +337,7 @@ class TrialType(dict):
             try:
                 return self[name]
             except KeyError:
-                raise AttributeError, ('TrialType has no attribute (or key) \'%s\'' %(name))
+                raise AttributeError('TrialType has no attribute (or key) \'%s\'' %(name))
 
 class _BaseTrialHandler(object):
     def setExp(self, exp):
@@ -359,17 +371,18 @@ class _BaseTrialHandler(object):
             exp.loopEnded(self)
         #and halt the loop
         raise StopIteration
-    def saveAsPickle(self,fileName, fileCollisionMethod = 'rename'):
+    def saveAsPickle(self,fileName, fileCollisionMethod='rename'):
         """Basically just saves a copy of the handler (with data) to a pickle file.
 
-        This can be reloaded if necessesary and further analyses carried out.
+        This can be reloaded if necessary and further analyses carried out.
 
         :Parameters:
 
             fileCollisionMethod: Collision method passed to :func:`~psychopy.tools.fileerrortools.handleFileCollision`
         """
         if self.thisTrialN<1 and self.thisRepN<1:#if both are <1 we haven't started
-            logging.info('.saveAsPickle() called but no trials completed. Nothing saved')
+            if self.autoLog:
+                logging.info('.saveAsPickle() called but no trials completed. Nothing saved')
             return -1
         #otherwise use default location
         if not fileName.endswith('.psydat'):
@@ -422,10 +435,11 @@ class _BaseTrialHandler(object):
 
         """
         if self.thisTrialN<1 and self.thisRepN<1:#if both are <1 we haven't started
-            logging.info('TrialHandler.saveAsText called but no trials completed. Nothing saved')
+            if self.autoLog:
+                logging.info('TrialHandler.saveAsText called but no trials completed. Nothing saved')
             return -1
 
-        dataArray = self._createOutputArray(stimOut=[],
+        dataArray = self._createOutputArray(stimOut=stimOut,
             dataOut=dataOut,
             matrixOnly=matrixOnly)
 
@@ -437,17 +451,19 @@ class _BaseTrialHandler(object):
                 delim='\t'
 
         #create the file or print to stdout
-        if appendFile: writeFormat='a'
-        else: writeFormat='w' #will overwrite a file
-        if fileName=='stdout':
+        if appendFile:
+            writeFormat = 'a'
+        else:
+            writeFormat = 'w' #will overwrite a file
+        if fileName == 'stdout':
             f = sys.stdout
         elif fileName[-4:] in ['.dlm','.DLM', '.csv', '.CSV']:
-            f= codecs.open(fileName,writeFormat, encoding = "utf-8")
+            f = codecs.open(fileName, writeFormat, encoding="utf-8")
         else:
             if delim==',':
-                f= codecs.open(fileName+'.csv',writeFormat, encoding = "utf-8")
+                f= codecs.open(fileName+'.csv', writeFormat, encoding="utf-8")
             else:
-                f=codecs.open(fileName+'.dlm',writeFormat, encoding = "utf-8")
+                f=codecs.open(fileName+'.dlm', writeFormat, encoding="utf-8")
 
         #loop through lines in the data matrix
         for line in dataArray:
@@ -461,7 +477,8 @@ class _BaseTrialHandler(object):
             f.write("\n")#add an EOL at end of each line
         if f != sys.stdout:
             f.close()
-            logging.info('saved data to %s' %f.name)
+            if self.autoLog:
+                logging.info('saved data to %s' %f.name)
     def printAsText(self, stimOut=[],
                     dataOut=('all_mean', 'all_std', 'all_raw'),
                     delim='\t',
@@ -519,16 +536,17 @@ class _BaseTrialHandler(object):
         """
 
         if self.thisTrialN<1 and self.thisRepN<1:#if both are <1 we haven't started
-            logging.info('TrialHandler.saveAsExcel called but no trials completed. Nothing saved')
+            if self.autoLog:
+                logging.info('TrialHandler.saveAsExcel called but no trials completed. Nothing saved')
             return -1
 
         #NB this was based on the limited documentation (1 page wiki) for openpyxl v1.0
         if not haveOpenpyxl:
-            raise ImportError, 'openpyxl is required for saving files in Excel (xlsx) format, but was not found.'
-            return -1
+            raise ImportError('openpyxl is required for saving files in Excel (xlsx) format, but was not found.')
+            #return -1
 
         #create the data array to be sent to the Excel file
-        dataArray = self._createOutputArray(stimOut=[],
+        dataArray = self._createOutputArray(stimOut=stimOut,
             dataOut=dataOut,
             matrixOnly=matrixOnly)
 
@@ -537,14 +555,16 @@ class _BaseTrialHandler(object):
         from openpyxl.writer.excel import ExcelWriter
         from openpyxl.reader.excel import load_workbook
 
-        if not fileName.endswith('.xlsx'): fileName+='.xlsx'
+        if not fileName.endswith('.xlsx'):
+            fileName+='.xlsx'
         #create or load the file
         if appendFile and os.path.isfile(fileName):
             wb = load_workbook(fileName)
             newWorkbook=False
         else:
             if not appendFile: #the file exists but we're not appending, so will be overwritten
-                logging.warning('Data file, %s, will be overwritten' %fileName)
+                if self.autoLog:
+                    logging.warning('Data file, %s, will be overwritten' %fileName)
             wb = Workbook()#create new workbook
             wb.properties.creator='PsychoPy'+psychopy.__version__
             newWorkbook=True
@@ -586,7 +606,7 @@ class _BaseTrialHandler(object):
         return self.next()
     def getOriginPathAndFile(self, originPath=None):
         """Attempts to determine the path of the script that created this data file
-        and returns both the path to that script and it's contents.
+        and returns both the path to that script and its contents.
         Useful to store the entire experiment with the data.
 
         If originPath is provided (e.g. from Builder) then this is used otherwise
@@ -596,12 +616,14 @@ class _BaseTrialHandler(object):
         if originPath==None or not os.path.isfile(originPath):
             try:
                 originPath = inspect.getouterframes(inspect.currentframe())[1][1]
-                logging.debug("Using %s as origin file" %originPath)
+                if self.autoLog:
+                    logging.debug("Using %s as origin file" %originPath)
             except:
-                logging.debug("Failed to find origin file using inspect.getouterframes")
+                if self.autoLog:
+                    logging.debug("Failed to find origin file using inspect.getouterframes")
                 return '',''
         if os.path.isfile(originPath):#do we NOW have a path?
-            origin = codecs.open(originPath,"r", encoding = "utf-8").read()
+            origin = codecs.open(originPath, "r", encoding="utf-8").read()
         else:
             origin=None
         return originPath, origin
@@ -631,7 +653,8 @@ class TrialHandler(_BaseTrialHandler):
                  extraInfo=None,
                  seed=None,
                  originPath=None,
-                 name=''):
+                 name='',
+                 autoLog=True):
         """
 
         :Parameters:
@@ -693,14 +716,18 @@ class TrialHandler(_BaseTrialHandler):
 
         """
         self.name=name
+        self.autoLog = autoLog
+
         if trialList in [None, []]:#user wants an empty trialList
             self.trialList = [None]#which corresponds to a list with a single empty entry
+        elif isinstance(trialList, basestring) and os.path.isfile(trialList): #user has hopefully specified a filename
+            self.trialList = importConditions(trialList) #import conditions from that file
         else:
             self.trialList =trialList
         #convert any entry in the TrialList into a TrialType object (with obj.key or obj[key] access)
-        for n, entry in enumerate(trialList):
+        for n, entry in enumerate(self.trialList):
             if type(entry)==dict:
-                trialList[n]=TrialType(entry)
+                self.trialList[n]=TrialType(entry)
         self.nReps = int(nReps)
         self.nTotal = self.nReps*len(self.trialList)
         self.nRemaining =self.nTotal #subtract 1 each trial
@@ -741,8 +768,10 @@ class TrialHandler(_BaseTrialHandler):
         attribs = dir(self)
 
         #print data first, then all others
-        try: data=self.data
-        except: data=None
+        try:
+            data = self.data
+        except:
+            data = None
         if data:
             strRepres += str('\tdata=')
             strRepres +=str(data)+'\n'
@@ -813,7 +842,8 @@ class TrialHandler(_BaseTrialHandler):
             sequential = numpy.repeat(indices, self.nReps,1) # = sequential
             randomFlat = shuffleArray(sequential.flat, seed=self.seed)
             sequenceIndices = numpy.reshape(randomFlat, (len(indices), self.nReps))
-        logging.exp('Created sequence: %s, trialTypes=%d, nReps=%i, seed=%s' %
+        if self.autoLog:
+            logging.exp('Created sequence: %s, trialTypes=%d, nReps=%i, seed=%s' %
                 (self.method, len(indices), self.nReps, str(self.seed) )  )
         return sequenceIndices
 
@@ -887,7 +917,8 @@ class TrialHandler(_BaseTrialHandler):
             self.thisTrial = self.trialList[self.thisIndex]
             self.data.add('ran',1)
             self.data.add('order',self.thisN)
-        logging.exp('New trial (rep=%i, index=%i): %s' %(self.thisRepN, self.thisTrialN, self.thisTrial), obj=self.thisTrial)
+        if self.autoLog:
+            logging.exp('New trial (rep=%i, index=%i): %s' %(self.thisRepN, self.thisTrialN, self.thisTrial), obj=self.thisTrial)
         return self.thisTrial
 
     def getFutureTrial(self, n=1):
@@ -907,7 +938,8 @@ class TrialHandler(_BaseTrialHandler):
         prior to the first.
         """
         # treat positive offset values as equivalent to negative ones:
-        if n > 0: n = n * -1
+        if n > 0:
+            n = n * -1
         return self.getFutureTrial(n)
 
     def _createOutputArray(self,stimOut,dataOut,delim=None,
@@ -932,8 +964,10 @@ class TrialHandler(_BaseTrialHandler):
             lines.append(thisLine)
             #write a header line
             for heading in stimOut+dataHead:
-                if heading=='ran_sum': heading ='n'
-                elif heading=='order_raw': heading ='order'
+                if heading=='ran_sum':
+                    heading ='n'
+                elif heading=='order_raw':
+                    heading ='order'
                 thisLine.append(heading)
 
         #loop through stimuli, writing data
@@ -986,26 +1020,30 @@ class TrialHandler(_BaseTrialHandler):
         """
         dataHead=[]#will store list of data headers
         dataAnal=dict([])    #will store data that has been analyzed
-        if type(dataOut)==str: dataOut=[dataOut]#don't do list convert or we get a list of letters
-        elif type(dataOut)!=list: dataOut = list(dataOut)
+        if type(dataOut)==str:
+            dataOut=[dataOut]#don't do list convert or we get a list of letters
+        elif type(dataOut)!=list:
+            dataOut = list(dataOut)
 
         #expand any 'all' dataTypes to be the full list of available dataTypes
         allDataTypes=self.data.keys()
         #treat these separately later
         allDataTypes.remove('ran')
-        #ready to go trhough standard data types
+        #ready to go through standard data types
         dataOutNew=[]
         for thisDataOut in dataOut:
-            if thisDataOut=='n':
+            if thisDataOut == 'n':
                 #n is really just the sum of the ran trials
                 dataOutNew.append('ran_sum')
                 continue#no need to do more with this one
             #then break into dataType and analysis
-            dataType, analType =string.rsplit(thisDataOut, '_', 1)
-            if dataType=='all':
+            dataType, analType = string.rsplit(thisDataOut, '_', 1)
+            if dataType == 'all':
                 dataOutNew.extend([key+"_"+analType for key in allDataTypes])
-                if 'order_mean' in dataOutNew: dataOutNew.remove('order_mean')
-                if 'order_std' in dataOutNew: dataOutNew.remove('order_std')
+                if 'order_mean' in dataOutNew:
+                    dataOutNew.remove('order_mean')
+                if 'order_std' in dataOutNew:
+                    dataOutNew.remove('order_std')
             else:
                 dataOutNew.append(thisDataOut)
         dataOut=dataOutNew
@@ -1022,7 +1060,7 @@ class TrialHandler(_BaseTrialHandler):
             dataOut.append('order_raw')
         #do the necessary analysis on the data
         for thisDataOutN,thisDataOut in enumerate(dataOut):
-            dataType, analType =string.rsplit(thisDataOut, '_', 1)
+            dataType, analType = string.rsplit(thisDataOut, '_', 1)
             if not dataType in self.data:
                 dataOutInvalid.append(thisDataOut)#that analysis can't be done
                 continue
@@ -1035,7 +1073,7 @@ class TrialHandler(_BaseTrialHandler):
                 try:#this will fail if we try to take mean of a string for example
                     if analType=='std':
                         thisAnal = numpy.std(thisData,axis=1,ddof=0)
-                        #normalise by N-1 instead. his should work by setting ddof=1
+                        #normalise by N-1 instead. This should work by setting ddof=1
                         #but doesn't as of 08/2010 (because of using a masked array?)
                         N=thisData.shape[1]
                         if N == 1:
@@ -1051,7 +1089,7 @@ class TrialHandler(_BaseTrialHandler):
             elif analType=='raw':
                 thisAnal=thisData
             else:
-                raise AttributeError, 'You can only use analyses from numpy'
+                raise AttributeError('You can only use analyses from numpy')
             #add extra cols to header if necess
             if len(thisAnal.shape)>1:
                 for n in range(thisAnal.shape[1]-1):
@@ -1059,7 +1097,8 @@ class TrialHandler(_BaseTrialHandler):
             dataAnal[thisDataOut]=thisAnal
 
         #remove invalid analyses (e.g. average of a string)
-        for invalidAnal in dataOutInvalid: dataOut.remove(invalidAnal)
+        for invalidAnal in dataOutInvalid:
+            dataOut.remove(invalidAnal)
         return dataOut, dataAnal, dataHead
 
 
@@ -1106,15 +1145,18 @@ class TrialHandler(_BaseTrialHandler):
 
         #create the file or print to stdout
         if appendFile:
-            writeFormat='a'
-        else: writeFormat='w' #will overwrite a file
-        if fileName=='stdout':
+            writeFormat = 'a'
+        else:
+            writeFormat = 'w' #will overwrite a file
+        if fileName == 'stdout':
             f = sys.stdout
         elif fileName[-4:] in ['.dlm','.DLM', '.tsv', '.TSV', '.txt', '.TXT', '.csv', '.CSV']:
-            f = codecs.open(fileName,writeFormat, encoding = "utf-8")
+            f = codecs.open(fileName, writeFormat, encoding="utf-8")
         else:
-            if delim==',': f = codecs.open(fileName+'.csv', writeFormat, encoding="utf-8")
-            else: f=codecs.open(fileName+'.txt',writeFormat, encoding = "utf-8")
+            if delim==',':
+                f = codecs.open(fileName+'.csv', writeFormat, encoding="utf-8")
+            else:
+                f = codecs.open(fileName+'.txt', writeFormat, encoding="utf-8")
 
         # collect parameter names related to the stimuli:
         if self.trialList[0]:
@@ -1230,24 +1272,26 @@ def importConditions(fileName, returnFieldNames=False):
         OK, return silently; else raise ImportError with msg
         """
         if not all(fieldNames):
-            raise ImportError, 'Conditions file %s: Missing parameter name(s); empty cell(s) in the first row?' % fileName
+            raise ImportError('Conditions file %s: Missing parameter name(s); empty cell(s) in the first row?' % fileName)
         for name in fieldNames:
             OK, msg = isValidVariableName(name)
             if not OK: #tailor message to importConditions
                 msg = msg.replace('Variables', 'Parameters (column headers)')
-                raise ImportError, 'Conditions file %s: %s%s"%s"' %(fileName, msg, os.linesep*2, name)
+                raise ImportError('Conditions file %s: %s%s"%s"' %(fileName, msg, os.linesep*2, name))
 
     if fileName in ['None','none',None]:
         if returnFieldNames:
             return [], []
         return []
     if not os.path.isfile(fileName):
-        raise ImportError, 'Conditions file not found: %s' %os.path.abspath(fileName)
+        raise ImportError('Conditions file not found: %s' %os.path.abspath(fileName))
 
     if fileName.endswith('.csv'):
         #use csv import library to fetch the fieldNames
         f = open(fileName, 'rU')#the U converts line endings to os.linesep (not unicode!)
-        trialsArr = numpy.recfromcsv(f)
+        trialsArr = numpy.recfromcsv(f, case_sensitive=True)
+        if trialsArr.shape == ():  # convert 0-D to 1-D with one element:
+            trialsArr = trialsArr[numpy.newaxis]
         fieldNames = trialsArr.dtype.names
         _assertValidVarNames(fieldNames, fileName)
         f.close()
@@ -1270,7 +1314,7 @@ def importConditions(fileName, returnFieldNames=False):
         try:
             trialsArr = cPickle.load(f)
         except:
-            raise ImportError, 'Could not open %s as conditions' % fileName
+            raise ImportError('Could not open %s as conditions' % fileName)
         f.close()
         trialList = []
         fieldNames = trialsArr[0] # header line first
@@ -1282,11 +1326,11 @@ def importConditions(fileName, returnFieldNames=False):
             trialList.append(thisTrial)
     else:
         if not haveOpenpyxl:
-            raise ImportError, 'openpyxl is required for loading excel format files, but it was not found.'
+            raise ImportError('openpyxl is required for loading excel format files, but it was not found.')
         try:
-            wb = load_workbook(filename = fileName)
+            wb = load_workbook(filename=fileName)
         except: # InvalidFileException(unicode(e)): # this fails
-            raise ImportError, 'Could not open %s as conditions' % fileName
+            raise ImportError('Could not open %s as conditions' % fileName)
         ws = wb.worksheets[0]
         nCols = ws.get_highest_column()
         nRows = ws.get_highest_row()
@@ -1368,11 +1412,14 @@ class StairHandler(_BaseTrialHandler):
     Calls to nextTrial() will fetch the next object given to this
     handler, according to the method specified.
 
-    See ``demo_trialHandler.py``
+    See ``Demos >> ExperimentalControl >> JND_staircase_exp.py``
 
     The staircase will terminate when *nTrials* AND *nReversals* have been exceeded. If *stepSizes* was an array
     and has been exceeded before nTrials is exceeded then the staircase will continue
-    to reverse
+    to reverse.
+
+    *nUp* and *nDown* are always considered as 1 until the first reversal is reached. The values entered as arguments
+    are then used.
 
     """
     def __init__(self,
@@ -1388,7 +1435,8 @@ class StairHandler(_BaseTrialHandler):
                  minVal=None,
                  maxVal=None,
                  originPath=None,
-                 name=''):
+                 name='',
+                 autoLog=True):
         """
         :Parameters:
 
@@ -1477,6 +1525,8 @@ class StairHandler(_BaseTrialHandler):
         self._warnUseOfNext=True
         self.minVal = minVal
         self.maxVal = maxVal
+        self.autoLog = autoLog
+        self.initialRule = 0  #a flag for the 1-up 1-down initial rule
 
         #self.originPath and self.origin (the contents of the origin file)
         self.originPath, self.origin = self.getOriginPathAndFile(originPath)
@@ -1521,7 +1571,7 @@ class StairHandler(_BaseTrialHandler):
         self.calculateNextIntensity()
 
     def addOtherData(self, dataName, value):
-        """Add additonal data to the handler, to be tracked alongside the result
+        """Add additional data to the handler, to be tracked alongside the result
         data but not affecting the value of the staircase
         """
         if not dataName in self.otherData: #init the list
@@ -1549,7 +1599,6 @@ class StairHandler(_BaseTrialHandler):
             #always using a 1-down, 1-up rule initially
             if self.data[-1]==1:    #last answer correct
                 #got it right
-                self._intensityDec()
                 if self.currentDirection=='up':
                     reversal=True
                 else:#direction is 'down' or 'start'
@@ -1557,7 +1606,6 @@ class StairHandler(_BaseTrialHandler):
                 self.currentDirection='down'
             else:
                 #got it wrong
-                self._intensityInc()
                 if self.currentDirection=='down':
                     reversal=True
                 else:#direction is 'up' or 'start'
@@ -1566,8 +1614,6 @@ class StairHandler(_BaseTrialHandler):
                 self.currentDirection='up'
 
         elif self.correctCounter >= self.nDown: #n right, time to go down!
-            #make it harder
-            self._intensityDec()
             if self.currentDirection!='down':
                 reversal=True
             else:
@@ -1575,8 +1621,6 @@ class StairHandler(_BaseTrialHandler):
             self.currentDirection='down'
 
         elif self.correctCounter <= -self.nUp: #n wrong, time to go up!
-            #make it easier
-            self._intensityInc()
             #note current direction
             if self.currentDirection!='up':
                 reversal=True
@@ -1592,18 +1636,32 @@ class StairHandler(_BaseTrialHandler):
         #add reversal info
         if reversal:
             self.reversalPoints.append(self.thisTrialN)
+            if len(self.reversalIntensities)<1:
+                self.initialRule=1
             self.reversalIntensities.append(self.intensities[-1])
         #test if we're done
         if len(self.reversalIntensities)>=self.nReversals and \
             len(self.intensities)>=self.nTrials:
                 self.finished=True
         #new step size if necessary
-        if reversal and self._variableStep and self.finished==False:
+        if reversal and self._variableStep:
             if len(self.reversalIntensities) >= len(self.stepSizes):
                 #we've gone beyond the list of step sizes so just use the last one
                 self.stepSizeCurrent = self.stepSizes[-1]
             else:
                 self.stepSizeCurrent = self.stepSizes[len(self.reversalIntensities)]
+
+        #apply new step size
+        if len(self.reversalIntensities)<1 or self.initialRule==1:
+            self.initialRule=0 #reset the flag
+            if self.data[-1]==1:
+                self._intensityDec()
+            else:
+                self._intensityInc()
+        elif self.correctCounter >= self.nDown: #n right, so going down
+            self._intensityDec()
+        elif self.correctCounter <= -self.nUp:  #n wrong, so going up
+            self._intensityInc()
 
 
     def next(self):
@@ -1686,7 +1744,8 @@ class StairHandler(_BaseTrialHandler):
         """
 
         if self.thisTrialN<1:
-            logging.debug('StairHandler.saveAsText called but no trials completed. Nothing saved')
+            if self.autoLog:
+                logging.debug('StairHandler.saveAsText called but no trials completed. Nothing saved')
             return -1
 
         #create the file or print to stdout
@@ -1695,8 +1754,10 @@ class StairHandler(_BaseTrialHandler):
         elif fileName[-4:] in ['.dlm','.DLM', '.csv','.CSV']:
             f= file(fileName,'w')
         else:
-            if delim==',': f=file(fileName+'.csv','w')
-            else: f=file(fileName+'.dlm','w')
+            if delim==',':
+                f = file(fileName+'.csv','w')
+            else:
+                f = file(fileName+'.dlm','w')
 
         #write the data
         reversalStr = str(self.reversalIntensities)
@@ -1738,7 +1799,8 @@ class StairHandler(_BaseTrialHandler):
         f.write("\n")
         if f != sys.stdout:
             f.close()
-            logging.info('saved data to %s' %f.name)
+            if self.autoLog:
+                logging.info('saved data to %s' %f.name)
 
     def saveAsExcel(self,fileName, sheetName='data',
                    matrixOnly=False, appendFile=True,
@@ -1777,19 +1839,21 @@ class StairHandler(_BaseTrialHandler):
         """
 
         if self.thisTrialN<1:
-            logging.debug('StairHandler.saveAsExcel called but no trials completed. Nothing saved')
+            if self.autoLog:
+                logging.debug('StairHandler.saveAsExcel called but no trials completed. Nothing saved')
             return -1
         #NB this was based on the limited documentation (1 page wiki) for openpyxl v1.0
         if not haveOpenpyxl:
-            raise ImportError, 'openpyxl is required for saving files in Excel (xlsx) format, but was not found.'
-            return -1
+            raise ImportError('openpyxl is required for saving files in Excel (xlsx) format, but was not found.')
+            #return -1
 
         #import necessary subpackages - they are small so won't matter to do it here
         from openpyxl.workbook import Workbook
         from openpyxl.writer.excel import ExcelWriter
         from openpyxl.reader.excel import load_workbook
 
-        if not fileName.endswith('.xlsx'): fileName+='.xlsx'
+        if not fileName.endswith('.xlsx'):
+            fileName+='.xlsx'
         #create or load the file
         if appendFile and os.path.isfile(fileName):
             wb = load_workbook(fileName)
@@ -1828,14 +1892,16 @@ class StairHandler(_BaseTrialHandler):
         #add self.extraInfo
         rowN = 0
         if (self.extraInfo != None) and not matrixOnly:
-            ws.cell(_getExcelCellName(col=6,row=rowN)).value = 'extraInfo'; rowN+=1
+            ws.cell(_getExcelCellName(col=6,row=rowN)).value = 'extraInfo'
+            rowN += 1
             for key,val in self.extraInfo.items():
                 ws.cell(_getExcelCellName(col=6,row=rowN)).value = unicode(key)+u':'
                 ws.cell(_getExcelCellName(col=7,row=rowN)).value = unicode(val)
                 rowN+=1
 
         ew.save(filename = fileName)
-        logging.info('saved data to %s' %fileName)
+        if self.autoLog:
+            logging.info('saved data to %s' %fileName)
 
     def saveAsPickle(self,fileName):
         """Basically just saves a copy of self (with data) to a pickle file.
@@ -1843,7 +1909,8 @@ class StairHandler(_BaseTrialHandler):
         This can be reloaded if necess and further analyses carried out.
         """
         if self.thisTrialN<1:
-            logging.debug('StairHandler.saveAsPickle called but no trials completed. Nothing saved')
+            if self.autoLog:
+                logging.debug('StairHandler.saveAsPickle called but no trials completed. Nothing saved')
             return -1
         #otherwise use default location
         f = open(fileName+'.psydat', "wb")
@@ -1891,7 +1958,7 @@ class QuestHandler(StairHandler):
             # get response
             ...
             # inform QUEST of the response, needed to calculate next level
-            staircase.addData(thisResp)
+            staircase.addResponse(thisResp)
         ...
         # can now access 1 of 3 suggested threshold levels
         staircase.mean()
@@ -1917,7 +1984,8 @@ class QuestHandler(StairHandler):
                  maxVal=None,
                  staircase=None,
                  originPath=None,
-                 name=''):
+                 name='',
+                 autoLog=True):
         """
         Typical values for pThreshold are:
             * 0.82 which is equivalent to a 3 up 1 down standard staircase
@@ -1940,7 +2008,7 @@ class QuestHandler(StairHandler):
             pThreshold
                 Your threshold criterion expressed as probability of response==1. An intensity
                 offset is introduced into the psychometric function so that the threshold (i.e.,
-                the midpoint of the table) yields pThreshold..
+                the midpoint of the table) yields pThreshold.
 
             nTrials: *None* or a number
                 The maximum number of trials to be conducted.
@@ -1998,7 +2066,7 @@ class QuestHandler(StairHandler):
 
         # Initialize using parent class first
         StairHandler.__init__(self, startVal, nTrials=nTrials, extraInfo=extraInfo, method=method,
-                                stepType=stepType, minVal=minVal, maxVal=maxVal, name=name)
+                                stepType=stepType, minVal=minVal, maxVal=maxVal, name=name, autoLog=autoLog)
 
         # Setup additional values
         self.stopInterval = stopInterval
@@ -2017,6 +2085,7 @@ class QuestHandler(StairHandler):
         #store the origin file and its path
         self.originPath, self.origin = self.getOriginPathAndFile(originPath)
         self._exp=None
+        self.autoLog = autoLog
 
     def addResponse(self, result, intensity=None):
         """Add a 1 or 0 to signify a correct/detected or incorrect/missed trial
@@ -2049,12 +2118,12 @@ class QuestHandler(StairHandler):
         """import some data which wasn't previously given to the quest algorithm"""
         # NOT SURE ABOUT CLASS TO USE FOR RAISING ERROR
         if len(intensities) != len(results):
-            raise AttributeError, "length of intensities and results input must be the same"
+            raise AttributeError("length of intensities and results input must be the same")
         self.incTrials(len(intensities))
         for intensity, result in zip(intensities,results):
             try:
                 self.next()
-                self.addData(result, intensity)
+                self.addResponse(result, intensity)
             except StopIteration:   # would get a stop iteration if stopInterval set
                 pass    # TODO: might want to check if nTrials is still good
     def calculateNextIntensity(self):
@@ -2185,7 +2254,7 @@ class QuestHandler(StairHandler):
 
 class MultiStairHandler(_BaseTrialHandler):
     def __init__(self, stairType='simple', method='random',
-            conditions=None, nTrials=50, originPath=None, name=''):
+            conditions=None, nTrials=50, originPath=None, name='', autoLog=True):
         """A Handler to allow easy interleaved staircase procedures (simple or
         QUEST).
 
@@ -2213,7 +2282,7 @@ class MultiStairHandler(_BaseTrialHandler):
 
             conditions: a list of dictionaries specifying conditions
                 Can be used to control parameters for the different staicases.
-                Can be imported from an Excel file using `psychopy.data.importTrialTypes`
+                Can be imported from an Excel file using `psychopy.data.importConditions`
                 MUST include keys providing, 'startVal', 'label' and 'startValSd' (QUEST only).
                 The 'label' will be used in data file saving so should be unique.
                 See Example Usage below.
@@ -2237,7 +2306,7 @@ class MultiStairHandler(_BaseTrialHandler):
 
                 #do something with thisIntensity and thisOri
 
-                stairs.addData(correctIncorrect)#this is ESSENTIAL
+                stairs.addResponse(correctIncorrect)#this is ESSENTIAL
 
             #save data as multiple formats
             stairs.saveDataAsExcel(fileName)#easy to browse
@@ -2245,6 +2314,7 @@ class MultiStairHandler(_BaseTrialHandler):
 
         """
         self.name=name
+        self.autoLog = autoLog
         self.type=stairType
         self.method=method #'random' or 'sequential'
         self.conditions=conditions
@@ -2276,21 +2346,23 @@ class MultiStairHandler(_BaseTrialHandler):
                 ', not a list of %ss' %type(c0))
         #did conditions contain the things we need?
         params = c0.keys()
-        if self.type in ['simple','quest']:
+        if self.type in ['simple','quest','QUEST']:
             if 'startVal' not in params:
                 logging.error('MultiStairHandler needs a param called `startVal` in conditions')
             if 'label' not in params:
                 logging.error('MultiStairHandler needs a param called `label` in conditions')
-            if 'startValSd' not in params and self.type=='quest':
+            if 'startValSd' not in params and self.type in ['QUEST','quest']:
                 logging.error("MultiStairHandler('quest') needs a param called `startValSd` in conditions")
         else:
-            logging.error("MultiStairHandler `stairType` should be 'simple' or 'quest', not '%s'" %self.type)
+            logging.error("MultiStairHandler `stairType` should be 'simple', 'QUEST' or 'quest', not '%s'" %self.type)
     def _createStairs(self):
         if self.type=='simple':
             defaults = {'nReversals':None, 'stepSizes':4, 'nTrials':self.nTrials,
                 'nUp':1, 'nDown':3, 'extraInfo':None,
                 'stepType':'db', 'minVal':None, 'maxVal':None}
-        elif self.type=='quest':
+        elif self.type in ['QUEST','quest']:
+            # fp added alternatives since the builder creates 'QUEST' but
+            # the API spec wants 'quest'?
             defaults = {'pThreshold':0.82, 'nTrials':self.nTrials, 'stopInterval':None,
                 'method':'quantile', 'stepType':'log', 'beta':3.5, 'delta':0.01,
                 'gamma':0.5, 'grain':0.01, 'range':None, 'extraInfo':None,
@@ -2301,8 +2373,10 @@ class MultiStairHandler(_BaseTrialHandler):
             #fetch each params from conditions if possible
             for paramName in defaults:
                 #get value for the parameter
-                if paramName in condition.keys(): val=condition[paramName]
-                else: val = defaults[paramName]
+                if paramName in condition.keys():
+                    val=condition[paramName]
+                else:
+                    val = defaults[paramName]
                 #assign value to variable name
                 exec('%s=%s' %(paramName, repr(val)))
             #then create actual staircase
@@ -2311,7 +2385,8 @@ class MultiStairHandler(_BaseTrialHandler):
                     stepSizes=stepSizes, nTrials=nTrials, nUp=nUp, nDown=nDown,
                     extraInfo=extraInfo,
                     stepType=stepType, minVal=minVal, maxVal=maxVal)
-            elif self.type=='quest':
+            elif self.type in ['QUEST','quest']:
+                # see above
                 thisStair = QuestHandler(startVal, startValSd=condition['startValSd'],
                     pThreshold=pThreshold, nTrials=nTrials, stopInterval=stopInterval,
                     method=method, stepType=stepType, beta=beta, delta=delta,
@@ -2354,12 +2429,7 @@ class MultiStairHandler(_BaseTrialHandler):
         self.currentStaircase = self.thisPassRemaining.pop(0)#take the first and remove it
         #if staircase.next() not called, staircaseHandler would not save the first intensity,
         #Error: miss align intensities and responses
-        try:
-            self._nextIntensity =self.currentStaircase.next()#gets updated by self.addData()
-        except:
-            self.runningStaircases.remove(self.currentStaircase)
-            if len(self.runningStaircases)==0: #If finished,set finished flag 
-                self.finished=True
+        self._nextIntensity =self.currentStaircase.next()#gets updated by self.addData()
         #return value
         if not self.finished:
             #inform experiment of the condition (but not intensity, that might be overridden by user)
@@ -2382,23 +2452,26 @@ class MultiStairHandler(_BaseTrialHandler):
     def _startNewPass(self):
         """Create a new iteration of the running staircases for this pass.
 
-        This is not normally needed byt he user - it gets called at __init__
+        This is not normally needed by the user - it gets called at __init__
         and every time that next() runs out of trials for this pass.
         """
         self.thisPassRemaining = copy.copy(self.runningStaircases)
-        if self.method=='random': numpy.random.shuffle(self.thisPassRemaining)
+        if self.method=='random':
+            numpy.random.shuffle(self.thisPassRemaining)
     def addResponse(self, result, intensity=None):
         """Add a 1 or 0 to signify a correct/detected or incorrect/missed trial
 
         This is essential to advance the staircase to a new intensity level!
         """
         self.currentStaircase.addResponse(result, intensity)
+        if self.currentStaircase.finished:
+            self.runningStaircases.remove(self.currentStaircase)
         #add the current data to experiment if poss
         if self.getExp() != None:#update the experiment handler too
             self.getExp().addData(self.name+".response", result)
         self.totalTrials+=1
     def addOtherData(self, name, value):
-        """Add some data about the curent trial that will not be used to control the
+        """Add some data about the current trial that will not be used to control the
         staircase(s) such as reaction time data
         """
         self.currentStaircase.addOtherData(name, value)
@@ -2411,20 +2484,22 @@ class MultiStairHandler(_BaseTrialHandler):
         """
         self.addResponse(result, intensity)
         if type(result) in [str, unicode]:
-            raise TypeError, "MultiStairHandler.addData should only receive corr/incorr. Use .addOtherData('datName',val)"
+            raise TypeError("MultiStairHandler.addData should only receive corr/incorr. Use .addOtherData('datName',val)")
     def saveAsPickle(self, fileName):
         """Saves a copy of self (with data) to a pickle file.
 
         This can be reloaded later and further analyses carried out.
         """
         if self.totalTrials<1:
-            logging.debug('StairHandler.saveAsPickle called but no trials completed. Nothing saved')
+            if self.autoLog:
+                logging.debug('StairHandler.saveAsPickle called but no trials completed. Nothing saved')
             return -1
         #otherwise use default location
         f = open(fileName+'.psydat', "wb")
         cPickle.dump(self, f)
         f.close()
-        logging.info('saved data to %s' %f.name)
+        if self.autoLog:
+            logging.info('saved data to %s' %f.name)
     def saveAsExcel(self, fileName, matrixOnly=False, appendFile=False):
         """
         Save a summary data file in Excel OpenXML format workbook (:term:`xlsx`) for processing
@@ -2456,15 +2531,16 @@ class MultiStairHandler(_BaseTrialHandler):
 
         """
         if self.totalTrials<1:
-            logging.debug('StairHandler.saveAsExcel called but no trials completed. Nothing saved')
+            if self.autoLog:
+                logging.debug('StairHandler.saveAsExcel called but no trials completed. Nothing saved')
             return -1
-        for stairN, thisStair in enumerate(self.staircases):
-            if stairN==0: append=appendFile
-            else: append=True
+        append=appendFile
+        for thisStair in self.staircases:
             #make a filename
             label = thisStair.condition['label']
             thisStair.saveAsExcel(fileName=fileName, sheetName=label,
                 matrixOnly=matrixOnly, appendFile=append)
+            append = True
     def saveAsText(self,fileName,
                    delim='\t',
                    matrixOnly=False):
@@ -2489,9 +2565,10 @@ class MultiStairHandler(_BaseTrialHandler):
                 If True, prevents the output of the `extraInfo` provided at initialisation.
         """
         if self.totalTrials<1:
-            logging.debug('StairHandler.saveAsText called but no trials completed. Nothing saved')
+            if self.autoLog:
+                logging.debug('StairHandler.saveAsText called but no trials completed. Nothing saved')
             return -1
-        for stairN, thisStair in enumerate(self.staircases):
+        for thisStair in self.staircases:
             #make a filename
             label = thisStair.condition['label']
             thisFileName = fileName+"_"+label
@@ -2511,13 +2588,15 @@ class MultiStairHandler(_BaseTrialHandler):
             matrixOnly: True/False
                 If True, prevents the output of the `extraInfo` provided at initialisation.
         """
-        nStairs=len(self.staircases)
+        nStairs = len(self.staircases)
         for stairN, thisStair in enumerate(self.staircases):
-            if stairN<(nStairs-1): thisMatrixOnly=True #never print info for first files
-            else: thisMatrixOnly = matrixOnly
+            if stairN < nStairs - 1:
+                thisMatrixOnly = True #never print info for first files
+            else:
+                thisMatrixOnly = matrixOnly
             #make a filename
             label = thisStair.condition['label']
-            print "\n%s:" %label
+            print "\n%s:" % label
             thisStair.saveAsText(fileName='stdout', delim=delim,
                 matrixOnly=thisMatrixOnly)
 
@@ -2542,7 +2621,8 @@ class DataHandler(dict):
         self.dataTypes=[]#names will be added during addDataType
         self.isNumeric={}
         #if given dataShape use it - otherwise guess!
-        if dataShape: self.dataShape=dataShape
+        if dataShape:
+            self.dataShape=dataShape
         elif self.trials:
             self.dataShape=list(numpy.asarray(trials.trialList,'O').shape)
             self.dataShape.append(trials.nReps)
@@ -2560,10 +2640,12 @@ class DataHandler(dict):
         Not needed by user: appropriate types will be added
         during initialisation and as each xtra type is needed.
         """
-        if not shape: shape = self.dataShape
+        if not shape:
+            shape = self.dataShape
         if not isinstance(names,basestring):
             #recursively call this function until we have a string
-            for thisName in names: self.addDataType(thisName)
+            for thisName in names:
+                self.addDataType(thisName)
         else:
             #create the appropriate array in the dict
             #initially use numpy masked array of floats with mask=True for missing vals
@@ -2615,9 +2697,8 @@ class DataHandler(dict):
 class FitFunction:
     """Deprecated: - use the specific functions; FitWeibull, FitLogistic...
     """
-    def __init__(self, fnName, xx, yy, sems=1.0, guess=None, display=1,
-                 expectedMin=0.5):
-        raise "FitFunction is now fully DEPRECATED: use FitLogistic, FitWeibull etc instead"
+    def __init__(self, *args, **kwargs):
+        raise DeprecationWarning("FitFunction is now fully DEPRECATED: use FitLogistic, FitWeibull etc instead")
 
 class _baseFunctionFit:
     """Not needed by most users except as a superclass for developping your own functions
@@ -2631,6 +2712,7 @@ class _baseFunctionFit:
         self.yy = numpy.asarray(yy)
         self.sems = numpy.asarray(sems)
         self.expectedMin = expectedMin
+        self.guess = guess
         # for holding error calculations:
         self.ssq=0
         self.rms=0
@@ -2646,7 +2728,7 @@ class _baseFunctionFit:
         #self.params = optimize.fmin_bfgs(self._getErr, self.params, None, (self.xx,self.yy,self.sems),disp=self.display)
         global _chance
         _chance = self.expectedMin
-        self.params, self.covar = optimize.curve_fit(self._eval, self.xx, self.yy)
+        self.params, self.covar = optimize.curve_fit(self._eval, self.xx, self.yy, p0=self.guess, sigma=self.sems)
         self.ssq = self._getErr(self.params, self.xx, self.yy, 1.0)
         self.chi = self._getErr(self.params, self.xx, self.yy, self.sems)
         self.rms = self.ssq/len(self.xx)
@@ -2689,7 +2771,7 @@ class FitWeibull(_baseFunctionFit):
     with ``fit.eval(x)``, retrieve the inverse of the function with
     ``fit.inverse(y)`` or retrieve the parameters from ``fit.params``
     (a list with ``[alpha, beta]``)"""
-    #static mathods have no `self` and this is important for optimise.curve_fit
+    #static methods have no `self` and this is important for optimise.curve_fit
     @staticmethod
     def _eval(xx, alpha, beta):
         global _chance
@@ -2716,22 +2798,26 @@ class FitNakaRushton(_baseFunctionFit):
     Note that this differs from most of the other functions in
     not using a value for the expected minimum. Rather, it fits this
     as one of the parameters of the model."""
-    #static mathods have no `self` and this is important for optimise.curve_fit
+    #static methods have no `self` and this is important for optimise.curve_fit
     @staticmethod
     def _eval(xx, c50, n, rMin, rMax):
         xx = numpy.asarray(xx)
-        if c50<=0: c50=0.001
-        if n<=0: n=0.001
-        if rMax<=0: n=0.001
-        if rMin<=0: n=0.001
-        yy = rMin + (rMax-rMin)*(xx**n/(xx**n+c50**n))
+        if c50 <= 0:
+            c50 = 0.001
+        if n <= 0:
+            n = 0.001
+        if rMax <= 0:
+            n = 0.001
+        if rMin <= 0:
+            n = 0.001
+        yy = rMin + (rMax-rMin) * (xx**n / (xx**n + c50**n))
         return yy
     @staticmethod
     def _inverse(yy, c50, n, rMin, rMax):
-        yScaled = (yy-rMin)/(rMax-rMin) #remove baseline and scale
+        yScaled = (yy-rMin) / (rMax-rMin) #remove baseline and scale
         #do we need to shift while fitting?
-        yScaled[yScaled<0]=0
-        xx = (yScaled*(c50)**n/(1-yScaled))**(1/n)
+        yScaled[yScaled < 0] = 0
+        xx = (yScaled * c50**n / (1-yScaled))**(1/n)
         return xx
 
 class FitLogistic(_baseFunctionFit):
@@ -2749,7 +2835,7 @@ class FitLogistic(_baseFunctionFit):
     ``fit.inverse(y)`` or retrieve the parameters from ``fit.params``
     (a list with ``[PSE, JND]``)
     """
-    #static mathods have no `self` and this is important for optimise.curve_fit
+    #static methods have no `self` and this is important for optimise.curve_fit
     @staticmethod
     def _eval(xx, PSE, JND):
         global _chance
@@ -2768,11 +2854,11 @@ class FitCumNormal(_baseFunctionFit):
     """Fit a Cumulative Normal function (aka error function or erf)
     of the form::
 
-        y = chance + (1-chance)*(special.erf(xx*xScale - xShift)/2.0+0.5)
+        y = chance + (1-chance)*((special.erf((xx-xShift)/(sqrt(2)*sd))+1)*0.5)
 
     and with inverse::
 
-        x = (erfinv((yy-chance)/(1-chance)*2.0-1)+xShift)/xScale
+        x = xShift+sqrt(2)*sd*(erfinv(((yy-chance)/(1-chance)-.5)*2))
 
     After fitting the function you can evaluate an array of x-values
     with fit.eval(x), retrieve the inverse of the function with
@@ -2786,19 +2872,19 @@ class FitCumNormal(_baseFunctionFit):
     1.74.00 the parameters became the [centre,sd] of the normal distribution.
 
     """
-    #static mathods have no `self` and this is important for optimise.curve_fit
+    #static methods have no `self` and this is important for optimise.curve_fit
     @staticmethod
     def _eval(xx, xShift, sd):
         global _chance
         xx = numpy.asarray(xx)
-        yy = _chance + (1-_chance)*(special.erf((xx-xShift)/sd)/2.0+0.5)#NB numpy.special.erf() goes from -1:1
+        yy = _chance + (1-_chance)*((special.erf((xx-xShift)/(numpy.sqrt(2)*sd))+1)*0.5)#NB numpy.special.erf() goes from -1:1
         return yy
     @staticmethod
     def _inverse(yy, xShift, sd):
         global _chance
         yy = numpy.asarray(yy)
         #xx = (special.erfinv((yy-chance)/(1-chance)*2.0-1)+xShift)/xScale#NB numpy.special.erfinv() goes from -1:1
-        xx = xShift+sd*special.erfinv(( (yy-_chance)/(1-_chance) - 0.5 )*2)
+        xx = xShift+numpy.sqrt(2)*sd*special.erfinv(( (yy-_chance)/(1-_chance) - 0.5 )*2)
         return xx
 
 ########################## End psychopy.data classes ##########################
@@ -2837,30 +2923,32 @@ def bootStraps(dat, n=1):
     return resamples
 
 def functionFromStaircase(intensities, responses, bins = 10):
-    """Create a psychometric function by binning data from a staircase procedure
+    """Create a psychometric function by binning data from a staircase procedure.
+    Although the default is 10 bins Jon now always uses 'unique' bins
+    (fewer bins looks pretty but leads to errors in slope estimation)
 
     usage::
 
-        [intensity, meanCorrect, n] = functionFromStaircase(intensities, responses, bins)
+        intensity, meanCorrect, n = functionFromStaircase(intensities, responses, bins)
 
     where:
             intensities
-                are a list of intensities to be binned
+                are a list (or array) of intensities to be binned
 
             responses
                 are a list of 0,1 each corresponding to the equivalent intensity value
 
             bins
-                can be an integer (giving that number of bins) or 'unique' (where each bin is made from ALL data for exactly one intensity value)
+                can be an integer (giving that number of bins) or 'unique' (each bin is made from aa data for exactly one intensity value)
 
             intensity
-                is the center of an intensity bin
+                a numpy array of intensity values (where each is the center of an intensity bin)
 
             meanCorrect
-                is mean % correct in that bin
+                a numpy array of mean % correct in each bin
 
             n
-                is number of responses contributing to that mean
+                a numpy array of number of responses contributing to each mean
     """
     #convert to arrays
     try:#concatenate if multidimensional
@@ -2875,8 +2963,10 @@ def functionFromStaircase(intensities, responses, bins = 10):
     sortedInten = numpy.take(intensities, sort_ii)
     sortedResp = numpy.take(responses, sort_ii)
 
-    binnedResp=[]; binnedInten=[]; nPoints = []
-    if bins=='unique':
+    binnedResp = []
+    binnedInten = []
+    nPoints = []
+    if bins == 'unique':
         intensities = numpy.round(intensities, decimals=8)
         uniqueIntens=numpy.unique(intensities)
         for thisInten in uniqueIntens:
@@ -2889,7 +2979,6 @@ def functionFromStaircase(intensities, responses, bins = 10):
         for binN in range(bins):
             thisResp = sortedResp[int(round(binN*pointsPerBin)) : int(round((binN+1)*pointsPerBin))]
             thisInten = sortedInten[int(round(binN*pointsPerBin)) : int(round((binN+1)*pointsPerBin))]
-
             binnedResp.append( numpy.mean(thisResp))
             binnedInten.append( numpy.mean(thisInten))
             nPoints.append( len(thisInten) )
@@ -2912,6 +3001,19 @@ def getDateStr(format="%Y_%b_%d_%H%M"):
         now_dec = time.strftime("%Y_%m_%d_%H%M", time.localtime())  # '2011_03_16_1307'
 
     return now_dec
+
+def checkValidFilePath(filepath, makeValid=True):
+    """Checks whether file path location (e.g. is a valid folder)
+
+    This should also check whether we have write-permissions to the folder
+    but doesn't currently do that!
+
+    added in: 1.90.00
+    """
+    folder = os.path.split(os.path.abspath(filepath))[0]
+    if not os.path.isdir(folder):
+        os.makedirs(folder) #spit an error if we fail
+    return True
 
 def isValidVariableName(name):
     """Checks whether a certain string could be used as a valid variable.
@@ -2943,9 +3045,9 @@ def isValidVariableName(name):
         name=str(name)#convert from unicode if possible
     except:
         if type(name) in [unicode, numpy.unicode_]:
-            raise AttributeError, "name %s (type %s) contains non-ASCII characters (e.g. accents)" % (name, type(name))
+            raise AttributeError("name %s (type %s) contains non-ASCII characters (e.g. accents)" % (name, type(name)))
         else:
-            raise AttributeError, "name %s (type %s) could not be converted to a string" % (name, type(name))
+            raise AttributeError("name %s (type %s) could not be converted to a string" % (name, type(name)))
 
     if name[0].isdigit():
         return False, "Variables cannot begin with numeric character"
@@ -2962,4 +3064,3 @@ def _getExcelCellName(col, row):
     'C2'
     """
     return "%s%i" %(get_column_letter(col+1), row+1)#BEWARE - openpyxl uses indexing at 1, to fit with Excel
-

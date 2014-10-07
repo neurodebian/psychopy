@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """
 There are many ways to generate counter-phase e.g. 
 vary the contrast of a grating sinusoidally between 1 and -1, 
@@ -30,7 +30,7 @@ t = lastFPSupdate = 0
 while t<20:#quits after 20 secs
     t=trialClock.getTime()
     
-    grating1.setContrast(sin(t*pi*2))
+    grating1.contrast = sin(t*pi*2)
     grating1.draw()  #redraw it
     
     message.draw()

@@ -2,28 +2,25 @@
 """Audio capture and analysis using pyo"""
 
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 # Author: Jeremy R. Gray, March 2012, March 2013
 
 from __future__ import division
-import os, sys, shutil, time
+import os, glob
 import threading, urllib2, json
-import tempfile, glob
 import numpy as np
 from scipy.io import wavfile
 from psychopy import core, logging, sound, web, prefs
-from psychopy.constants import *
+from psychopy.constants import NOT_STARTED, PLAYING, PSYCHOPY_USERAGENT
 # import pyo is done within switchOn to better encapsulate it, because it can be very slow
 # idea: don't want to delay up to 3 sec when importing microphone
 # downside: to make this work requires some trickiness with globals
 
-global haveMic
-haveMic = False # goes True in switchOn, if can import pyo
+haveMic = False  # goes True in switchOn, if can import pyo
 
 # flac is used for audio compression; user needs to install it
-global FLAC_PATH
 FLAC_PATH = None  # set on first call to _getFlacPath()
 
 
@@ -81,10 +78,10 @@ class AudioCapture(object):
             self.running = False
         def run(self, filename, sec, sampletype=0, buffering=16, chnl=0, chnls=2):
             self.running = True
-            inputter = Input(chnl=chnl, mul=1)  # chnl from pyo.pa_get_input_devices()
-            self.recorder = Record(inputter, filename, chnls=chnls, fileformat=0,
+            inputter = pyo.Input(chnl=chnl, mul=1)  # chnl from pyo.pa_get_input_devices()
+            self.recorder = pyo.Record(inputter, filename, chnls=chnls, fileformat=0,
                                 sampletype=sampletype, buffering=buffering)
-            Clean_objects(sec, self.recorder).start()  # handles recording offset
+            pyo.Clean_objects(sec, self.recorder).start()  # handles recording offset
             threading.Timer(sec, self._stop).start()  # set running flag False
         def stop(self):
             self.recorder.stop()
@@ -93,7 +90,7 @@ class AudioCapture(object):
             self.running = False
 
     def __init__(self, name='mic', filename='', saveDir='', sampletype=0,
-                 buffering=16, chnl=0, stereo=True):
+                 buffering=16, chnl=0, stereo=True, autoLog=True):
         """
         :Parameters:
             name :
@@ -129,11 +126,12 @@ class AudioCapture(object):
         self.status = NOT_STARTED # for Builder component
 
         # pyo server good to go?
-        if not serverCreated():
+        if not pyo.serverCreated():
             raise AttributeError('pyo server not created')
-        if not serverBooted():
+        if not pyo.serverBooted():
             raise AttributeError('pyo server not booted')
 
+        self.autoLog = autoLog
         self.loggingId = self.__class__.__name__
         if self.name:
             self.loggingId += ' ' + self.name
@@ -141,9 +139,9 @@ class AudioCapture(object):
         # the recorder object needs to persist, or else get bus errors:
         self.recorder = self._Recorder()
         self.options = {'sampletype': sampletype, 'buffering': buffering,
-                        'chnl': chnl, 'chnls': 1 + int(stereo==True)}
+                        'chnl': chnl, 'chnls': 1 + int(stereo == True)}
 
-    def stop(self):
+    def stop(self, log=True):
         """Interrupt a recording that is in progress; close & keep the file.
 
         Ends the recording before the duration that was initially specified. The
@@ -153,15 +151,18 @@ class AudioCapture(object):
         but you can start a new one.
         """
         if not self.recorder.running:
-            logging.exp('%s: Stop requested, but no record() in progress' % self.loggingId )
+            if log and self.autoLog:
+                logging.exp('%s: Stop requested, but no record() in progress' % self.loggingId)
             return
         self.duration = core.getTime() - self.onset  # new shorter duration
         self.recorder.stop()
-        logging.data('%s: Record stopped early, new duration %.3fs' % (self.loggingId, self.duration))
+        if log and self.autoLog:
+            logging.data('%s: Record stopped early, new duration %.3fs' % (self.loggingId, self.duration))
 
-    def reset(self):
+    def reset(self, log=True):
         """Restores to fresh state, ready to record again"""
-        logging.exp('%s: resetting at %.3f' % (self.loggingId, core.getTime()))
+        if log and self.autoLog:
+            logging.exp('%s: resetting at %.3f' % (self.loggingId, core.getTime()))
         self.__init__(name=self.name, saveDir=self.saveDir)
     def record(self, sec, filename='', block=True):
         """Capture sound input for duration <sec>, save to a file.
@@ -170,15 +171,16 @@ class AudioCapture(object):
         a meaningful identifier for filename and log.
         """
         return self._record(sec, filename=filename, block=block)
-    def _record(self, sec, filename='', block=True):
+    def _record(self, sec, filename='', block=True, log=True):
         while self.recorder.running:
             pass
         self.duration = float(sec)
         self.onset = core.getTime()  # for duration estimation, high precision
         self.fileOnset = core.getAbsTime()  # for log and filename, 1 sec precision
         ms = "%.3f" % (core.getTime() - int(core.getTime()))
-        logging.data('%s: Record: onset %d, capture %.3fs' %
-                     (self.loggingId, self.fileOnset, self.duration) )
+        if log and self.autoLog:
+            logging.data('%s: Record: onset %d, capture %.3fs' %
+                     (self.loggingId, self.fileOnset, self.duration))
         if not filename:
             onsettime = '-%d' % self.fileOnset + ms[1:]
             self.savedFile = onsettime.join(os.path.splitext(self.wavOutFilename))
@@ -191,17 +193,19 @@ class AudioCapture(object):
         self.rate = sound.pyoSndServer.getSamplingRate()
         if block:
             core.wait(self.duration, 0)
-            logging.exp('%s: Record: stop. %.3f, capture %.3fs (est)' %
-                     (self.loggingId, core.getTime(), core.getTime() - t0) )
+            if log and self.autoLog:
+                logging.exp('%s: Record: stop. %.3f, capture %.3fs (est)' %
+                     (self.loggingId, core.getTime(), core.getTime() - t0))
             while self.recorder.running:
                 core.wait(.001, 0)
         else:
-            logging.exp('%s: Record: return immediately, no blocking' %
-                     (self.loggingId) )
+            if log and self.autoLog:
+                logging.exp('%s: Record: return immediately, no blocking' %
+                     (self.loggingId))
 
         return self.savedFile
 
-    def playback(self, block=True, loops=0, stop=False):
+    def playback(self, block=True, loops=0, stop=False, log=True):
         """Plays the saved .wav file, as just recorded or resampled. Execution
         blocks by default, but can return immediately with `block=False`.
 
@@ -221,18 +225,19 @@ class AudioCapture(object):
             return
 
         # play this file:
-        name = self.name+'.current_recording'
+        name = self.name + '.current_recording'
         self.current_recording = sound.Sound(self.savedFile, name=name, loops=loops)
         self.current_recording.play()
         if block:
             core.wait(self.duration * (loops + 1)) # set during record()
 
-        if loops:
-            logging.exp('%s: Playback: play %.3fs x %d (est) %s' % (self.loggingId, self.duration, loops+1, self.savedFile))
-        else:
-            logging.exp('%s: Playback: play %.3fs (est) %s' % (self.loggingId, self.duration, self.savedFile))
+        if log and self.autoLog:
+            if loops:
+                logging.exp('%s: Playback: play %.3fs x %d (est) %s' % (self.loggingId, self.duration, loops+1, self.savedFile))
+            else:
+                logging.exp('%s: Playback: play %.3fs (est) %s' % (self.loggingId, self.duration, self.savedFile))
 
-    def resample(self, newRate=16000, keep=True):
+    def resample(self, newRate=16000, keep=True, log=True):
         """Re-sample the saved file to a new rate, return the full path.
 
         Can take several visual frames to resample a 2s recording.
@@ -269,12 +274,14 @@ class AudioCapture(object):
             logging.warn('%s: Re-sample by %sx is undefined, skipping' % (self.loggingId, str(ratio)))
         elif self.rate >= newRate:
             t0 = core.getTime()
-            downsamp(self.savedFile, newFile, ratio) # default 128-sample anti-aliasing
-            logging.exp('%s: Down-sampled %sx in %.3fs to %s' % (self.loggingId, str(ratio), core.getTime()-t0, newFile))
+            pyo.downsamp(self.savedFile, newFile, ratio) # default 128-sample anti-aliasing
+            if log and self.autoLog:
+                logging.exp('%s: Down-sampled %sx in %.3fs to %s' % (self.loggingId, str(ratio), core.getTime()-t0, newFile))
         else:
             t0 = core.getTime()
-            upsamp(self.savedFile, newFile, ratio) # default 128-sample anti-aliasing
-            logging.exp('%s: Up-sampled %sx in %.3fs to %s' % (self.loggingId, str(ratio), core.getTime()-t0, newFile))
+            pyo.upsamp(self.savedFile, newFile, ratio) # default 128-sample anti-aliasing
+            if log and self.autoLog:
+                logging.exp('%s: Up-sampled %sx in %.3fs to %s' % (self.loggingId, str(ratio), core.getTime()-t0, newFile))
 
         # clean-up:
         if not keep:
@@ -293,10 +300,11 @@ class AdvAudioCapture(AudioCapture):
     See Coder demo > input > latencyFromTone.py
     """
     def __init__(self, name='advMic', filename='', saveDir='', sampletype=0,
-                 buffering=16, chnl=0, stereo=True):
+                 buffering=16, chnl=0, stereo=True, autoLog=True):
         AudioCapture.__init__(self, name=name, filename=filename, saveDir=saveDir,
                 sampletype=sampletype, buffering=buffering, chnl=chnl, stereo=stereo)
         self.setMarker()
+        self.autoLog = autoLog
 
     def record(self, sec, filename='', block=False):
         """Starts recording and plays an onset marker tone just prior
@@ -313,7 +321,7 @@ class AdvAudioCapture(AudioCapture):
         """
         self.filename = filename
 
-    def setMarker(self, tone=19000, secs=0.015, volume=0.03):
+    def setMarker(self, tone=19000, secs=0.015, volume=0.03, log=True):
         """Sets the onset marker, where `tone` is either in hz or a custom sound.
 
         The default tone (19000 Hz) is recommended for auto-detection, as being
@@ -332,14 +340,16 @@ class AdvAudioCapture(AudioCapture):
         if hasattr(tone, 'play'):
             self.marker_hz = 0
             self.marker = tone
-            logging.exp('custom sound set as marker; getMarkerOnset() will not be able to auto-detect onset')
+            if log and self.autoLog:
+                logging.exp('custom sound set as marker; getMarkerOnset() will not be able to auto-detect onset')
         else:
             self.marker_hz = float(tone)
             sampleRate = sound.pyoSndServer.getSamplingRate()
             if sampleRate < 2 * self.marker_hz:
                 # NyquistError
                 logging.warning("Recording rate (%i Hz) too slow for %i Hz-based marker detection." % (int(sampleRate), self.marker_hz))
-            logging.exp('frequency of recording onset marker: %.1f' % self.marker_hz)
+            if log and self.autoLog:
+                logging.exp('frequency of recording onset marker: %.1f' % self.marker_hz)
             self.marker = sound.Sound(self.marker_hz, secs, volume=volume, name=self.name+'.marker_tone')
 
     def playMarker(self):
@@ -364,55 +374,17 @@ class AdvAudioCapture(AudioCapture):
         If given a filename, it will first set that file as the one to work with,
         and then try to detect the onset marker.
         """
-        def thresh2SD(data, mult=2, thr=None):
-            """Return index of first value in abs(data) exceeding 2 * std(data),
-            or length of the data + 1 if nothing > threshold
-
-            Return threshold so can re-use the same threshold later
-            """
-            # this algorithm could use improvement
-            data = abs(data)
-            if not thr:
-                thr = mult * np.std(data)
-            val = data[(data > thr)]
-            if not len(val):
-                return len(data)+1, thr
-            first = val[0]
-            for i, v in enumerate(data):
-                if v == first:
-                    return i, thr
-
         while self.recorder.running:
             core.wait(0.10, 0)
-        # read from self.filename:
         if filename:
             self.setFile(filename)
-        data, sampleRate = readWavFile(self.filename)
-        if self.marker_hz == 0:
-            raise ValueError("Custom marker sounds cannot be auto-detected.")
-        if sampleRate < 2 * self.marker_hz:
-            # NyquistError
-            raise ValueError("Recording rate (%i Hz) too slow for %i Hz-based marker detection." % (int(sampleRate), self.marker_hz))
+        else:
+            filename = self.filename
 
-        # extract onset:
-        chunk = max(16, chunk)  # trades-off against size of bandpass filter
-          # precision in time-domain (= smaller chunks) requires wider freq
-        bandSize = 150 * 2 ** (8 - int(np.log2(chunk)))  # {16: 2400, 32: 1200, 64: 600, 128: 300}
-        dataToUse = data[:int(sampleRate * secs)]  # only look at first secs
-        lo = max(0, self.marker_hz - bandSize)  # for bandpass filter
-        hi = self.marker_hz + bandSize
-        dftProfile = getDftBins(dataToUse, sampleRate, lo, hi, chunk)
-        onsetChunks, thr = thresh2SD(dftProfile)  # leading edge of startMarker in chunks
-        onsetSecs = onsetChunks * chunk / sampleRate  # in secs
-
-        # extract offset:
-        start = onsetChunks - 4
-        stop = int(onsetChunks+self.marker.getDuration()*sampleRate/chunk) + 4
-        backwards = dftProfile[max(start,0):min(stop, len(dftProfile))]
-        offChunks, _ = thresh2SD(backwards[::-1], thr=thr)
-        offSecs = (start + len(backwards) - offChunks) * chunk / sampleRate  # in secs
-
-        return onsetSecs, offSecs
+        return getMarkerOnset(chunk=chunk, secs=secs,
+                              filename=filename,
+                              marker_hz=self.marker_hz,
+                              marker_duration=self.marker.getDuration())
 
     def getLoudness(self):
         """Return the RMS loudness of the saved recording.
@@ -443,8 +415,57 @@ class AdvAudioCapture(AudioCapture):
         if os.path.isfile(self.savedFile) and self.savedFile.endswith('.flac'):
             self.savedFile = flac2wav(self.savedFile, keep=keep)
 
+def getMarkerOnset(filename, chunk=128, secs=0.5, marker_hz=19000, marker_duration=0.015):
+    """Returns marker sound (onset, offset) in sec, as read from filename.
+    """
+    def thresh2SD(data, mult=2, thr=None):
+        """Return index of first value in abs(data) exceeding 2 * std(data),
+        or length of the data + 1 if nothing > threshold
+
+        Return threshold so can re-use the same threshold later
+        """
+        # this algorithm could use improvement
+        data = abs(data)
+        if not thr:
+            thr = mult * np.std(data)
+        val = data[(data > thr)]
+        if not len(val):
+            return len(data)+1, thr
+        first = val[0]
+        for i, v in enumerate(data):
+            if v == first:
+                return i, thr
+
+    # read data from file:
+    data, sampleRate = readWavFile(filename)
+    if marker_hz == 0:
+        raise ValueError("Custom marker sounds cannot be auto-detected.")
+    if sampleRate < 2 * marker_hz:
+        # NyquistError
+        raise ValueError("Recording rate (%i Hz) too slow for %i Hz-based marker detection." % (int(sampleRate), marker_hz))
+
+    # extract onset:
+    chunk = max(16, chunk)  # trades-off against size of bandpass filter
+      # precision in time-domain (= smaller chunks) requires wider freq
+    bandSize = 150 * 2 ** (8 - int(np.log2(chunk)))  # {16: 2400, 32: 1200, 64: 600, 128: 300}
+    dataToUse = data[:int(sampleRate * secs)]  # only look at first secs
+    lo = max(0, marker_hz - bandSize)  # for bandpass filter
+    hi = marker_hz + bandSize
+    dftProfile = getDftBins(dataToUse, sampleRate, lo, hi, chunk)
+    onsetChunks, thr = thresh2SD(dftProfile)  # leading edge of startMarker in chunks
+    onsetSecs = onsetChunks * chunk / sampleRate  # in secs
+
+    # extract offset:
+    start = onsetChunks - 4
+    stop = int(onsetChunks + marker_duration*sampleRate/chunk) + 4
+    backwards = dftProfile[max(start, 0):min(stop, len(dftProfile))]
+    offChunks, _junk = thresh2SD(backwards[::-1], thr=thr)
+    offSecs = (start + len(backwards) - offChunks) * chunk / sampleRate  # in secs
+
+    return onsetSecs, offSecs
+
 def readWavFile(filename):
-    """Return (data, sampleRate) as read from a wav file
+    """Return (data, sampleRate) as read from a wav file, expects int16 data.
     """
     try:
         sampleRate, data = wavfile.read(filename)
@@ -455,12 +476,14 @@ def readWavFile(filename):
             sampleRate, data = wavfile.read(filename)
         except:
             raise SoundFileError('Failed to open wav sound file "%s"' % filename)
+    if data.dtype != 'int16':
+        raise AttributeError('expected `int16` data in .wav file %s' % filename)
     if len(data.shape) == 2 and data.shape[1] == 2:
         data = data.transpose()
         data = data[0]  # left channel only? depends on how the file was made
     return data, sampleRate
 
-def getDftBins(data=[], sampleRate=None, low=100, high=8000, chunk=64):
+def getDftBins(data=None, sampleRate=None, low=100, high=8000, chunk=64):
     """Return DFT (discrete Fourier transform) of ``data``, doing so in
     time-domain bins, each of size ``chunk`` samples.
 
@@ -469,10 +492,12 @@ def getDftBins(data=[], sampleRate=None, low=100, high=8000, chunk=64):
     If given a sampleRate, the data are bandpass filtered (low, high).
     """
     # good to reshape & vectorize data rather than use a python loop
+    if data is None:
+        data = []
     bins = []
     i = chunk
     if sampleRate:
-        _, freq = getDft(data[:chunk], sampleRate)  # just to get freq vector
+        _junk, freq = getDft(data[:chunk], sampleRate)  # just to get freq vector
         band = (freq > low) & (freq < high)  # band (frequency range)
     while i <= len(data):
         magn = getDft(data[i-chunk:i])
@@ -543,7 +568,7 @@ def getRMS(data):
     if isinstance(data, basestring):
         if not os.path.isfile(data):
             raise ValueError('getRMS: could not find file %s' % data)
-        fs, data = wavfile.read(data)
+        _junk, data = wavfile.read(data)
         data_tr = np.transpose(data)
         data = data_tr / 32768.
     elif not isinstance(data, np.ndarray):
@@ -594,8 +619,14 @@ class _GSQueryThread(threading.Thread):
         else: # whether timed-out or not:
             return self.duration
     def _unpackRaw(self):
-        # parse raw string response from google, expose via data fields (see _reset):
-        self.json = json.load(self.raw)
+        # parse raw url response from google, expose via data fields (see _reset):
+        if type(self.raw) != str:
+            self.json = json.load(self.raw)
+        else:
+            self._reset()
+            self.status = 'FAILED'
+            self.stop()
+            return
         self.status = self.json['status']
         report = []
         for utter_list in self.json["hypotheses"]:
@@ -620,7 +651,8 @@ class _GSQueryThread(threading.Thread):
         self.duration = 0
         try:
             self.raw = urllib2.urlopen(self.request)
-        except: # yeah, its the internet, stuff happens
+        except: # pragma: no cover
+            # yeah, its the internet, stuff happens
             # maybe temporary HTTPError: HTTP Error 502: Bad Gateway
             try:
                 self.raw = urllib2.urlopen(self.request)
@@ -706,7 +738,7 @@ class Speech2Text(object):
                  timeout=10,
                  samplingrate=16000,
                  pro_filter=2,
-                 quiet=True):
+                 level=0):
         """
             :Parameters:
 
@@ -725,49 +757,42 @@ class Speech2Text(object):
                     the sampling rate is auto-detected for .wav files.
                 `pro_filter` :
                     profanity filter level; default 2 (e.g., f***)
-                `quiet` :
-                    no reporting intermediate details; default `True` (non-verbose)
+                `level` :
+                    flac compression level (0 less compression but fastest)
         """
         # set up some key parameters:
         results = 5 # how many words wanted
         self.timeout = timeout
         useragent = PSYCHOPY_USERAGENT
         host = "www.google.com/speech-api/v1/recognize"
-        flac_path = _getFlacPath()
 
         # determine file type, convert wav to flac if needed:
         if not os.path.isfile(filename):
             raise IOError("Cannot find file: %s" % filename)
         ext = os.path.splitext(filename)[1]
-        if ext not in ['.flac', '.spx', '.wav']:
+        if ext not in ['.flac', '.wav']:
             raise SoundFormatNotSupported("Unsupported filetype: %s\n" % ext)
         if ext == '.wav':
-            __, samplingrate = readWavFile(filename)
+            _junk, samplingrate = readWavFile(filename)
         if samplingrate not in [16000, 8000]:
             raise SoundFormatNotSupported('Speech2Text sample rate must be 16000 or 8000 Hz')
         self.filename = filename
         if ext == ".flac":
             filetype = "x-flac"
-        elif ext == ".spx":
-            filetype = "x-speex-with-header-byte"
         elif ext == ".wav": # convert to .flac
             filetype = "x-flac"
-            filename = wav2flac(filename)
+            filename = wav2flac(filename, level=level)  # opt for speed
         logging.info("Loading: %s as %s, audio/%s" % (self.filename, lang, filetype))
         c = 0 # occasional error; core.wait(.1) is not always enough; better slow than fail
         while not os.path.isfile(filename) and c < 10:
             core.wait(.1, 0)
             c += 1
-        try:
-            audio = open(filename, 'rb').read()
-        except:
-            msg = "Can't read file %s from %s.\n" % (filename, self.filename)
-            logging.error(msg)
-            raise SoundFileError(msg)
-        finally:
-            if ext == '.wav' and filename.endswith('.flac'):
-                try: os.remove(filename)
-                except: pass
+        audio = open(filename, 'rb').read()
+        if ext == '.wav' and filename.endswith('.flac'):
+            try:
+                os.remove(filename)
+            except:
+                pass
 
         # urllib2 makes no attempt to validate the server certificate. here's an idea:
         # http://thejosephturner.com/blog/2011/03/19/https-certificate-verification-in-python-with-urllib2/
@@ -782,7 +807,8 @@ class Speech2Text(object):
         web.requireInternetAccess()  # needed to access google's speech API
         try:
             self.request = urllib2.Request(url, audio, header)
-        except: # try again before accepting defeat
+        except: # pragma: no cover
+            # try again before accepting defeat
             logging.info("https request failed. %s, %s. trying again..." % (filename, self.filename))
             core.wait(0.2, 0)
             self.request = urllib2.Request(url, audio, header)
@@ -856,15 +882,15 @@ class BatchSpeech2Text(list):
             fileList = list(files)
         web.requireInternetAccess()  # needed to access google's speech API
         for i, filename in enumerate(fileList):
-            gs = Speech2Text(filename)
-            self.append( (filename, gs.getThread()) ) # tuple
+            gs = Speech2Text(filename, level=5)
+            self.append((filename, gs.getThread())) # tuple
             if verbose:
                 logging.info("%i %s" % (i, filename))
             while self._activeCount() >= maxThreads:
                 core.wait(.1, 0) # idle at max count
     def _activeCount(self):
         # self is a list of (name, thread) tuples; count active threads
-        count = len([f for f,t in self if t.running and t.elapsed() <= self.timeout] )
+        count = len([f for f, t in self if t.running and t.elapsed() <= self.timeout])
         return count
 
 def _getFlacPath(path=None):
@@ -907,28 +933,27 @@ def flac2wav(path, keep=True):
         return None
     wav_files = []
     for flacfile in flac_files:
-        wavfile = flacfile.strip('.flac') + '.wav'
-        flac_cmd = [flac_path, "-d", "--totally-silent", "-f", "-o", wavfile, flacfile]
-        __, se = core.shellCall(flac_cmd, stderr=True)
-        if se or not os.path.isfile(flacfile): # just try again
-            logging.warn('Failed to convert to .wav; trying again')
-            __, se = core.shellCall(flac_cmd, stderr=True)
-            if se:
-                logging.error(se)
+        wavname = flacfile.strip('.flac') + '.wav'
+        flac_cmd = [flac_path, "-d", "--totally-silent", "-f", "-o", wavname, flacfile]
+        _junk, se = core.shellCall(flac_cmd, stderr=True)
+        if se:
+            logging.error(se)
         if not keep:
             os.unlink(flacfile)
-        wav_files.append(wavfile)
+        wav_files.append(wavname)
     if len(wav_files) == 1:
         return wav_files[0]
     else:
         return wav_files
 
-def wav2flac(path, keep=True):
+def wav2flac(path, keep=True, level=5):
     """Lossless compression: convert .wav file (on disk) to .flac format.
 
     If `path` is a directory name, convert all .wav files in the directory.
 
     `keep` to retain the original .wav file(s), default `True`.
+
+    `level` is compression level: 0 is fastest but larger, 8 is slightly smaller but much slower.
     """
     flac_path = _getFlacPath()
     wav_files = []
@@ -940,19 +965,19 @@ def wav2flac(path, keep=True):
         logging.warn('failed to find .wav file(s) from %s' % path)
         return None
     flac_files = []
-    for wavfile in wav_files:
-        flacfile = wavfile.strip('.wav') + '.flac'
-        flac_cmd = [flac_path, "-8", "-f", "--totally-silent", "-o", flacfile, wavfile]
-        __, se = core.shellCall(flac_cmd, stderr=True)
+    for wavname in wav_files:
+        flacfile = wavname.replace('.wav', '.flac')
+        flac_cmd = [flac_path, "-%d" % level, "-f", "--totally-silent", "-o", flacfile, wavname]
+        _junk, se = core.shellCall(flac_cmd, stderr=True)
         if se or not os.path.isfile(flacfile): # just try again
             # ~2% incidence when recording for 1s, 650+ trials
             # never got two in a row; core.wait() does not help
             logging.warn('Failed to convert to .flac; trying again')
-            __, se = core.shellCall(flac_cmd, stderr=True)
+            _junk, se = core.shellCall(flac_cmd, stderr=True)
             if se:
                 logging.error(se)
         if not keep:
-            os.unlink(wavfile)
+            os.unlink(wavname)
         flac_files.append(flacfile)
     if len(wav_files) == 1:
         return flac_files[0]
@@ -978,20 +1003,18 @@ def switchOn(sampleRate=48000, outputDevice=None, bufferSize=None):
     outputDevice, bufferSize: set these parameters on the pyoSndServer before booting;
         None means use pyo's default values
     """
-    # imports from pyo, creates sound.pyoSndServer using sound.initPyo() if not yet created
+    # imports pyo, creates sound.pyoSndServer using sound.initPyo() if not yet created
     t0 = core.getTime()
     try:
-        global Server, Record, Input, Clean_objects, SfPlayer, serverCreated, serverBooted
-        from pyo import Server, Record, Input, Clean_objects, SfPlayer, serverCreated, serverBooted
-        global getVersion, pa_get_input_devices, pa_get_output_devices, downsamp, upsamp
-        from pyo import getVersion, pa_get_input_devices, pa_get_output_devices, downsamp, upsamp
+        global pyo
+        import pyo
         global haveMic
         haveMic = True
-    except ImportError:
+    except ImportError: # pragma: no cover
         msg = 'Microphone class not available, needs pyo; see http://code.google.com/p/pyo/'
         logging.error(msg)
         raise ImportError(msg)
-    if serverCreated():
+    if pyo.serverCreated():
         sound.pyoSndServer.setSamplingRate(sampleRate)
     else:
         #sound.initPyo() will create pyoSndServer. We want there only ever to be one server
@@ -1006,44 +1029,3 @@ def switchOff():
     """(No longer needed as of v1.76.00; retained for backwards compatibility.)
     """
     logging.info("deprecated:  microphone.switchOff() is no longer needed.")
-
-'''
-if __name__ == '__main__':
-    print ('\nMicrophone command-line testing\n')
-    core.checkPygletDuringWait = False # don't dispatch events during a wait
-    logging.console.setLevel(logging.DEBUG)
-    switchOn(48000) # import pyo, create a server
-
-    mic = AdvAudioCapture()
-    save = bool('--save' in sys.argv)
-    if save:
-        del sys.argv[sys.argv.index('--save')]
-
-    raw_input('testing record and playback, press <return> to start: ')
-    print "say something:",
-    sys.stdout.flush()
-    try:
-        # tell it to record for 10s:
-        mic.record(10, block=False)  # returns immediately
-        core.wait(2)  # we'll stop the record after 2s
-        mic.stop()
-        print '\nrecord stopped; sleeping 1s'
-        sys.stdout.flush()
-        core.wait(1)
-        print 'start playback (x 2)'
-        sys.stdout.flush()
-        mic.playback(loops=3, block=False)
-        core.wait(4)  # but only wait for 2 repetitions to complete
-        mic.playback(stop=True)
-        mic.playback(stop=True)  # not a problem
-        print '\nend.', mic.savedFile
-        for i in range(3):
-            t0 = time.time()
-            print mic.getLoudness(), time.time() - t0
-        #mic.compress()
-    finally:
-        # delete the file even if Ctrl-C
-        if not save:
-            try: os.unlink(mic.savedFile)
-            except: pass
-'''

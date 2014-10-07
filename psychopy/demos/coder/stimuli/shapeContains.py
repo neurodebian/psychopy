@@ -13,27 +13,28 @@ shape = visual.ShapeStim(win, fillColor='darkblue', lineColor=None,
     vertices=[(-0.02, -0.0), (-.8,.2), (0,.6), (.1,0.06), (.8, .3), (.6,-.4)])
 
 # define a buffer zone around the mouse for proximity detection:
-bufzone = visual.Circle(win, radius=0.15, edges=13)
+# use pix units just to show that it works to mix (shape and mouse use norm units)
+bufzone = visual.Circle(win, radius=30, edges=13, units='pix')
 
 # loop until detect a click inside the shape:
 while not mouse.isPressedIn(shape):
     instr.draw()
     # dynamic buffer zone around mouse pointer:
-    bufzone.setPos(mouse.getPos())  # follow the mouse
-    bufzone.setSize(mouse.getWheelRel()[1]/20., '+')  # vert scroll adjusts radius, can go negative
+    bufzone.pos = mouse.getPos() * win.size / 2  # follow the mouse
+    bufzone.size += mouse.getWheelRel()[1] / 20.0  # vert scroll adjusts radius, can go negative
     # is the mouse inside the shape (hovering over it)?
     if shape.contains(mouse):
-        msg.setText('inside')
-        shape.setOpacity(1)
-        bufzone.setOpacity(1)
+        msg.text = 'inside'
+        shape.opacity = 1
+        bufzone.opacity = 1
     elif shape.overlaps(bufzone):
-        msg.setText('near')
-        shape.setOpacity(.6)
-        bufzone.setOpacity(.6)
+        msg.text = 'near'
+        shape.opacity = 0.6
+        bufzone.opacity = 0.6
     else:
-        msg.setText('far away')
-        shape.setOpacity(0.2)
-        bufzone.setOpacity(0.2)
+        msg.text = 'far away'
+        shape.opacity = 0.2
+        bufzone.opacity = 0.2
     bufzone.draw()  # drawing helps visualize the mechanics
     msg.draw()
     shape.draw()

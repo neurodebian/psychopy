@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 from psychopy import visual, core, event
 
 #create a window to draw in
@@ -19,8 +19,8 @@ message = visual.TextStim(myWin,text='Hit Q to quit',
                                  
 trialClock = core.Clock()
 t = lastFPSupdate = 0
-dotPatch.setAutoDraw(True)#always draw
-message.setAutoDraw(True)#always draw
+dotPatch.autoDraw = True  #always draw
+message.autoDraw = True  #always draw
 
 while t<60:#quits after 20 secs
     t=trialClock.getTime()

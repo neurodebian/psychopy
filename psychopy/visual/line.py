@@ -1,16 +1,18 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 '''Creates a Line between two points
 as a special case of a :class:`~psychopy.visual.ShapeStim`'''
 
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 import psychopy  # so we can get the __path__
 from psychopy import logging
+import numpy
 
 from psychopy.visual.shape import ShapeStim
+from psychopy.tools.attributetools import attributeSetter, setAttribute
 
 
 class Line(ShapeStim):
@@ -25,43 +27,49 @@ class Line(ShapeStim):
 
         The methods `contains` and `overlaps` are inherited from `~psychopy.visual.ShapeStim`,
         but always return False (because a line is not a proper (2D) polygon).
-
-        :Parameters:
-
-            start : tuple, list or 2x1 array
-                Specifies the position of the start of the line
-
-            end : tuple, list or 2x1 array
-                Specifies the position of the end of the line
-
         """
-        self.start = start
-        self.end = end
-        self.vertices = [start, end]
+        #what local vars are defined (these are the init params) for use by __repr__
+        self._initParams = dir()
+        self._initParams.remove('self')
+        #kwargs isn't a parameter, but a list of params
+        self._initParams.remove('kwargs')
+        self._initParams.extend(kwargs)
+
+        self.__dict__['start'] = numpy.array(start)
+        self.__dict__['end'] = numpy.array(end)
+        self.__dict__['vertices'] = [start, end]
         kwargs['closeShape'] = False # Make sure nobody messes around here
         kwargs['vertices'] = self.vertices
         kwargs['fillColor'] = None
-        ShapeStim.__init__(self, win, **kwargs)
+        super(Line, self).__init__(win, **kwargs)
 
-    def setStart(self, start, log=True):
-        """Changes the start point of the line. Argument should be
-
-            - tuple, list or 2x1 array specifying the coordinates of the start point"""
-        self.start = start
+    @attributeSetter
+    def start(self, start):
+        """tuple, list or 2x1 array.
+        
+        Specifies the position of the start of the line. :ref:`Operations <attrib-operations>` supported."""
+        self.__dict__['start'] = numpy.array(start)
         self.setVertices([self.start, self.end], log=False)
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s start=%s" %(self.name, start),
-                level=logging.EXP,obj=self)
+    def setStart(self, start, log=None):
+        """Usually you can use 'stim.attribute = value' syntax instead,
+        but use this method if you need to suppress the log message
+        """
+        setAttribute(self, 'start', start, log)
 
-    def setEnd(self, end, log=True):
-        """Changes the end point of the line. Argument should be a tuple, list
-        or 2x1 array specifying the coordinates of the end point"""
-        self.end = end
+    @attributeSetter
+    def end(self, end):
+        """tuple, list or 2x1 array
+        
+        Specifies the position of the end of the line. :ref:`Operations <attrib-operations>` supported."""
+        self.__dict__['end'] = numpy.array(end)
         self.setVertices([self.start, self.end], log=False)
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s end=%s" %(self.name, end),
-                level=logging.EXP,obj=self)
+    def setEnd(self, end, log=None):
+        """Usually you can use 'stim.attribute = value' syntax instead,
+        but use this method if you need to suppress the log message
+        """
+        setAttribute(self, 'end', end, log)
 
+    # Not meaningful for a line, thus deleted
     def contains(self):
         pass
     def overlaps(self):

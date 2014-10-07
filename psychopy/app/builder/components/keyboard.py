@@ -1,15 +1,25 @@
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 from _base import *
 from os import path
 
 from psychopy.app.builder.experiment import CodeGenerationException, _valid_var_re
+from psychopy.app.builder.experiment import TrialHandler
 
 thisFolder = path.abspath(path.dirname(__file__))#the absolute path to the folder containing this path
 iconFile = path.join(thisFolder,'keyboard.png')
-tooltip = 'Keyboard: check and record keypresses'
+tooltip = _translate('Keyboard: check and record keypresses')
+
+# only use _localized values for label values, nothing functional:
+_localized = {'allowedKeys': _translate('Allowed keys'),
+              'discard previous': _translate('Discard previous'),
+              'store': _translate('Store'),
+              'forceEndRoutine': _translate('Force end of Routine'),
+              'storeCorrect': _translate('Store correct'),
+              'correctAns': _translate('Correct answer')
+              }
 
 class KeyboardComponent(BaseComponent):
     """An event class for checking the keyboard at given timepoints"""
@@ -17,60 +27,46 @@ class KeyboardComponent(BaseComponent):
     def __init__(self, exp, parentName, name='key_resp', allowedKeys="'y','n','left','right','space'",store='last key',
                 forceEndRoutine=True,storeCorrect=False,correctAns="", discardPrev=True,
                 startType='time (s)', startVal=0.0,
-                stopType='duration (s)', stopVal=1.0,
+                stopType='duration (s)', stopVal='',
                 startEstim='', durationEstim=''):
+        super(KeyboardComponent, self).__init__(exp, parentName, name,
+                startType=startType,startVal=startVal,
+                stopType=stopType, stopVal=stopVal,
+                startEstim=startEstim, durationEstim=durationEstim)
         self.type='Keyboard'
         self.url="http://www.psychopy.org/builder/components/keyboard.html"
-        self.exp=exp#so we can access the experiment if necess
         self.exp.requirePsychopyLibs(['gui'])
-        self.parentName=parentName
+
         #params
-        self.params={}
         self.order=['forceEndRoutine','allowedKeys',#NB name and timing params always come 1st
             'store','storeCorrect','correctAns',
             ]
-        self.params['name']=Param(name,  valType='code', hint="A name for this keyboard object (e.g. response)",
-            label="Name")
         self.params['allowedKeys']=Param(allowedKeys, valType='code', allowedTypes=[],
             updates='constant', allowedUpdates=['constant','set every repeat'],
-            hint="A comma-separated list of keys (with quotes), such as 'q','right','space','left' ",
-            label="Allowed keys")
-        self.params['startType']=Param(startType, valType='str',
-            allowedVals=['time (s)', 'frame N', 'condition'],
-            hint="How do you want to define your start point?",
-            label="")
-        self.params['stopType']=Param(stopType, valType='str',
-            allowedVals=['duration (s)', 'duration (frames)', 'time (s)', 'frame N', 'condition'],
-            hint="How do you want to define your end point?")
-        self.params['startVal']=Param(startVal, valType='code', allowedTypes=[],
-            hint="When does the keyboard checking start?")
-        self.params['stopVal']=Param(stopVal, valType='code', allowedTypes=[],
-            updates='constant', allowedUpdates=[],
-            hint="When does the keyboard checking end?")
-        self.params['startEstim']=Param(startEstim, valType='code', allowedTypes=[],
-            hint="(Optional) expected start (s), purely for representing in the timeline")
-        self.params['durationEstim']=Param(durationEstim, valType='code', allowedTypes=[],
-            hint="(Optional) expected duration (s), purely for representing in the timeline")
+            hint=_translate("A comma-separated list of keys (with quotes), such as 'q','right','space','left' "),
+            label=_localized['allowedKeys'])
+
+        # hints say 'responses' not 'key presses' because the same hint is also used with button boxes
         self.params['discard previous']=Param(discardPrev, valType='bool', allowedTypes=[],
             updates='constant', allowedUpdates=[],
-            hint="Do you want to discard any keypresses occuring before the onset of this component?",
-            label="Discard previous")
+            hint=_translate("Do you want to discard all responses occuring before the onset of this component?"),
+            label=_localized['discard previous'])
         self.params['store']=Param(store, valType='str', allowedTypes=[],allowedVals=['last key', 'first key', 'all keys', 'nothing'],
             updates='constant', allowedUpdates=[],
-            hint="Choose which (if any) keys to store at end of trial",
-            label="Store")
+            hint=_translate("Choose which (if any) responses to store at the end of a trial"),
+            label=_localized['store'])
         self.params['forceEndRoutine']=Param(forceEndRoutine, valType='bool', allowedTypes=[],
             updates='constant', allowedUpdates=[],
-            hint="Should the keypress force the end of the routine (e.g end the trial)?",
-            label="Force end of Routine")
+            hint=_translate("Should a response force the end of the Routine (e.g end the trial)?"),
+            label=_localized['forceEndRoutine'])
         self.params['storeCorrect']=Param(storeCorrect, valType='bool', allowedTypes=[],
             updates='constant', allowedUpdates=[],
-            hint="Do you want to save the response as correct/incorrect?",
-            label="Store correct")
+            hint=_translate("Do you want to save the response as correct/incorrect?"),
+            label=_localized['storeCorrect'])
         self.params['correctAns']=Param(correctAns, valType='str', allowedTypes=[],
             updates='constant', allowedUpdates=[],
-            hint="What is the 'correct' key? Might be helpful to add a correctAns column and use $thisTrial.correctAns",
-            label="Correct answer")
+            hint=_translate("What is the 'correct' key? Might be helpful to add a correctAns column and use $thisTrial.correctAns"),
+            label=_localized['correctAns'])
     def writeRoutineStartCode(self,buff):
         buff.writeIndented("%(name)s = event.BuilderKeyResponse()  # create an object of type KeyResponse\n" %self.params)
         buff.writeIndented("%(name)s.status = NOT_STARTED\n" %self.params)
@@ -110,7 +106,7 @@ class KeyboardComponent(BaseComponent):
         if store != 'nothing':
             buff.writeIndented("%(name)s.clock.reset()  # now t=0\n" % self.params)
         if self.params['discard previous'].val:
-            buff.writeIndented("event.clearEvents()\n")
+            buff.writeIndented("event.clearEvents(eventType='keyboard')\n")
         buff.setIndentLevel(-1, relative=True)#to get out of the if statement
         #test for stop (only if there was some setting for duration or stop)
         if self.params['stopVal'].val not in ['', None, -1, 'None']:
@@ -136,6 +132,10 @@ class KeyboardComponent(BaseComponent):
             keyListStr= "keyList=%s" %(repr(keyList))
         #check for keypresses
         buff.writeIndented("theseKeys = event.getKeys(%s)\n" %(keyListStr))
+        if self.exp.settings.params['Enable Escape'].val:
+            buff.writeIndentedLines('\n# check for quit:')
+            buff.writeIndented('if "escape" in theseKeys:\n')
+            buff.writeIndented('    endExpNow = True\n')
 
         #how do we store it?
         if store!='nothing' or forceEnd:
@@ -171,34 +171,37 @@ class KeyboardComponent(BaseComponent):
         #some shortcuts
         name = self.params['name']
         store=self.params['store'].val
+        if store == 'nothing':
+            return
         if len(self.exp.flow._loopList):
-            currLoop=self.exp.flow._loopList[-1]#last (outer-most) loop
-        else: currLoop=None
+            currLoop=self.exp.flow._loopList[-1]  # last (outer-most) loop
+        else:
+            currLoop = self.exp._expHandler
 
         #write the actual code
-        if (store!='nothing') and currLoop:#need a loop to do the storing of data!
-            buff.writeIndented("# check responses\n" %self.params)
-            buff.writeIndented("if %(name)s.keys in ['', [], None]:  # No response was made\n"%self.params)
-            buff.writeIndented("   %(name)s.keys=None\n" %(self.params))
-            if self.params['storeCorrect'].val:#check for correct NON-repsonse
-                buff.writeIndented("   # was no response the correct answer?!\n" %(self.params))
-                buff.writeIndented("   if str(%(correctAns)s).lower() == 'none': %(name)s.corr = 1  # correct non-response\n" %(self.params))
-                buff.writeIndented("   else: %(name)s.corr = 0  # failed to respond (incorrectly)\n" %(self.params))
-            buff.writeIndented("# store data for %s (%s)\n" %(currLoop.params['name'], currLoop.type))
-            if currLoop.type in ['StairHandler', 'MultiStairHandler']:
-                #data belongs to a Staircase-type of object
-                if self.params['storeCorrect'].val==True:
-                    buff.writeIndented("%s.addResponse(%s.corr)\n" %(currLoop.params['name'], name))
-                    buff.writeIndented("%s.addOtherData('%s.rt', %s.rt)\n" %(currLoop.params['name'], name, name))
-            else:
-                #always add keys
-                buff.writeIndented("%s.addData('%s.keys',%s.keys)\n" \
-                   %(currLoop.params['name'],name,name))
-                if self.params['storeCorrect'].val==True:
-                    buff.writeIndented("%s.addData('%s.corr', %s.corr)\n" \
-                                       %(currLoop.params['name'], name, name))
-                #only add an RT if we had a response
-                buff.writeIndented("if %(name)s.keys != None:  # we had a response\n" %(self.params))
-                buff.writeIndented("    %s.addData('%s.rt', %s.rt)\n" \
+        buff.writeIndented("# check responses\n" %self.params)
+        buff.writeIndented("if %(name)s.keys in ['', [], None]:  # No response was made\n"%self.params)
+        buff.writeIndented("   %(name)s.keys=None\n" %(self.params))
+        if self.params['storeCorrect'].val:#check for correct NON-repsonse
+            buff.writeIndented("   # was no response the correct answer?!\n" %(self.params))
+            buff.writeIndented("   if str(%(correctAns)s).lower() == 'none': %(name)s.corr = 1  # correct non-response\n" %(self.params))
+            buff.writeIndented("   else: %(name)s.corr = 0  # failed to respond (incorrectly)\n" %(self.params))
+        buff.writeIndented("# store data for %s (%s)\n" %(currLoop.params['name'], currLoop.type))
+        if currLoop.type in ['StairHandler', 'MultiStairHandler']:
+            #data belongs to a Staircase-type of object
+            if self.params['storeCorrect'].val==True:
+                buff.writeIndented("%s.addResponse(%s.corr)\n" %(currLoop.params['name'], name))
+                buff.writeIndented("%s.addOtherData('%s.rt', %s.rt)\n" %(currLoop.params['name'], name, name))
+        else:
+            #always add keys
+            buff.writeIndented("%s.addData('%s.keys',%s.keys)\n" \
+               %(currLoop.params['name'],name,name))
+            if self.params['storeCorrect'].val==True:
+                buff.writeIndented("%s.addData('%s.corr', %s.corr)\n" \
                                    %(currLoop.params['name'], name, name))
-
+            #only add an RT if we had a response
+            buff.writeIndented("if %(name)s.keys != None:  # we had a response\n" %(self.params))
+            buff.writeIndented("    %s.addData('%s.rt', %s.rt)\n" \
+                               %(currLoop.params['name'], name, name))
+        if currLoop.params['name'].val == self.exp._expHandler.name:
+            buff.writeIndented("%s.nextEntry()\n" % self.exp._expHandler.name)

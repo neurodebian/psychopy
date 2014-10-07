@@ -38,13 +38,13 @@ stim2 = visual.ShapeStim(win,
                  
 clock = core.Clock()
 while True:
-    stim1.setOri(2,'+')
+    stim1.ori += 2  # increment by 2
     stim1.draw()
     
     sqrVertices[1] = [ -0.2-sin(clock.getTime())/6.0, -0.2-cos(clock.getTime())/6.0 ]#change one of the vertices
-    stim2.setVertices(sqrVertices)
+    stim2.vertices = sqrVertices
     stim2.draw()
  
     win.flip()
-    if len(event.getKeys()):
+    if event.getKeys(keyList=['escape', 'q']):
         core.quit()

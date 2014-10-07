@@ -12,19 +12,12 @@ Distributed under the terms of the GNU General Public License (GPL version 3 or 
 .. fileauthor:: Sol Simpson <sol@isolver-software.com>
 """
 
-import gc, os, sys
+import gc, os, sys, copy
 import collections
 from collections import deque
 from operator import itemgetter
 import numpy as N
-
-global _psutil_available
-_psutil_available=False
-
-if sys.platform != 'darwin':
-    import psutil
-    _psutil_available=True
-
+import psutil
 from ..util import convertCamelToSnake, print2err,printExceptionDetailsToStdErr
 from psychopy.clock import monotonicClock
 
@@ -163,7 +156,7 @@ class Computer(object):
         currently supported on OS X.
     
     The Computer class also has methods to monitor current Computer memory 
-    and CPU usage. The psutil Process object (if available) can access
+    and CPU usage. The psutil Process object can access
     process level memory, CPU, thread count, disk, and network utilization. 
 
     The Computer class contains only static or class level methods, so an instance 
@@ -176,58 +169,73 @@ class Computer(object):
     
     #: True if the current process is the ioHub Server Process. False if the
     #: current process is the Experiment Runtime Process.
-    isIoHubProcess=False
-    
+    is_iohub_process=False
+
+    #: If Computer class is on the iohub server process, psychopy_process is
+    #: the psychopy process created from the pid passed to iohub on startup.
+    #: The iohub server checks that this process exists
+    #: (server.checkForPsychopyProcess()) and shuts down if it does not.
+    psychopy_process = None
+
     #: True if the current process is currently in high or real-time priority mode
     #: (enabled by calling Computer.enableHighPriority() or Computer.enableRealTimePriority() )
     #: False otherwise.
-    inHighPriorityMode=False
+    in_high_priority_mode=False
     
     #: A iohub.MonotonicClock class instance used as the common time base for all devices
     #: and between the ioHub Server and Experiment Runtime Process. Do not 
     #: access this class directly, instead use the Computer.getTime()
     #: and associated method name alias's to actually get the current ioHub time.
-    globalClock=monotonicClock
+    global_clock=monotonicClock
 
     #: The name of the current operating system Python is running on.
     system=sys.platform
     
     #: Attribute representing the number of *processing units* available on the current computer. 
     #: This includes cpu's, cpu cores, and hyperthreads. Notes:
-    #:      * processingUnitCount = num_cpus*num_cores_per_cpu*num_hyperthreads.
+    #:      * processing_unit_count = num_cpus*num_cores_per_cpu*num_hyperthreads.
     #:      * For single core CPU's,  num_cores_per_cpu = 1.
-    #:      * For CPU's that do not support hyperthreading,  num_hyperthreads = 1, otherwise num_hyperthreads = 2.  
-    processingUnitCount=None
-    if _psutil_available:
-        processingUnitCount=psutil.NUM_CPUS
-    else:
-        import multiprocessing
-        processingUnitCount=multiprocessing.cpu_count()
-    
-    #: The OS processes ID of the current Python process.
-    currentProcessID=os.getpid()
+    #:      * For CPU's that do not support hyperthreading,  num_hyperthreads = 1, otherwise num_hyperthreads = 2.
+    processing_unit_count = psutil.cpu_count()
+    core_count = psutil.cpu_count(False) #hyperthreads not included
     
     #: Access to the psutil.Process class for the current system Process.
-    #: On OS X, this is the returned value from multiprocessing.current_process()
-    if _psutil_available:
-        currentProcess=psutil.Process(currentProcessID)
-    else:
-        
-        import multiprocessing
-        currentProcess=multiprocessing.current_process()
-        
+    current_process = psutil.Process()
+
     #: The OS process ID of the ioHub Process.
-    ioHubServerProcessID=None
+    iohub_process_id=None
     
-    #: On Windows and Linux, the psutil Process object for the ioHub Process.
-    #: On OS X, None.
-    ioHubServerProcess=None
+    #: The psutil Process object for the ioHub Process.
+    iohub_process=None
     
-    _process_original_nice_value=-1 # used on linux.
+    _process_original_nice_value=0 # used on linux.
     
     def __init__(self):
         print2err("WARNING: Computer is a static class, no need to create an instance. just use Computer.xxxxxx")
 
+
+    @staticmethod
+    def getProcessPriority(proc):
+        proc_priority = proc.nice()
+        if Computer.system == 'win32':
+            if proc_priority == psutil.HIGH_PRIORITY_CLASS:
+                return 'high'
+            if proc_priority == psutil.REALTIME_PRIORITY_CLASS:
+                return 'realtime'
+            if proc_priority == psutil.NORMAL_PRIORITY_CLASS:
+                return 'normal'
+            if proc_priority == psutil.BELOW_NORMAL_PRIORITY_CLASS:
+                return 'low'
+        else:
+            if proc_priority <= -15:
+                return 'realtime'
+            if proc_priority <= -10:
+                return 'high'
+            if proc_priority >= -3 and proc_priority <= 3:
+                return 'normal'
+            if proc_priority > 5:
+                return 'low'
+        return 'unknown'
 
     @staticmethod
     def enableHighPriority(disable_gc=True):
@@ -237,31 +245,25 @@ class Computer(object):
         useful for the duration of a trial, for example, where you enable at
         start of trial and disable at end of trial. 
         
-        On Linux, the process is set to a nice level of 10.
+        On Linux, the process is set to a nice level of -10.
 
         This method is not supported on OS X.
         
         Args:
             disable_gc (bool): True = Turn of the Python Garbage Collector. False = Leave the Garbage Collector running. Default: True
         """
-        if _psutil_available is False:
-            print2err("Computer.enableHighPriority is not supported on OS X")
-            return False
-        
-        if Computer.inHighPriorityMode is False:
+        if Computer.in_high_priority_mode is False:
+            nice_val = -10
+            Computer._process_original_nice_value = Computer.current_process.nice()
+            if Computer.system=='win32':
+                nice_val = psutil.HIGH_PRIORITY_CLASS
+
             if disable_gc:
                 gc.disable()
-            if Computer.system=='win32':
-                Computer.currentProcess.set_nice(psutil.HIGH_PRIORITY_CLASS)
-                Computer.inHighPriorityMode=True
-            elif Computer.system=='linux2':
-                current_nice=Computer.currentProcess.get_nice()
-                Computer._process_original_nice_value=current_nice
-                if current_nice <10:
-                    Computer.currentProcess.set_nice(10)
-                    Computer.currentProcess.get_nice()
-                    Computer.inHighPriorityMode = True
-                    
+
+            Computer.current_process.nice(nice_val)
+            Computer.in_high_priority_mode=True
+
 
     @staticmethod
     def enableRealTimePriority(disable_gc=True):
@@ -280,23 +282,17 @@ class Computer(object):
         Args:
             disable_gc (bool): True = Turn of the Python Garbage Collector. False = Leave the Garbage Collector running. Default: True
         """
-        if _psutil_available is False:
-            print2err("Computer.enableRealtimePriority is not supported on OS X")
-            return False
+        if Computer.in_high_priority_mode is False:
+            nice_val = -18
+            Computer._process_original_nice_value = Computer.current_process.nice()
+            if Computer.system=='win32':
+                nice_val = psutil.REALTIME_PRIORITY_CLASS
 
-        if Computer.inHighPriorityMode is False:
             if disable_gc:
                 gc.disable()
-            if Computer.system=='win32':
-                Computer.currentProcess.set_nice(psutil.REALTIME_PRIORITY_CLASS)
-                Computer.inHighPriorityMode = True
-            elif Computer.system=='linux2':
-                current_nice=Computer.currentProcess.get_nice()
-                Computer._process_original_nice_value=current_nice
-                if current_nice <16:
-                    Computer.currentProcess.set_nice(16)
-                    Computer.currentProcess.get_nice()
-                    Computer.inHighPriorityMode = True
+
+            Computer.current_process.nice(nice_val)
+            Computer.in_high_priority_mode=True
 
     @staticmethod
     def disableRealTimePriority():
@@ -314,10 +310,6 @@ class Computer(object):
         Return: 
             None
         """
-        if _psutil_available is False:
-            print2err("Computer.disableRealTimePriority is not supported on OS X")
-            return False
-
         Computer.disableHighPriority()
 
     @staticmethod
@@ -336,19 +328,13 @@ class Computer(object):
         Return: 
             None
         """
-        
-        if _psutil_available is False:
-            print2err("Computer.disableHighPriority is not supported on OS X")
-            return False
         try:
-            if Computer.inHighPriorityMode is True:
+            if Computer.in_high_priority_mode is True:
+                nice_val = Computer._process_original_nice_value
                 gc.enable()
-                if Computer.system=='win32':
-                    Computer.currentProcess.set_nice(psutil.NORMAL_PRIORITY_CLASS)
-                    Computer.inHighPriorityMode=False
-                elif Computer.system=='linux2' and Computer._process_original_nice_value > 0:
-                    Computer.currentProcess.set_nice(Computer._process_original_nice_value)
-                    Computer.inHighPriorityMode=False
+
+                Computer.current_process.nice(nice_val)
+                Computer.in_high_priority_mode=False
         except psutil.AccessDenied:
             print2err("WARNING: Could not disable increased priority for process {0}".format(Computer.currentProcessID))
 
@@ -360,7 +346,7 @@ class Computer(object):
         
         Notes:
             
-        * processingUnitCount = num_cpus*num_cores_per_cpu*num_hyperthreads.
+        * processing_unit_count = num_cpus*num_cores_per_cpu*num_hyperthreads.
         * For single core CPU's,  num_cores_per_cpu = 1.
         * For CPU's that do not support hyperthreading,  num_hyperthreads = 1, otherwise num_hyperthreads = 2.  
         
@@ -371,7 +357,7 @@ class Computer(object):
             int: the number of processing units on the computer.
         """
         
-        return Computer.processingUnitCount
+        return Computer.processing_unit_count
 
     @staticmethod
     def getProcessAffinities():
@@ -422,9 +408,7 @@ class Computer(object):
             (list,list) Tuple of two lists: PsychoPy Process affinity ID list and ioHub Process affinity ID list. 
 
         """
-        if _psutil_available is False:
-            return range(Computer.processingUnitCount),range(Computer.processingUnitCount),
-        return Computer.currentProcess.get_cpu_affinity(),Computer.ioHubServerProcess.get_cpu_affinity()
+        Computer.current_process.cpu_affinity(),Computer.iohub_process.cpu_affinity()
 
     @staticmethod
     def setProcessAffinities(experimentProcessorList, ioHubProcessorList):
@@ -468,11 +452,8 @@ class Computer(object):
         Returns:
            None
         """
-        if _psutil_available is False:
-            print2err("Computer.setProcessAffinities is not supported on OSX.")
-            return
-        Computer.currentProcess.set_cpu_affinity(experimentProcessorList)
-        Computer.ioHubServerProcess.set_cpu_affinity(ioHubProcessorList)
+        Computer.current_process.cpu_affinity(experimentProcessorList)
+        Computer.iohub_process.cpu_affinity(ioHubProcessorList)
 
     @staticmethod
     def autoAssignAffinities():
@@ -497,28 +478,24 @@ class Computer(object):
         Returns:
             None
         """
-        if _psutil_available is False:
-            print2err("Computer.autoAssignAffinities is not supported on OSX.")
-            return
-        cpu_count=Computer.cpuCount
-        print "System processor count:", cpu_count
+        cpu_count=Computer.processing_unit_count
         if cpu_count == 2:
-            print 'Assigning experiment process to CPU 0, ioHubServer process to CPU 1'
+            #print 'Assigning experiment process to CPU 0, ioHubServer process to CPU 1'
             Computer.setProcessAffinities([0,],[1,])
         elif cpu_count == 4:
-            print 'Assigning experiment process to CPU 0,1, ioHubServer process to CPU 2,3'
+            #print 'Assigning experiment process to CPU 0,1, ioHubServer process to CPU 2,3'
             Computer.setProcessAffinities([0,1],[2,3])
         elif cpu_count == 8:
-            print 'Assigning experiment process to CPU 2,3, ioHubServer process to CPU 4,5, attempting to assign all others to 0,1,6,7'
+            #print 'Assigning experiment process to CPU 2,3, ioHubServer process to CPU 4,5, attempting to assign all others to 0,1,6,7'
             Computer.setProcessAffinities([2,3],[4,5])
-            Computer.setAllOtherProcessesAffinity([0,1,6,7],[Computer.currentProcessID,Computer.ioHubServerProcessID])
+            Computer.setAllOtherProcessesAffinity([0,1,6,7],[Computer.currentProcessID,Computer.iohub_process_id])
         else:
             print "autoAssignAffinities does not support %d processors."%(cpu_count,)
             
     @staticmethod
     def getCurrentProcessAffinity():
         """
-        Returns a list of 'processor' ID's (from 0 to Computer.processingUnitCount-1)
+        Returns a list of 'processor' ID's (from 0 to Computer.processing_unit_count-1)
         that the current (calling) process is able to run on.
 
         Args:
@@ -527,14 +504,12 @@ class Computer(object):
         Returns:
             None        
         """
-        if _psutil_available is False:
-            return range(Computer.processingUnitCount)
-        return Computer.currentProcess.get_cpu_affinity()
+        return Computer.current_process.cpu_affinity()
 
     @staticmethod
     def setCurrentProcessAffinity(processorList):
         """
-        Sets the list of 'processor' ID's (from 0 to Computer.processingUnitCount-1)
+        Sets the list of 'processor' ID's (from 0 to Computer.processing_unit_count-1)
         that the current (calling) process should only be allowed to run on.
 
         Args:
@@ -544,15 +519,12 @@ class Computer(object):
             None
         
         """
-        if _psutil_available is False:
-            print2err("Computer.setCurrentProcessAffinity is not supported on OSX.")
-            return
-        return Computer.currentProcess.set_cpu_affinity(processorList)
+        return Computer.current_process.cpu_affinity(processorList)
 
     @staticmethod
     def setProcessAffinityByID(process_id,processor_list):
         """
-        Sets the list of 'processor' ID's (from 0 to Computer.processingUnitCount-1)
+        Sets the list of 'processor' ID's (from 0 to Computer.processing_unit_count-1)
         that the process with the provided OS Process ID is able to run on.
 
         Args:
@@ -563,17 +535,13 @@ class Computer(object):
         Returns:
             None
         """
-        if _psutil_available is False:
-            print2err("Computer.setProcessAffinityByID is not supported on OSX.")
-            return
-            
         p=psutil.Process(process_id)
-        return p.set_cpu_affinity(processor_list)
+        return p.cpu_affinity(processor_list)
 
     @staticmethod
     def getProcessAffinityByID(process_id):
         """
-        Returns a list of 'processor' ID's (from 0 to Computer.processingUnitCount-1)
+        Returns a list of 'processor' ID's (from 0 to Computer.processing_unit_count-1)
         that the process with the provided processID is able to run on.
 
         Args:
@@ -582,17 +550,15 @@ class Computer(object):
         Returns:
            processorList (list): list of int processor ID's to set process with the given processID too. An empty list means all processors.
         """
-        if _psutil_available is False:
-            return range(Computer.processingUnitCount)
         p=psutil.Process(process_id)
-        return p.get_cpu_affinity()
+        return p.cpu_affinity()
 
     @staticmethod
     def setAllOtherProcessesAffinity(processor_list, exclude_process_id_list=[]):
         """ 
         Sets the affinity for all OS Processes other than those specified in the
         exclude_process_id_list, to the processing unit indexes specified in processor_list.
-        Valid values in the processor_list are between 0 to Computer.processingUnitCount-1.
+        Valid values in the processor_list are between 0 to Computer.processing_unit_count-1.
         
         exclude_process_id_list should be a list of OS Process ID integers, 
         or an empty list (indicating to set the affiinty to all processing units).
@@ -611,23 +577,19 @@ class Computer(object):
         Returns:
            None
         """
-        if _psutil_available is False:
-            print2err("Computer.setAllOtherProcessesAffinity is not supported on OSX.")
-            return
-        for p in psutil.process_iter():
-            if p.pid not in exclude_process_id_list:
+        for p in psutil.pids():
+            if p not in exclude_process_id_list:
                 try:
-                    p.set_cpu_affinity(processor_list)
-                    print2err('Set OK process affinity: %s : %ld'%(p.name,p.pid))
+                    psutil.Process(p).cpu_affinity(processor_list)
                 except Exception:
-                    print2err('ERROR setting process affinity: %s : %ld'%(p.name,p.pid))
+                    pass
 
     @staticmethod
     def currentTime():
         """
         Alias for Computer.currentSec()
         """
-        return Computer.globalClock.getTime()
+        return Computer.global_clock.getTime()
         
     @staticmethod
     def currentSec():
@@ -653,14 +615,14 @@ class Computer(object):
            None
         """
 
-        return Computer.globalClock.getTime()
+        return Computer.global_clock.getTime()
 
     @staticmethod
     def getTime():
         """
         Alias for Computer.currentSec()        
         """
-        return Computer.globalClock.getTime()
+        return Computer.global_clock.getTime()
 
     @staticmethod
     def _getNextEventID():
@@ -687,29 +649,22 @@ class Computer(object):
         * vmem.used: the used amount of memory in bytes.
         * vmem.free: the amount of memory that is free in bytes.On Windows, this is the same as vmem.available.           
         """
-        if _psutil_available is False:
-            print2err("Computer.getPhysicalSystemMemoryInfo is not supported on OS X")
-            return False
-        
         m= psutil.virtual_memory()
         return m
 
     @staticmethod
     def getCPUTimeInfo(percpu=False):
         """
-        Return information about the computers CPU usage.
+        Return a float representing the current CPU utilization as a percentage.
         
         Args:
-           percpu (bool): If True, a list of cputimes objects is returned, one for each processing unit for the computer. If False, only a single cputimes object is returned.
-                      
+           percpu (bool): If True, a list of cputimes objects is returned,
+                          one for each processing unit for the computer.
+                          If False, only a single cputimes object is returned.
         Returns:
            object: (user=float, system=float, idle=float)        
         """
-        if _psutil_available is False:
-            print2err("Computer.getCPUTimeInfo is not supported on OS X")
-            return False
-
-        return psutil.cpu_times(percpu)
+        return psutil.cpu_times_percent(percpu=percpu)
 
 
     @staticmethod
@@ -717,8 +672,7 @@ class Computer(object):
         """
         Get the current / Local process. 
         
-        On Windows and Linux, this is a psutil.Process class instance. 
-        On OS X, it is a multiprocessing.Process instance.
+        On Windows and Linux, this is a psutil.Process class instance.
 
         Args:
            None
@@ -726,7 +680,7 @@ class Computer(object):
         Returns:
            object: Process object for the current system process.           
         """
-        return Computer.currentProcess
+        return Computer.current_process
 
 
     @staticmethod
@@ -734,8 +688,7 @@ class Computer(object):
         """
         Get the ioHub Process. 
         
-        On Windows and Linux, this is a psutil.Process class instance. 
-        On OS X, it is a multiprocessing.Process instance.
+        On Windows and Linux, this is a psutil.Process class instance.
 
         Args:
            None
@@ -743,7 +696,7 @@ class Computer(object):
         Returns:
            object: Process object for the ioHub Process.           
         """
-        return Computer.ioHubServerProcess
+        return Computer.iohub_process
 
 ########### Base Abstract Device that all other Devices inherit from ##########
 class Device(ioObject):
@@ -790,7 +743,7 @@ class Device(ioObject):
     
     _display_device=None
     _iohub_server=None
-            
+    next_filter_id = 1
     DEVICE_TYPE_ID=None
     DEVICE_TYPE_STRING=None
     
@@ -801,7 +754,8 @@ class Device(ioObject):
                                             '_last_callback_time',
                                             '_is_reporting_events',
                                             '_configuration',
-                                            'monitor_event_types']
+                                            'monitor_event_types',
+                                            '_filters']
     
     def __init__(self,*args,**kwargs):        
         #: The user defined name given to this device instance. A device name must be
@@ -856,16 +810,16 @@ class Device(ioObject):
         self.manufacture_date=None
 
         
-        ioObject.__init__(self,*args,**kwargs)
+        ioObject.__init__(self, *args, **kwargs)
 
-        self._is_reporting_events=kwargs.get('auto_report_events')
-        self._iohub_event_buffer=dict()
-        self._event_listeners=dict()
-        self._configuration=kwargs
-        self._last_poll_time=0
-        self._last_callback_time=0
-        self._native_event_buffer=deque(maxlen=self.event_buffer_length)
-
+        self._is_reporting_events = kwargs.get('auto_report_events', False)
+        self._iohub_event_buffer = dict()
+        self._event_listeners = dict()
+        self._configuration = kwargs
+        self._last_poll_time = 0
+        self._last_callback_time = 0
+        self._native_event_buffer = deque(maxlen=self.event_buffer_length)
+        self._filters = dict()
         
     def getConfiguration(self):
         """
@@ -905,40 +859,53 @@ class Device(ioObject):
         Returns:   
             (list): New events that the ioHub has received since the last getEvents() or clearEvents() call to the device. Events are ordered by the ioHub time of each event, older event at index 0. The event object type is determined by the asType parameter passed to the method. By default a namedtuple object is returned for each event. 
         """
+        eventTypeID = None
+        clearEvents = True
         if len(args)==1:
             eventTypeID=args[0]
-            clearEvents=kwargs.get('clearEvents',True)
         elif len(args)==2:
             eventTypeID=args[0]
             clearEvents=args[1]
-        else:
+
+        if eventTypeID is None:
             eventTypeID=kwargs.get('event_type_id',None)
             if eventTypeID is None:
-                eventTypeID=kwargs.get('event_type',None)    
-            clearEvents=kwargs.get('clearEvents',True)
+                eventTypeID=kwargs.get('event_type',None)
+        clearEvents=kwargs.get('clearEvents',True)
+
+        filter_id=kwargs.get('filter_id',None)
 
         currentEvents=[]
         if eventTypeID:
             currentEvents=list(self._iohub_event_buffer.get(eventTypeID,[]))
+
+            if filter_id:
+                currentEvents = [e for e in currentEvents if e[DeviceEvent.EVENT_FILTER_ID_INDEX] == filter_id]
+
             if clearEvents is True and len(currentEvents)>0:
-                self._iohub_event_buffer[eventTypeID]=[]
+                self.clearEvents(eventTypeID,filter_id=filter_id)
         else:
-            [currentEvents.extend(l) for l in self._iohub_event_buffer.values()]
+            if filter_id:
+                [currentEvents.extend([fe for fe in l if fe[DeviceEvent.EVENT_FILTER_ID_INDEX] == filter_id]) for l in self._iohub_event_buffer.values()]
+            else:
+                [currentEvents.extend(l) for l in self._iohub_event_buffer.values()]
+
             if clearEvents is True and len(currentEvents)>0:
-                self.clearEvents()
+                self.clearEvents(filter_id=filter_id)
 
         if len(currentEvents)>0:
             currentEvents=sorted(currentEvents, key=itemgetter(DeviceEvent.EVENT_HUB_TIME_INDEX))
         return currentEvents
 
 
-    def clearEvents(self):
+    def clearEvents(self, event_type=None, filter_id=None):
         """
         Clears any DeviceEvents that have occurred since the last call to the device's getEvents(),
         or clearEvents() methods.
             
-        Note that calling clearEvents() atthe device level only clears the 
-        given device's event buffer. The ioHub Process's Global Event Buffer is unchanged.
+        Note that calling clearEvents() at the device level only clears the 
+        given device's event buffer. The ioHub Process's Global Event Buffer 
+        is unchanged.
         
         Args: 
             None
@@ -946,7 +913,21 @@ class Device(ioObject):
         Returns:
             None
         """
-        self._iohub_event_buffer.clear()
+        if event_type:
+            if filter_id:
+                event_que = self._iohub_event_buffer[event_type]
+                newque = deque([e for e in event_que if e[DeviceEvent.EVENT_FILTER_ID_INDEX] != filter_id], maxlen=self.event_buffer_length)
+                self._iohub_event_buffer[event_type] = newque
+            else:
+                self._iohub_event_buffer.setdefault(event_type,
+                                deque(maxlen=self.event_buffer_length)).clear()
+        else:
+            if filter_id:
+                for event_type, event_deque in self._iohub_event_buffer.items():
+                    newque = deque([e for e in event_deque if e[DeviceEvent.EVENT_FILTER_ID_INDEX] != filter_id], maxlen=self.event_buffer_length)
+                    self._iohub_event_buffer[event_type] = newque
+            else:
+                self._iohub_event_buffer.clear()
 
     def enableEventReporting(self,enabled=True):
         """
@@ -975,9 +956,92 @@ class Device(ioObject):
         """
         return self._is_reporting_events
 
+    def addFilter(self, filter_file_path, filter_class_name, kwargs):
+        """
+        Take the filter_file_path and add the filters module dir to sys.path
+        if it does not already exist.
+
+        Then import the filter module (file) class based on filter_class_name.
+        Create a filter instance, and add it to the _filters dict:
+
+        self._filters[filter_file_path+'.'+filter_class_name]
+
+        :param filter_path:
+        :return:
+        """
+        try:
+            import importlib
+            from psychopy.iohub import EventConstants, convertCamelToSnake
+    
+            filter_file_path = os.path.normpath(os.path.abspath(filter_file_path))
+            fdir, ffile = os.path.split(filter_file_path)
+            if not ffile.endswith(".py"):
+                ffile = ffile+".py"
+            if os.path.isdir(fdir) and os.path.exists(filter_file_path):
+                if fdir not in sys.path:
+                    sys.path.append(fdir)
+    
+                # import module using ffile
+                filter_module = importlib.import_module(ffile[:-3])
+    
+                # import class filter_class_name
+                filter_class = getattr(filter_module, filter_class_name, None)
+                if filter_class is None:
+                    print2err("Can not create Filter, filter class not found")
+                    return -1
+                else:
+                    # Create instance of class
+                    # For now, just use a class level counter.
+                    filter_class_instance = filter_class(**kwargs)
+                    filter_class_instance._parent_device_type = self.DEVICE_TYPE_ID
+                    # Add to filter list for device
+                    filter_key = filter_file_path+'.'+filter_class_name
+                    filter_class_instance._filter_key = filter_key
+                    self._filters[filter_key] = filter_class_instance
+                    return filter_class_instance.filter_id
+    
+            else:
+                print2err("Could not add filter . File not found.")
+            return -1
+        except:
+            printExceptionDetailsToStdErr()
+            print2err("ERROR During Add Filter")
+            
+    def removeFilter(self, filter_file_path, filter_class_name):
+        filter_key = filter_file_path+'.'+filter_class_name
+        if filter_key in self._filters:
+            del self._filters[filter_key]
+            return True
+        return False
+
+    def resetFilter(self,filter_file_path, filter_class_name):
+        filter_key = filter_file_path+'.'+filter_class_name
+        if filter_key in self._filters:
+            self._filters[filter_key].reset()
+            return True
+        return False
+
+    def enableFilters(self,yes=True):
+        for f in self._filters.values():
+            f.enable = yes
+
     def _handleEvent(self,e):
-        self._iohub_event_buffer.setdefault(e[DeviceEvent.EVENT_TYPE_ID_INDEX],[]).append(e)
-        
+        event_type_id = e[DeviceEvent.EVENT_TYPE_ID_INDEX]
+        self._iohub_event_buffer.setdefault(event_type_id,
+                               deque(maxlen=self.event_buffer_length)).append(e)
+
+        # Add the event to any filters bound to the device which
+        # list wanting the event's type and events filter_id
+        input_evt_filter_id = e[DeviceEvent.EVENT_FILTER_ID_INDEX]
+        for event_filter in self._filters.values():
+            if event_filter.enable is True:
+                current_filter_id = event_filter.filter_id
+                if current_filter_id != input_evt_filter_id:
+                    # stops circular event processing
+                    evt_filter_ids= event_filter.input_event_types.get(event_type_id, [])
+                    if input_evt_filter_id in evt_filter_ids:
+                        event_filter._addInputEvent(copy.deepcopy(e))
+
     def _getNativeEventBuffer(self):
         return self._native_event_buffer
 
@@ -996,7 +1060,22 @@ class Device(ioObject):
             
     def _getEventListeners(self,forEventType):
         return self._event_listeners.get(forEventType,[])
-        
+
+    def getCurrentDeviceState(self, clear_events=True):
+        result_dict={}
+
+        events = {key:tuple(value) for key, value in self._iohub_event_buffer.items()}
+        result_dict['events'] = events
+        if clear_events:
+            self.clearEvents()
+
+        result_dict['reporting_events'] = self._is_reporting_events
+
+        return result_dict
+
+    def resetState(self):
+        self.clearEvents()
+
     def _poll(self):
         """
         The _poll method is used when an ioHub Device needs to periodically
@@ -1025,7 +1104,7 @@ class Device(ioObject):
             when being transferred between the ioHub and Experiment processes.
             
             The ioHub Process can convert these list event representations to 
-            one of several, user-friendly object formats ( namedtuple [default], dict, or the correct
+            one of several, user-friendly, object formats ( namedtuple [default], dict, or the correct
             ioHub.devices.DeviceEvent subclass. ) for use within the experiment script.
         
         If an ioHub Device uses polling to check for new device events, the ioHub
@@ -1130,7 +1209,7 @@ class Device(ioObject):
         
         If the ioHub Device has been implemented to use the _poll() method of checking for
         new events, then this method simply should return what it is passed, and is the
-        default implmentation for the method.
+        default implementation for the method.
         
         If the ioHub Device has been implemented to use the event callback method
         to register new native device events with the ioHub Process, then this method should be
@@ -1394,3 +1473,4 @@ try:
 except:
     print2err("Warning: display device module could not be imported.")
     printExceptionDetailsToStdErr()
+

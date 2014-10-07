@@ -1,10 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 '''Stimulus object for drawing radial stimuli, like an annulus, a rotating wedge,
     a checkerboard etc...'''
 
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 # Ensure setting pyglet.options['debug_gl'] to False is done prior to any
@@ -22,8 +22,7 @@ from psychopy import logging
 # tools must only be imported *after* event or MovieStim breaks on win32
 # (JWP has no idea why!)
 from psychopy.tools.arraytools import val2array
-from psychopy.tools.attributetools import attributeSetter
-from psychopy.visual.basevisual import BaseVisualStim
+from psychopy.tools.attributetools import attributeSetter, setAttribute
 from psychopy.visual.grating import GratingStim
 
 try:
@@ -33,8 +32,6 @@ except ImportError:
 
 import numpy
 from numpy import pi
-
-
 
 class RadialStim(GratingStim):
     """Stimulus object for drawing radial stimuli, like an annulus, a rotating wedge,
@@ -72,21 +69,16 @@ class RadialStim(GratingStim):
                  depth=0,
                  rgbPedestal = (0.0,0.0,0.0),
                  interpolate=False,
-                 name='', autoLog=True):
-        """
-        :Parameters:
+                 name=None, 
+                 autoLog=None,
+                 maskParams=None):        
+        """ """ # Empty docstring on __init__, Simply inherits methods from GratingStim
+        #what local vars are defined (these are the init params) for use by __repr__
+        self._initParams = dir()
+        self._initParams.remove('self')
 
-            texRes : (default= *128* )
-                resolution of the texture (if not loading from an image file)
-            angularRes : (default= *100* )
-                100, the number of triangles used to make the sti
-            radialPhase :
-                the phase of the texture from the centre to the perimeter
-                of the stimulus (in radians)
-            angularPhase :
-                the phase of the texture around the stimulus (in radians)
-        """
-        BaseVisualStim.__init__(self, win, units=units, name=name, autoLog=autoLog)
+        super(RadialStim, self).__init__(win, units=units, name=name, autoLog=False) #autolog should start off false
+
         self.useShaders = win._haveShaders  #use shaders if available by default, this is a good thing
 
         # UGLY HACK again. (See same section in GratingStim for ideas)
@@ -100,7 +92,7 @@ class RadialStim(GratingStim):
         GL.glGenTextures(1, ctypes.byref(self._texID))
         self._maskID = GL.GLuint()
         GL.glGenTextures(1, ctypes.byref(self._maskID))
-        self.maskParams = None
+        self.__dict__['maskParams'] = maskParams
         self.maskRadialPhase = 0
         self.texRes = texRes #must be power of 2
         self.interpolate = interpolate
@@ -113,24 +105,23 @@ class RadialStim(GratingStim):
         self.colorSpace=colorSpace
         if rgb!=None:
             logging.warning("Use of rgb arguments to stimuli are deprecated. Please use color and colorSpace args instead")
-            self.setColor(rgb, colorSpace='rgb')
+            self.setColor(rgb, colorSpace='rgb', log=False)
         elif dkl!=None:
             logging.warning("Use of dkl arguments to stimuli are deprecated. Please use color and colorSpace args instead")
-            self.setColor(dkl, colorSpace='dkl')
+            self.setColor(dkl, colorSpace='dkl', log=False)
         elif lms!=None:
             logging.warning("Use of lms arguments to stimuli are deprecated. Please use color and colorSpace args instead")
-            self.setColor(lms, colorSpace='lms')
+            self.setColor(lms, colorSpace='lms', log=False)
         else:
-            self.setColor(color)
-
+            self.setColor(color, log=False)
 
         self.ori = float(ori)
-        self.angularRes = angularRes
-        self.radialPhase = radialPhase
-        self.radialCycles = radialCycles
-        self.visibleWedge = visibleWedge
-        self.angularCycles = angularCycles
-        self.angularPhase = angularPhase
+        self.__dict__['angularRes'] = angularRes
+        self.__dict__['radialPhase'] = radialPhase
+        self.__dict__['radialCycles'] = radialCycles
+        self.__dict__['visibleWedge'] = numpy.array(visibleWedge)
+        self.__dict__['angularCycles'] = angularCycles
+        self.__dict__['angularPhase'] = angularPhase
         self.pos = numpy.array(pos, float)
         self.depth=depth
         self.__dict__['sf'] = 1
@@ -142,33 +133,27 @@ class RadialStim(GratingStim):
         self.opacity = float(opacity)
 
         #
-        self._triangleWidth = pi*2/self.angularRes
-        self._angles = numpy.arange(0,pi*2, self._triangleWidth, dtype='float64')
-        #which vertices are visible?
-        self._visible = (self._angles>=(self.visibleWedge[0]*pi/180))#first edge of wedge
-        self._visible[(self._angles+self._triangleWidth)*180/pi>(self.visibleWedge[1])] = False#second edge of wedge
-        self._nVisible = numpy.sum(self._visible)*3
-
-        #do the scaling to the window coordinate system
-        self._calcPosRendered()
-        self._calcSizeRendered()#must be done BEFORE _updateXY
-
-        self._updateTextureCoords()
-        self._updateMaskCoords()
-        self._updateXY()
-        if not self.useShaders:
-            #generate a displaylist ID
-            self._listID = GL.glGenLists(1)
-            self._updateList()#ie refresh display list
+        self._updateEverything()
+        
+        # set autoLog now that params have been initialised
+        self.__dict__['autoLog'] = autoLog or autoLog is None and self.win.autoLog
+        if self.autoLog:
+            logging.exp("Created %s = %s" %(self.name, str(self)))
 
     @attributeSetter
     def mask(self, value):
-        """
-        + 'circle', 'gauss', 'raisedCos', **None** (resets to default)
-        + or the name of an image file (most formats supported)
-        + or a numpy array (1xN or NxN) ranging -1:1
+        """The alpha mask that forms the shape of the resulting image
 
-            The alpha mask (forming the shape of the image)
+        Value should one of:
+
+            + 'circle', 'gauss', 'raisedCos', **None** (resets to default)
+            + or the name of an image file (most formats supported)
+            + or a numpy array (1xN) ranging -1:1
+
+        Note that the mask for `RadialStim` is somewhat different to the
+        mask for :class:`ImageStim`. For `RadialStim` it is a 1D array
+        specifying the luminance profile extending outwards from the
+        center of the stimulus, rather than a 2D array
         """
         self.__dict__['mask'] = value
         res = self.texRes#resolution of texture - 128 is bearable
@@ -188,7 +173,11 @@ class RadialStim(GratingStim):
             intensity = 255.0*(rad<=1)
             fromFile=0
         elif self.mask == "gauss":
-            sigma = 1/3.0;
+            # Set SD if specified
+            if self.maskParams == None:    
+                sigma = 1.0 / 3
+            else:
+                sigma = 1.0 / self.maskParams['sd']
             intensity = 255.0*numpy.exp( -rad**2.0 / (2.0*sigma**2.0) )#3sd.s by the edge of the stimulus
             fromFile=0
         elif self.mask == "radRamp":#a radial ramp
@@ -200,6 +189,7 @@ class RadialStim(GratingStim):
             intensity = 255.0*numpy.ones(res,float)
             fromFile=0
         else:#might be a filename of a tiff
+            print value
             try:
                 im = Image.open(self.mask)
                 im = im.transpose(Image.FLIP_TOP_BOTTOM)
@@ -228,40 +218,115 @@ class RadialStim(GratingStim):
         GL.glEnable(GL.GL_TEXTURE_1D)
 
         self._needUpdate = True
-    def setSize(self, value, operation='', log=True):
-        self._set('size', value, operation, log=log)
-        self._calcSizeRendered()
-        self._updateXY()
-        self._needUpdate = True
-    def setAngularCycles(self,value,operation='', log=True):
-        """set the number of cycles going around the stimulus"""
-        self._set('angularCycles', value, operation, log=log)
+    def setMask(self, value, log=None):
+        """Usually you can use 'stim.attribute = value' syntax instead,
+        but use this method if you need to suppress the log message
+        """
+        setAttribute(self, 'mask', value, log)
+    
+    def _setRadialAtribute(self, attr, value):
+        """ Internal helper function to reduce redundancy """
+        self.__dict__[attr] = value  # dict to avoid recursing the attributeSetter
         self._updateTextureCoords()
         self._needUpdate = True
-    def setRadialCycles(self,value,operation='', log=True):
-        """set the number of texture cycles from centre to periphery"""
-        self._set('radialCycles', value, operation, log=log)
+    
+    @attributeSetter
+    def angularCycles(self, value):
+        """Float (but Int is prettiest). Set the number of cycles going around the stimulus. 
+        i.e. it controls the number of 'spokes'.
+        
+        :ref:`Operations <attrib-operations>` supported."""
+        self._setRadialAtribute('angularCycles', value)
+    def setAngularCycles(self, value, operation='', log=None):
+        """Usually you can use 'stim.attribute = value' syntax instead,
+        but use this method if you need to suppress the log message
+        """
+        setAttribute(self, 'angularCycles', value, log, operation)  # calls the attributeSetter
+    
+    @attributeSetter
+    def radialCycles(self, value):
+        """Float (but Int is prettiest). Set the number of texture cycles from centre to periphery, 
+        i.e. it controls the number of 'rings'.
+        
+        :ref:`Operations <attrib-operations>` supported."""
+        self._setRadialAtribute('radialCycles', value)
+    def setRadialCycles(self, value, operation='', log=None):
+        """Usually you can use 'stim.attribute = value' syntax instead,
+        but use this method if you need to suppress the log message
+        """
+        setAttribute(self, 'radialCycles', value, log, operation)  # calls the attributeSetter
+        
+    @attributeSetter
+    def angularPhase(self, value):
+        """Float. Set the angular phase (like orientation) of the texture (wraps 0-1).
+
+        This is akin to setting the orientation of the texture around the
+        stimulus in radians. If possible, it is more efficient to rotate the 
+        stimulus using its `ori` setting instead.
+       
+        :ref:`Operations <attrib-operations>` supported."""
+        self._setRadialAtribute('angularPhase', value)
+    def setAngularPhase(self, value, operation='', log=None):
+        """Usually you can use 'stim.attribute = value' syntax instead,
+        but use this method if you need to suppress the log message
+        """
+        setAttribute(self, 'angularPhase', value, log, operation)  # calls the attributeSetter
+
+    @attributeSetter
+    def radialPhase(self, value):
+        """Float. Set the radial phase of the texture (wraps 0-1). This is the 
+        phase of the texture from the centre to the perimeter of the stimulus 
+        (in radians). Can be used to drift concentric rings out/inwards.
+        
+        :ref:`Operations <attrib-operations>` supported."""
+        self._setRadialAtribute('radialPhase', value)
+    def setRadialPhase(self, value, operation='', log=None):
+        """Usually you can use 'stim.attribute = value' syntax instead,
+        but use this method if you need to suppress the log message
+        """
+        setAttribute(self, 'radialPhase', value, log, operation)  # calls the attributeSetter
+    
+    def _updateEverything(self):
+        """Internal helper function for angularRes and visibleWedge (and init)"""
+        self._triangleWidth = pi * 2 / self.angularRes
+        self._angles = numpy.arange(0, pi * 2, self._triangleWidth, dtype='float64')
+        #which vertices are visible?
+        self._visible = (self._angles >= (self.visibleWedge[0] * pi / 180))#first edge of wedge
+        self._visible[(self._angles + self._triangleWidth) * 180 / pi > (self.visibleWedge[1])] = False#second edge of wedge
+        self._nVisible = numpy.sum(self._visible) * 3
+
         self._updateTextureCoords()
-        self._needUpdate = True
-    def setAngularPhase(self,value, operation='', log=True):
-        """set the angular phase of the texture (radians)"""
-        self._set('angularPhase', value, operation, log=log)
-        self._updateTextureCoords()
-        self._needUpdate = True
-    def setRadialPhase(self,value, operation='', log=True):
-        """set the radial phase of the texture (radians)"""
-        self._set('radialPhase', value, operation, log=log)
-        self._updateTextureCoords()
-        self._needUpdate = True
+        self._updateMaskCoords()
+        self._updateVerticesBase()
+        self._updateVertices()  # is this necessary? Works fine without...
+        if not self.useShaders:
+            #generate a displaylist ID
+            self._listID = GL.glGenLists(1)
+            self._updateList()#ie refresh display list
+    
+    @attributeSetter
+    def angularRes(self, value):
+        """The number of triangles used to make the sti.
+        
+         :ref:`Operations <attrib-operations>` supported."""
+        self.__dict__['angularRes'] = value
+        self._updateEverything()
+    @attributeSetter
+    def visibleWedge(self, value):
+        """tuple (start, end) in degrees. Determines visible range. (0, 360) is full visibility.
+        
+        :ref:`Operations <attrib-operations>` supported."""
+        self.__dict__['visibleWedge'] = numpy.array(value)
+        self._updateEverything()
 
     def draw(self, win=None):
         """
         Draw the stimulus in its relevant window. You must call
-        this method after every MyWin.flip() if you want the
+        this method after every `win.flip()` if you want the
         stimulus to appear on that frame and then update the screen
         again.
 
-        If win is specified then override the normal window of this stimulus.
+        If `win` is specified then override the normal window of this stimulus.
         """
         if win==None: win=self.win
         self._selectWindow(win)
@@ -269,18 +334,14 @@ class RadialStim(GratingStim):
         #do scaling
         GL.glPushMatrix()#push before the list, pop after
         #scale the viewport to the appropriate size
-        self.win.setScale(self._winScale)
-        #move to centre of stimulus and rotate
-        GL.glTranslatef(self._posRendered[0],self._posRendered[1],0)
-        GL.glRotatef(-self.ori,0.0,0.0,1.0)
-
+        self.win.setScale('pix')
         if self.useShaders:
             #setup color
             desiredRGB = self._getDesiredRGB(self.rgb, self.colorSpace, self.contrast)
             GL.glColor4f(desiredRGB[0],desiredRGB[1],desiredRGB[2], self.opacity)
 
             #assign vertex array
-            GL.glVertexPointer(2, GL.GL_DOUBLE, 0, self._visibleXY.ctypes)
+            GL.glVertexPointer(2, GL.GL_DOUBLE, 0, self.verticesPix.ctypes)
 
             #then bind main texture
             GL.glActiveTexture(GL.GL_TEXTURE0)
@@ -325,6 +386,8 @@ class RadialStim(GratingStim):
             GL.glUseProgram(0)
         else:
             #the list does the texture mapping
+            if self._needTextureUpdate:
+                self.setTex(value=self.tex, log=False)
             if self._needUpdate:
                 self._updateList()
             GL.glCallList(self._listID)
@@ -332,18 +395,18 @@ class RadialStim(GratingStim):
         #return the view to previous state
         GL.glPopMatrix()
 
-    def _updateXY(self):
-        """Update if the SIZE changes
-        Update AFTER _calcSizeRendered"""
+    def _updateVerticesBase(self):
+        """Update the base vertices if angular resolution changes. These will be
+        multiplied by the size and rotation matrix before rendering"""
         #triangles = [trisX100, verticesX3, xyX2]
-        self._XY = numpy.zeros([self.angularRes, 3, 2])
-        self._XY[:,1,0] = numpy.sin(self._angles)*self._sizeRendered[0]/2 #x position of 1st outer vertex
-        self._XY[:,1,1] = numpy.cos(self._angles)*self._sizeRendered[1]/2#y position of 1st outer vertex
-        self._XY[:,2,0] = numpy.sin(self._angles+self._triangleWidth)*self._sizeRendered[0]/2#x position of 2nd outer vertex
-        self._XY[:,2,1] = numpy.cos(self._angles+self._triangleWidth)*self._sizeRendered[1]/2#y position of 2nd outer vertex
-
-        self._visibleXY = self._XY[self._visible,:,:]
-        self._visibleXY = self._visibleXY.reshape(self._nVisible,2)
+        vertsBase = numpy.zeros([self.angularRes, 3, 2])
+        vertsBase[:,1,0] = numpy.sin(self._angles) #x position of 1st outer vertex
+        vertsBase[:,1,1] = numpy.cos(self._angles) #y position of 1st outer vertex
+        vertsBase[:,2,0] = numpy.sin(self._angles+self._triangleWidth)#x position of 2nd outer vertex
+        vertsBase[:,2,1] = numpy.cos(self._angles+self._triangleWidth)#y position of 2nd outer vertex
+        vertsBase /= 2.0 #size should be 1.0, so radius should be 0.5
+        vertsBase = vertsBase[self._visible,:,:]
+        self._verticesBase = vertsBase.reshape(self._nVisible,2)
 
     def _updateTextureCoords(self):
         #calculate texture coordinates if angularCycles or Phase change
@@ -374,7 +437,7 @@ class RadialStim(GratingStim):
         GL.glNewList(self._listID,GL.GL_COMPILE)
 
         #assign vertex array
-        arrPointer = self._visibleXY.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+        arrPointer = self.verticesPix.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
         GL.glVertexPointer(2, GL.GL_FLOAT, 0, arrPointer)
 
         #setup the shaderprogram
@@ -428,7 +491,7 @@ class RadialStim(GratingStim):
         GL.glColor4f(1.0,1.0,1.0,self.opacity)#glColor can interfere with multitextures
 
         #assign vertex array
-        GL.glVertexPointer(2, GL.GL_DOUBLE, 0, self._visibleXY.ctypes)
+        GL.glVertexPointer(2, GL.GL_DOUBLE, 0, self.verticesPix.ctypes)
         GL.glEnableClientState(GL.GL_VERTEX_ARRAY)
 
         #bind and enable textures
@@ -464,24 +527,7 @@ class RadialStim(GratingStim):
 
         GL.glEndList()
 
-    def setMask(self,value, log=True):
-        """Change the alpha-mask for the stimulus
-        """
-        self.mask = value
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s mask=%s" %(self.name, value),
-                level=logging.EXP,obj=self)
-
     def __del__(self):
         if not self.useShaders:
             GL.glDeleteLists(self._listID, 1)
         self.clearTextures()#remove textures from graphics card to prevent crash
-
-    def clearTextures(self):
-        """
-        Clear the textures associated with the given stimulus.
-        As of v1.61.00 this is called automatically during garbage collection of
-        your stimulus, so doesn't need calling explicitly by the user.
-        """
-        GL.glDeleteTextures(1, self._texID)
-        GL.glDeleteTextures(1, self._maskID)

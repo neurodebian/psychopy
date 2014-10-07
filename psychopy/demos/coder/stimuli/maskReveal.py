@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """When you want to reveal an image gradually from behind a mask, 
 the tempting thing to do is to alter a stimulus mask using .setMask()
 
@@ -42,20 +42,19 @@ numpy.random.shuffle(maskIndices)
 frameN=0
 while True:
     t=trialClock.getTime()
-    gabor.setOri(1,'+')#advance ori by 1 degree
+    gabor.ori += 1  #advance ori by 1 degree
     gabor.draw()
 
     #update mask b ymaking one element transparent
     if frameN<len(maskIndices):
         ii = maskIndices[frameN]#select the next index to make transparent
         opacs[ii]=0
-        mask.setOpacities(opacs)
+        mask.opacities = opacs
     mask.draw()
     
     myWin.flip()
     frameN+=1
     #handle key presses each frame
-    for keys in event.getKeys():
-        if keys in ['escape','q']:
-            myWin.close()
-            core.quit()
+    if event.getKeys(keyList=['escape','q']):
+        myWin.close()
+        core.quit()

@@ -1,7 +1,7 @@
 """Tools to help with calibrations
 """
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 from calibData import *
@@ -46,18 +46,6 @@ if isinstance(monitorFolder, str):
 
 if not os.path.isdir(monitorFolder):
     os.makedirs(monitorFolder)
-
-    #try to import monitors from old location (PsychoPy <0.93 used site-packages/monitors instead)
-    #this only gets done if there was no existing .psychopy folder (and so no calib files)
-    import glob, shutil #these are just to copy old calib files across
-    try:
-        calibFiles = glob.glob('C:\Python24\Lib\site-packages\monitors\*.calib')
-        for thisFile in calibFiles:
-            thisPath, fileName = os.path.split(thisFile)
-            shutil.copyfile(thisFile, join(monitorFolder,fileName))
-    except:
-        pass #never mind - the user will have to do it!
-
 
 pr650code={'OK':'000\r\n',#this is returned after measure
     '18':'Light Low',#these is returned at beginning of data
@@ -158,13 +146,14 @@ class Monitor:
         useBits=None,
         verbose=True,
         currentCalib={},
-         ):
+        autoLog=True ):
         """
         """
 
         #make sure that all necessary settings have some value
         self.__type__ = 'psychoMonitor'
         self.name = name
+        self.autoLog = autoLog
         self.currentCalib = currentCalib
         self.currentCalibName = strFromDate(time.localtime())
         self.calibs = {}
@@ -174,10 +163,11 @@ class Monitor:
         self._loadAll()
         if len(self.calibNames)>0:
             self.setCurrent(-1) #will fetch previous vals if monitor exists
+            if self.autoLog:
+                logging.info('Loaded monitor calibration from %s' %self.calibNames)
         else:
             self.newCalib()
-
-        logging.info(self.calibNames)
+            logging.warning("Monitor specification not found. Creating a temporary one...")
 
         #overide current monitor settings with the vals given
         if width: self.setWidth(width)
@@ -189,12 +179,10 @@ class Monitor:
     def gammaIsDefault(self):
         """Determine whether we're using the default gamma values
         """
-        thisGrid = self.getGammaGrid()
-        #the old default (for simple gamma eq)
-        oldGrid = numpy.array([[0,1,1],[0,1,1],[0,1,1],[0,1,1]])
+        thisGamma = self.getGamma()
         #run the test just on this
-        if thisGrid==None \
-            or numpy.alltrue(thisGrid[:4,:3]==oldGrid):
+        if thisGamma == None \
+            or numpy.alltrue(numpy.array(thisGamma)==numpy.array([1,1,1])):
             return True
         else:
             return False
@@ -229,7 +217,7 @@ class Monitor:
         0 uses y=a+(bx)^gamma
         1 uses y=(a+bx)^gamma
         2 uses linear interpolation over the curve"""
-        self.currentCalib['lineariseMethod']=method
+        self.currentCalib['linearizeMethod']=method
     def setMeanLum(self, meanLum):
         """Records the mean luminance (for reference only)"""
         self.currentCalib['meanLum']=meanLum
@@ -284,7 +272,9 @@ class Monitor:
         calibTools.strFromDate"""
         return self.currentCalib['calibDate']
     def getGamma(self):
-        if 'gamma' in self.currentCalib:
+        if 'gammaGrid' in self.currentCalib and not numpy.alltrue(self.getGammaGrid()[1:, 2]==1):
+            return self.getGammaGrid()[1:, 2]
+        elif 'gamma' in self.currentCalib:
             return self.currentCalib['gamma']
         else:
             return None
@@ -300,10 +290,10 @@ class Monitor:
             return grid
         else:
             return None
-    def getLineariseMethod(self):
+    def getLinearizeMethod(self):
         """Gets the min,max,gamma values for the each gun"""
-        if 'lineariseMethod' in self.currentCalib:
-            return self.currentCalib['lineariseMethod']
+        if 'linearizeMethod' in self.currentCalib:
+            return self.currentCalib['linearizeMethod']
         else:
             return None
     def getMeanLum(self):
@@ -394,7 +384,6 @@ class Monitor:
             self.name+".calib")     #the name of the actual file
 
         if not os.path.exists(thisFileName):
-            logging.warning("Creating new monitor...")
             self.calibNames = []
         else:
             thisFile = open(thisFileName,'r')
@@ -461,8 +450,6 @@ class Monitor:
             return False
 
         self.currentCalib = self.calibs[self.currentCalibName]      #do the import
-        logging.info("Loaded calibration from:%s" %self.currentCalibName)
-
         return self.currentCalibName
 
     def delCalib(self,calibName):
@@ -496,7 +483,7 @@ class Monitor:
     def lineariseLums(self, desiredLums, newInterpolators=False, overrideGamma=None):
         """lums should be uncalibrated luminance values (e.g. a linear ramp)
         ranging 0:1"""
-        linMethod = self.getLineariseMethod()
+        linMethod = self.getLinearizeMethod()
         desiredLums = numpy.asarray(desiredLums)
         output = desiredLums*0.0 #needs same size as input
 
@@ -506,7 +493,8 @@ class Monitor:
             if self._gammaInterpolator!=None and not newInterpolators:
                 pass #we already have an interpolator
             elif lumsPre != None:
-                logging.info('Creating linear interpolation for gamma')
+                if self.autoLog:
+                    logging.info('Creating linear interpolation for gamma')
                 #we can make an interpolator
                 self._gammaInterpolator, self._gammaInterpolator2 =[],[]
                 #each of these interpolators is a function!
@@ -544,7 +532,8 @@ class Monitor:
                 else: gamma = gammaGrid[1:4,2]
                 maxLumWhite = gammaGrid[0,1]
                 gammaWhite = gammaGrid[0,2]
-                logging.debug('using gamma grid'+str(gammaGrid))
+                if self.autoLog:
+                    logging.debug('using gamma grid'+str(gammaGrid))
             else:
                 #just do the calculation using gamma
                 minLum=0
@@ -851,16 +840,16 @@ def getLumSeries(lumLevels=8,
                 else:
                     #otherwise just this gun
                     lumsList[gun,valN] =  actualLum
-     
+
                 #check for quit request
                 for thisKey in psychopy.event.getKeys():
                     if thisKey in ['q', 'Q', 'escape']:
                         myWin.close()
                         return numpy.array([])
-     
+
             elif autoMode=='semi':
                 print "At DAC value %i" % DACval
-     
+
                 done = False
                 while not done:
                     #check for quit request
@@ -950,13 +939,11 @@ def DACrange(n):
 def getAllMonitors():
     """Find the names of all monitors for which calibration files exist
     """
-    currDir = os.getcwd()
-    os.chdir(monitorFolder)
-    monitorList=glob.glob('*.calib')
-    for monitorN,thisName in enumerate(monitorList):
-        monitorList[monitorN] = monitorList[monitorN][:-6]
-
-    os.chdir(currDir)
+    monitorList = glob.glob(os.path.join(monitorFolder, '*.calib'))
+    split = os.path.split
+    splitext = os.path.splitext
+    #skip the folder and the extension for each file
+    monitorList = [splitext(split(thisFile)[-1])[0] for thisFile in monitorList]
     return monitorList
 
 def gammaFun(xx, minLum, maxLum, gamma, eq=1, a=None, b=None, k=None):

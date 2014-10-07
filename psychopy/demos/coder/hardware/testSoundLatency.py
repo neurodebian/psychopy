@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 """This demo allows for automated testing of the sound latency on your system.
 To use it you need a labjack (or adapt for a similar device) and a cable to 
@@ -15,7 +15,7 @@ import numpy, sys, platform
 
 #setup window (can use for visual pulses)
 win = visual.Window([800,800], monitor='testMonitor')
-win.setRecordFrameIntervals(False)
+win.recordFrameIntervals = False
 stim = visual.PatchStim(win, color=-1, sf=0)
 
 sound.init(rate=48000, buffer=48)

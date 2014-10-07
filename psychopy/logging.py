@@ -21,7 +21,7 @@ messages, (which PsychoPy doesn't use) using the commands::
 
 """
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 #Much of the code below is based conceptually, if not syntactically, on the
@@ -135,31 +135,43 @@ class LogFile:
         """
         #work out if this is a filename or a stream to write to
         if f==None:
-            self.stream = sys.stdout
+            self.stream = 'stdout'
         elif hasattr(f, 'write'):
             self.stream=f
         elif type(f) in [unicode, str]:
             self.stream=codecs.open(f, filemode, encoding)
         self.level=level
-        #keep a weakref to the appropriate Logger (don't want to
         if logger is None:
             logger = root
-        self.logger=weakref.ref(logger)
+        # Can not use weak ref to logger, as sometimes this class
+        # instance would be gc'ed before _Logger.__del__
+        # was complete (running .flush()).
+        # This was causing following error when script closed:
+        #     Exception AttributeError: "'NoneType' object has no attribute 'stdout'" in
+        #     <bound method _Logger.__del__ of <psychopy.logging._Logger instance at 0x102e0d878>> ignored
+        # So instead free logger ref in __del__ of this class, so we know any log backlog can be flushed
+        # before it is gc'ed.
+        self.logger = logger
 
-        self.logger().addTarget(self)
+        self.logger.addTarget(self)
 
     def setLevel(self, level):
         """Set a new minimal level for the log file/stream
         """
         self.level = level
-        self.logger()._calcLowestTarget()
+        self.logger._calcLowestTarget()
     def write(self,txt):
         """Write directy to the log file (without using logging functions).
         Useful to send messages that only this file receives
         """
-        self.stream.write(txt)
+        #find the current stdout if we're the console logger
+        if self.stream=='stdout':
+            stream = sys.stdout
+        else:
+            stream = self.stream
+        stream.write(txt)
         try:
-            self.stream.flush()
+            stream.flush()
         except:
             pass
 class _Logger:
@@ -224,7 +236,10 @@ class _Logger:
                     if not thisEntry in formatted:
                         #convert the entry into a formatted string
                         formatted[thisEntry]= self.format %thisEntry.__dict__
-                    target.write(formatted[thisEntry]+'\n')
+                    if type(formatted[thisEntry])==unicode:
+                        target.write((formatted[thisEntry]+'\n').encode('utf-8'))
+                    else:
+                        target.write(formatted[thisEntry]+'\n')
             if hasattr(target.stream, 'flush'):
                 target.stream.flush()
         #finished processing entries - move them to self.flushed

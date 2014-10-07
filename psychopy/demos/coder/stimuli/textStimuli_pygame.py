@@ -1,11 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 from psychopy import visual, core, event
 import sys
 
 #create a window to draw in
 myWin = visual.Window((800.0,800.0),allowGUI=False,
             monitor='testMonitor', units ='cm', winType='pygame')
-myWin.setRecordFrameIntervals(True)
+myWin.recordFrameIntervals = True
 
 if sys.platform=='win32':
     fancy = 'c:\\windows\\fonts\\brush' #this will find brush script
@@ -51,26 +51,22 @@ psychopyTxt = visual.TextStim(myWin, rgb=+1,
                         
 trialClock = core.Clock()
 t=lastFPSupdate=0;
-while t<20:#quits after 20 secs
+while not event.getKeys(keyList=['q', 'escape']):
     t=trialClock.getTime()
     
-    rotating.setOri(1,"+")
+    rotating.ori += 1
     rotating.draw()
     
     unicodeStuff.draw()
     
     if t-lastFPSupdate>1:#update the fps every second
-        fpsText.setText("%i fps" %myWin.fps())
+        fpsText.text = "%i fps" %myWin.fps()
         lastFPSupdate+=1
     fpsText.draw()
     psychopyTxt.draw()
     
-    for key in event.getKeys():
-        if key in ['q', 'Esc']:
-            core.quit()
     #in pygame mouse and key events share one buffer. Need to clear them 
     #in case the large number of mouse events fill the buffer preventing keys to be seen
     event.clearEvents('mouse')#only really needed for pygame windows
     
     myWin.flip()
-

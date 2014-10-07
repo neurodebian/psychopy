@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """This script demonstrates the use of the ElementArrayStim, a highly optimised stimulus for generating 
 arrays of similar (but not identical) elements, such as in global form arrays or random dot stimuli.
 
@@ -36,10 +36,10 @@ def makeCoherentOris(XYs, coherence, formAngle):
     coherentIndices = possibleIndices[0:int(nNew*coherence)]#...and take first nnn elements
     #set the ori of the coherent elements
     theta, radius = cart2pol(XYs[:,0], XYs[:,1]) #get polar coordinates for elements
-    newOris[coherentIndices] = theta[coherentIndices]+formAngle
+    newOris[coherentIndices] = formAngle-theta[coherentIndices]
     return newOris
     
-globForm.setOris( makeCoherentOris(globForm.xys, coherence, 45) )
+globForm.oris = makeCoherentOris(globForm.xys, coherence, 45)
 
 #let's give each element a life of 10 frames and give it a new position after that
 lives = random(N)*10 #this will be the current life of each element
@@ -55,8 +55,8 @@ while True:
     new = makeCoherentOris(newXYs[deadElements,:], coherence, 45)#for new elements we still want same % coherent
     newOris[deadElements] = new
     #update the oris and xys of the new elements
-    globForm.setXYs( newXYs )
-    globForm.setOris( newOris )
+    globForm.xys = newXYs
+    globForm.pris = newOris
     
     globForm.draw()
     

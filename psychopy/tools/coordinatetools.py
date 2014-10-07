@@ -1,14 +1,14 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 '''Functions and classes related to coordinate system conversion'''
 
 import numpy
 
-from psychopy.tools.unittools import radians
+from numpy import radians
 
 
 def  cart2pol(x,y, units='deg'):

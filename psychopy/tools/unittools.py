@@ -1,21 +1,15 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 '''Functions and classes related to unit conversion'''
 
-import numpy
+# This module is not used by psychopy; retained for backwards compatibility
+# for user-scripts.
 
+# pylint: disable=W0611
+# W0611 = Unused import %s
 
-def radians(degrees):
-    """Convert degrees to radians
-
-    >>> radians(180)
-    3.1415926535897931
-    >>> degrees(45)
-    0.78539816339744828
-
-    """
-    return degrees*numpy.pi/180.0
+from numpy import radians, degrees

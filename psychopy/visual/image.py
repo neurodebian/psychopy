@@ -1,9 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 '''Display an image on `psycopy.visual.Window`'''
 
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 # Ensure setting pyglet.options['debug_gl'] to False is done prior to any
@@ -18,16 +18,16 @@ GL = pyglet.gl
 import psychopy  # so we can get the __path__
 from psychopy import logging
 
+from psychopy.tools.attributetools import attributeSetter, setAttribute
 from psychopy.tools.arraytools import val2array
 from psychopy.visual.basevisual import BaseVisualStim
-from psychopy.visual.helpers import (pointInPolygon, polygonsOverlap,
-                                     createTexture)
+from psychopy.visual.basevisual import ContainerMixin, ColorMixin, TextureMixin
 
 import numpy
 
 
-class ImageStim(BaseVisualStim):
-    '''Display an image on `psycopy.visual.Window`'''
+class ImageStim(BaseVisualStim, ContainerMixin, ColorMixin, TextureMixin):
+    '''Display an image on a :class:`psychopy.visual.Window`'''
     def __init__(self,
                  win,
                  image     =None,
@@ -45,42 +45,25 @@ class ImageStim(BaseVisualStim):
                  flipHoriz=False,
                  flipVert=False,
                  texRes=128,
-                 name='', autoLog=True,
+                 name=None,
+                 autoLog=None,
                  maskParams=None):
-        """
-        :Parameters:
+        """ """  # Empty docstring. All doc is in attributes
+        #what local vars are defined (these are the init params) for use by __repr__
+        self._initParams = dir()
+        self._initParams.remove('self')
 
-            image :
-                The image file to be presented (most formats supported)
-            mask :
-                The alpha mask that can be used to control the outer shape of the stimulus
-
-                + **None**, 'circle', 'gauss', 'raisedCos'
-                + or the name of an image file (most formats supported)
-                + or a numpy array (1xN or NxN) ranging -1:1
-
-            texRes:
-                Sets the resolution of the mask (this is independent of the image resolution)
-
-            maskParams: Various types of input. Default to None.
-                This is used to pass additional parameters to the mask if those
-                are needed.
-                - For the 'raisedCos' mask, pass a dict: {'fringeWidth':0.2},
-                where 'fringeWidth' is a parameter (float, 0-1), determining
-                the proportion of the patch that will be blurred by the raised
-                cosine edge.
-
-        """
-        BaseVisualStim.__init__(self, win, units=units, name=name, autoLog=autoLog)
-        self.useShaders = win._haveShaders  #use shaders if available by default, this is a good thing
+        super(ImageStim, self).__init__(win, units=units, name=name, autoLog=False)#set autoLog at end of init
+        self.__dict__['useShaders'] = win._haveShaders  #use shaders if available by default, this is a good thing
 
         #initialise textures for stimulus
         self._texID = GL.GLuint()
         GL.glGenTextures(1, ctypes.byref(self._texID))
         self._maskID = GL.GLuint()
         GL.glGenTextures(1, ctypes.byref(self._maskID))
-        self.maskParams= maskParams
-        self.texRes=texRes
+        self.__dict__['maskParams'] = maskParams
+        self.__dict__['mask'] = mask
+        self.__dict__['texRes'] = texRes  # Not pretty (redefined later) but it works!
 
         # Other stuff
         self._imName = image
@@ -102,21 +85,18 @@ class ImageStim(BaseVisualStim):
         self.setColor(color, colorSpace=colorSpace, log=False)
         self.rgbPedestal=[0,0,0]#does an rgb pedestal make sense for an image?
 
-        # Set the image and mask
+        # Set the image and mask-
         self.setImage(image, log=False)
-        self.setMask(mask, log=False)
-
-        #fix scaling to window coords
-        self._calcSizeRendered()
-        self._calcPosRendered()
-
-        # _verticesRendered for .contains() and .overlaps()
-        v = [(-.5,-.5), (-.5,.5), (.5,.5), (.5,-.5)]
-        self._verticesRendered = numpy.array(self._sizeRendered, dtype=float) * v
+        self.texRes = texRes  # rebuilds the mask
 
         #generate a displaylist ID
         self._listID = GL.glGenLists(1)
         self._updateList()#ie refresh display list
+
+        # set autoLog now that params have been initialised
+        self.__dict__['autoLog'] = autoLog or autoLog is None and self.win.autoLog
+        if self.autoLog:
+            logging.exp("Created %s = %s" %(self.name, str(self)))
 
     def _updateListShaders(self):
         """
@@ -128,11 +108,16 @@ class ImageStim(BaseVisualStim):
         """
         self._needUpdate = False
         GL.glNewList(self._listID,GL.GL_COMPILE)
+
         #setup the shaderprogram
-        if self.isLumImage:
+        if self.isLumImage: #for a luminance image do recoloring
             GL.glUseProgram(self.win._progSignedTexMask)
             GL.glUniform1i(GL.glGetUniformLocation(self.win._progSignedTexMask, "texture"), 0) #set the texture to be texture unit 0
             GL.glUniform1i(GL.glGetUniformLocation(self.win._progSignedTexMask, "mask"), 1)  # mask is texture unit 1
+        else: #for an rgb image there is no recoloring
+            GL.glUseProgram(self.win._progImageStim)
+            GL.glUniform1i(GL.glGetUniformLocation(self.win._progImageStim, "texture"), 0) #set the texture to be texture unit 0
+            GL.glUniform1i(GL.glGetUniformLocation(self.win._progImageStim, "mask"), 1)  # mask is texture unit 1
 
         #mask
         GL.glActiveTexture(GL.GL_TEXTURE1)
@@ -144,31 +129,24 @@ class ImageStim(BaseVisualStim):
         GL.glBindTexture(GL.GL_TEXTURE_2D, self._texID)
         GL.glEnable(GL.GL_TEXTURE_2D)
 
-        flipHoriz = self.flipHoriz*(-2)+1#True=(-1), False->(+1)
-        flipVert = self.flipVert*(-2)+1
-        #calculate coords in advance:
-        L = -self._sizeRendered[0]/2 * flipHoriz#vertices
-        R =  self._sizeRendered[0]/2 * flipHoriz
-        T =  self._sizeRendered[1]/2 * flipVert
-        B = -self._sizeRendered[1]/2 * flipVert
-
+        vertsPix = self.verticesPix #access just once because it's slower than basic property
         GL.glBegin(GL.GL_QUADS)                  # draw a 4 sided polygon
         # right bottom
         GL.glMultiTexCoord2f(GL.GL_TEXTURE0,1,0)
         GL.glMultiTexCoord2f(GL.GL_TEXTURE1,1,0)
-        GL.glVertex2f(R,B)
+        GL.glVertex2f(vertsPix[0,0], vertsPix[0,1])
         # left bottom
         GL.glMultiTexCoord2f(GL.GL_TEXTURE0,0,0)
         GL.glMultiTexCoord2f(GL.GL_TEXTURE1,0,0)
-        GL.glVertex2f(L,B)
+        GL.glVertex2f(vertsPix[1,0], vertsPix[1,1])
         # left top
         GL.glMultiTexCoord2f(GL.GL_TEXTURE0,0,1)
         GL.glMultiTexCoord2f(GL.GL_TEXTURE1,0,1)
-        GL.glVertex2f(L,T)
+        GL.glVertex2f(vertsPix[2,0], vertsPix[2,1])
         # right top
         GL.glMultiTexCoord2f(GL.GL_TEXTURE0,1,1)
         GL.glMultiTexCoord2f(GL.GL_TEXTURE1,1,1)
-        GL.glVertex2f(R,T)
+        GL.glVertex2f(vertsPix[3,0], vertsPix[3,1])
         GL.glEnd()
 
         #unbind the textures
@@ -194,7 +172,6 @@ class ImageStim(BaseVisualStim):
         rather than using the .set() command
         """
         self._needUpdate = False
-
         GL.glNewList(self._listID,GL.GL_COMPILE)
         GL.glColor4f(1.0,1.0,1.0,1.0)#glColor can interfere with multitextures
         #mask
@@ -207,31 +184,24 @@ class ImageStim(BaseVisualStim):
         GL.glEnable(GL.GL_TEXTURE_2D)
         GL.glBindTexture(GL.GL_TEXTURE_2D, self._texID)
 
-        flipHoriz = self.flipHoriz*(-2)+1#True=(-1), False->(+1)
-        flipVert = self.flipVert*(-2)+1
-        #calculate vertices
-        L = -self._sizeRendered[0]/2 * flipHoriz
-        R =  self._sizeRendered[0]/2 * flipHoriz
-        T =  self._sizeRendered[1]/2 * flipVert
-        B = -self._sizeRendered[1]/2 * flipVert
-
+        vertsPix = self.verticesPix #access just once because it's slower than basic property
         GL.glBegin(GL.GL_QUADS)                  # draw a 4 sided polygon
         # right bottom
         GL.glMultiTexCoord2fARB(GL.GL_TEXTURE0_ARB,1,0)
         GL.glMultiTexCoord2fARB(GL.GL_TEXTURE1_ARB,1,0)
-        GL.glVertex2f(R,B)
+        GL.glVertex2f(vertsPix[0,0], vertsPix[0,1])
         # left bottom
         GL.glMultiTexCoord2fARB(GL.GL_TEXTURE0_ARB,0,0)
         GL.glMultiTexCoord2fARB(GL.GL_TEXTURE1_ARB,0,0)
-        GL.glVertex2f(L,B)
+        GL.glVertex2f(vertsPix[1,0], vertsPix[1,1])
         # left top
         GL.glMultiTexCoord2fARB(GL.GL_TEXTURE0_ARB,0,1)
         GL.glMultiTexCoord2fARB(GL.GL_TEXTURE1_ARB,0,1)
-        GL.glVertex2f(L,T)
+        GL.glVertex2f(vertsPix[2,0], vertsPix[2,1])
         # right top
         GL.glMultiTexCoord2fARB(GL.GL_TEXTURE0_ARB,1,1)
         GL.glMultiTexCoord2fARB(GL.GL_TEXTURE1_ARB,1,1)
-        GL.glVertex2f(R,T)
+        GL.glVertex2f(vertsPix[3,0], vertsPix[3,1])
         GL.glEnd()
 
         GL.glDisable(GL.GL_TEXTURE_2D)
@@ -239,86 +209,72 @@ class ImageStim(BaseVisualStim):
 
 
     def __del__(self):
-        GL.glDeleteLists(self._listID, 1)
+        if hasattr(self, '_listID'):
+            GL.glDeleteLists(self._listID, 1)
         self.clearTextures()#remove textures from graphics card to prevent crash
 
-    def contains(self, x, y=None):
-        """Determines if a point x,y is on the image (within its boundary).
-
-        See :class:`~psychopy.visual.ShapeStim` `.contains()`.
-        """
-        if hasattr(x, 'getPos'):
-            x,y = x.getPos()
-        elif type(x) in [list, tuple, numpy.ndarray]:
-            x,y = x[0:2]
-        return pointInPolygon(x, y, self)
-
-    def overlaps(self, polygon):
-        """Determines if the image overlaps another image or shape (`polygon`).
-
-        See :class:`~psychopy.visual.ShapeStim` `.overlaps()`.
-        """
-        return polygonsOverlap(self, polygon)
-
-    def clearTextures(self):
-        """
-        Clear the textures associated with the given stimulus.
-        As of v1.61.00 this is called automatically during garbage collection of
-        your stimulus, so doesn't need calling explicitly by the user.
-        """
-        GL.glDeleteTextures(1, self._texID)
-        GL.glDeleteTextures(1, self._maskID)
     def draw(self, win=None):
         if win==None: win=self.win
         self._selectWindow(win)
 
-        #do scaling
         GL.glPushMatrix()#push before the list, pop after
-        win.setScale(self._winScale)
-        #move to centre of stimulus and rotate
-        GL.glTranslatef(self._posRendered[0],self._posRendered[1],0)
-        GL.glRotatef(-self.ori,0.0,0.0,1.0)
-        #the list just does the texture mapping
+        win.setScale('pix')
 
         desiredRGB = self._getDesiredRGB(self.rgb, self.colorSpace, self.contrast)
         GL.glColor4f(desiredRGB[0],desiredRGB[1],desiredRGB[2], self.opacity)
 
+        if self._needTextureUpdate:
+            self.setImage(value=self._imName, log=False)
         if self._needUpdate:
             self._updateList()
         GL.glCallList(self._listID)
 
         #return the view to previous state
         GL.glPopMatrix()
-    def setImage(self, value, log=True):
-        """Set the image to be used for the stimulus to this new value
+
+    @attributeSetter
+    def image(self, value):
+        """The image file to be presented (most formats supported)
         """
-        self._imName = value
+        self.__dict__['image'] = self._imName = value
 
         wasLumImage = self.isLumImage
         if value==None:
             datatype = GL.GL_FLOAT
         else:
             datatype = GL.GL_UNSIGNED_BYTE
-        self.isLumImage = createTexture(value, id=self._texID, stim=self,
+        self.isLumImage = self._createTexture(value, id=self._texID, stim=self,
             pixFormat=GL.GL_RGB, dataType=datatype,
             maskParams=self.maskParams, forcePOW2=False)
         #if user requested size=None then update the size for new stim here
         if hasattr(self, '_requestedSize') and self._requestedSize==None:
             self.size = None  # set size to default
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s image=%s" %(self.name, value),
-                level=logging.EXP,obj=self)
         #if we switched to/from lum image then need to update shader rule
         if wasLumImage != self.isLumImage:
             self._needUpdate=True
-    def setMask(self,value, log=True):
-        """Change the image to be used as an alpha-mask for the image
+        self._needTextureUpdate = False
+    def setImage(self, value, log=None):
+        """Usually you can use 'stim.attribute = value' syntax instead,
+        but use this method if you need to suppress the log message.
         """
-        self.mask = value
-        createTexture(value, id=self._maskID,
+        setAttribute(self, 'image', value, log)
+
+    @attributeSetter
+    def mask(self, value):
+        """The alpha mask that can be used to control the outer shape of the stimulus
+
+                + **None**, 'circle', 'gauss', 'raisedCos'
+                + or the name of an image file (most formats supported)
+                + or a numpy array (1xN or NxN) ranging -1:1
+        """
+        self.__dict__['mask'] = value
+        self._createTexture(value, id=self._maskID,
             pixFormat=GL.GL_ALPHA,dataType=GL.GL_UNSIGNED_BYTE,
             stim=self,
             res=self.texRes, maskParams=self.maskParams)
-        if log and self.autoLog:
-            self.win.logOnFlip("Set %s mask=%s" %(self.name, value),
-                level=logging.EXP,obj=self)
+
+    def setMask(self, value, log=None):
+        """Usually you can use 'stim.attribute = value' syntax instead,
+        but use this method if you need to suppress the log message.
+        """
+        setAttribute(self, 'mask', value, log)

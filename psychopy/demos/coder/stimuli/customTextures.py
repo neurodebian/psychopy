@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 from psychopy import visual, filters, event, core
 import numpy as np
 """Textures (e.g. for a GratingStim) can be created from custom numpy arrays. 
@@ -41,7 +41,7 @@ while True:
     t=globalClock.getTime()
     
     bigStim.draw()
-    subStim.setOri(np.sin(t*2*np.pi)*20) #control speed 
+    subStim.ori = np.sin(t * 2 * np.pi) * 20 #control speed 
     subStim.draw()
     win.flip()
     

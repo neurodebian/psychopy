@@ -1,5 +1,16 @@
 # -*- coding: utf-8 -*-
 from __future__ import division
+"""
+ioHub
+.. file: iohub/util/__init__.py
+
+Copyright (C) 2012-2014 iSolver Software Solutions
+Distributed under the terms of the GNU General Public License (GPL version 3 or any later version).
+
+.. moduleauthor:: Sol Simpson <sol@isolver-software.com>
+.. fileauthor:: Sol Simpson <sol@isolver-software.com>
+
+"""
 import datetime
 import warnings
 import scipy, numpy
@@ -7,7 +18,8 @@ import sys,os,inspect
 import psychopy
 from collections import Iterable
 
-from exception_tools import ioHubConnectionException, ioHubServerError, printExceptionDetailsToStdErr, print2err, createErrorResult, ioHubError
+from exception_tools import ioHubError
+from exception_tools import printExceptionDetailsToStdErr, print2err
 from psychopy.clock import MonotonicClock, monotonicClock
 
 # Path Update / Location functions
@@ -101,7 +113,7 @@ def convertCamelToSnake(name,lower_snake=True):
         return all_cap_re.sub(r'\1_\2', s1).lower()
     return all_cap_re.sub(r'\1_\2', s1).upper()
     
-if  sys.version_info[0] != 2 or sys.version_info[1] < 7:
+if sys.version_info[0] != 2 or sys.version_info[1] < 7:
     from ..ordereddict import OrderedDict
 else:
     from collections import OrderedDict
@@ -109,8 +121,8 @@ else:
 from variableProvider import ExperimentVariableProvider
 
 from visualUtil import SinusoidalMotion
-from visualUtil import TimeTrigger,DeviceEventTrigger
-from visualUtil import ScreenState,ClearScreen,InstructionScreen,ImageScreen
+from visualUtil import Trigger, TimeTrigger, DeviceEventTrigger
+from visualUtil import ScreenState, ClearScreen, InstructionScreen, ImageScreen
 
 ###############################################################################
 #
@@ -138,7 +150,7 @@ rad    = scipy.deg2rad
 ###############################################################################
 #
 ## A RingBuffer ( circular buffer) implemented using a numpy array as the backend. You can use
-## the sumary stats methods etc. that are built into the numpty array class
+## the summary stats methods etc. that are built into the numpy array class
 ## with this class as well. i.e ::
 ##      a = NumPyRingBuffer(max_size=100)
 ##      for i in xrange(0,150):
@@ -159,13 +171,8 @@ class NumPyRingBuffer(object):
     number of elements,  that the buffer can hold *must* be specified. When 
     the buffer becomes full, each element added to the buffer removes the oldest
     element from the buffer so that max_size is never exceeded. 
-    
-    The class supports simple slice type access to the buffer contents
-    with the following restrictions / considerations:
-    
-    #. Negative indexing is not supported.
  
-    Items area dded to the ring buffer using the classes append method.
+    Items are added to the ring buffer using the classes append method.
     
     The current number of elements in the buffer can be retrieved using the 
     getLength() method of the class. 
@@ -366,10 +373,6 @@ from visualUtil import TimeTrigger,DeviceEventTrigger
 from visualUtil import ScreenState,ClearScreen,InstructionScreen,ImageScreen
 from dialogs import ProgressBarDialog, MessageDialog, FileDialog, ioHubDialog
 
-
-
-
-
 ###############################################################################
 #
 ## Verify the validity of a given Python release number
@@ -393,27 +396,36 @@ except:
     validate_version=lambda version: version
 
 
+def to_numeric(lit):
+    'Return value of numeric literal string or ValueError exception'
+    # Handle '0'
+    if lit == '0': return 0
+    # Hex/Binary
+    litneg = lit[1:] if lit[0] == '-' else lit
+    if litneg[0] == '0':
+        if litneg[1] in 'xX':
+            return int(lit,16)
+        elif litneg[1] in 'bB':
+            return int(lit,2)
+        else:
+            try:
+                return int(lit,8)
+            except ValueError:
+                pass
 
-###############################################################################
-#
-## Test code
-#    
+    # Int/Float/Complex
+    try:
+        return int(lit)
+    except ValueError:
+        pass
+    try:
+        return float(lit)
+    except ValueError:
+        pass
+    try:
+        return complex(lit)
+    except ValueError:
+        pass
 
-if __name__ == '__main__':
-    import pylab
-    plot   = pylab.plot
-    show   = pylab.show
-    axis   = pylab.axis
-    grid   = pylab.grid
-    title  = pylab.title
-
-    #the code for test
-    pts = ar([[0,0],[1,0],[1,1],[0.5,1.5],[0,1]])
-    plot(*pts.T,lw=5,color='k')                     #points (poly) to be rotated
-    for ang in arange(0,2*pi,pi/8):
-        ots = rotate2D(pts,ar([0.5,0.5]),ang)       #the results
-        plot(*ots.T)
-    axis('image')
-    grid(True)
-    title('Rotate2D about a point')
-    show()
+    # return original str
+    return lit

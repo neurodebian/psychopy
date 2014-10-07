@@ -3,7 +3,7 @@
 See demo_mouse.py and i{demo_joystick.py} for examples
 """
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 # 01/2011 modified by Dave Britton to get mouse event timing
@@ -12,7 +12,7 @@ import sys, time, copy
 import psychopy.core
 from psychopy.tools.monitorunittools import cm2pix, deg2pix, pix2cm, pix2deg
 from psychopy import logging
-from psychopy.constants import *
+from psychopy.constants import NOT_STARTED
 import string, numpy
 
 #try to import pyglet & pygame and hope the user has at least one of them!
@@ -33,7 +33,6 @@ if havePygame: usePygame=True#will become false later if win not initialised
 else: usePygame=False
 
 if havePyglet:
-
     global _keyBuffer
     _keyBuffer = []
     global mouseButtons
@@ -76,7 +75,7 @@ def _onPygletText(text, emulated=False):
     logging.data("%s: %s" % (keySource, text))
 
 def _onPygletKey(symbol, modifiers, emulated=False):
-    """handler for on_key_press pyglet events, or call directly to emulate a key press
+    """handler for on_key_press pyglet events; call directly to emulate a key press
 
     Appends a tuple with (keyname, timepressed) into the global _keyBuffer. The
     _keyBuffer can then be accessed as normal using event.getKeys(), .waitKeys(),
@@ -84,15 +83,15 @@ def _onPygletKey(symbol, modifiers, emulated=False):
 
     J Gray 2012: Emulated means add a key (symbol) to the buffer virtually.
     This is useful for fMRI_launchScan, and for unit testing (in testTheApp)
-    Logging distinguished EmulatedKey events from real Keypress events.
+    Logging distinguishes EmulatedKey events from real Keypress events.
     For emulation, the key added to the buffer is unicode(symbol), instead of
-    pyglet.window.key.symbol_string(symbol)
+    pyglet.window.key.symbol_string(symbol).
 
     S Mathot 2012: Implement fallback to _onPygletText
     """
 
     global useText
-    keyTime=psychopy.clock.getTime() #capture when the key was pressed
+    keyTime=psychopy.core.getTime() #capture when the key was pressed
     if emulated:
         thisKey = unicode(symbol)
         keySource = 'EmulatedKey'
@@ -203,18 +202,16 @@ def getKeys(keyList=None, timeStamped=False):
     """
     keys=[]
 
-
     if havePygame and display.get_init():#see if pygame has anything instead (if it exists)
         for evts in evt.get(locals.KEYDOWN):
             keys.append( (pygame.key.name(evts.key),0) )#pygame has no keytimes
-
     elif havePyglet:
         #for each (pyglet) window, dispatch its events before checking event buffer
         wins = pyglet.window.get_platform().get_default_display().get_windows()
         for win in wins:
             try:
                 win.dispatch_events()#pump events on pyglet windows
-            except ValueError as e:
+            except ValueError as e:  # pragma: no cover
                 # Pressing special keys, such as 'volume-up', results in a
                 # ValueError. This appears to be a bug in pyglet, and may be
                 # specific to certain systems and versions of Python.
@@ -224,7 +221,7 @@ def getKeys(keyList=None, timeStamped=False):
         if len(_keyBuffer)>0:
             #then pyglet is running - just use this
             keys = _keyBuffer
-    #        _keyBuffer = []  # DO /NOT/ CLEAR THE KEY BUFFER ENTIRELY
+            #_keyBuffer = []  # DO /NOT/ CLEAR THE KEY BUFFER ENTIRELY
 
     if keyList==None:
         _keyBuffer = [] #clear buffer entirely
@@ -246,10 +243,16 @@ def getKeys(keyList=None, timeStamped=False):
         keyNames = [k[0] for k in targets]
         return keyNames
     elif hasattr(timeStamped, 'getLastResetTime'):
-        relTuple = [(k[0],k[1]-timeStamped.getLastResetTime()) for k in targets]
+        #keys were originally time-stamped with core.monotonicClock._lastResetTime
+        #we need to shift that by the difference between it and our custom clock
+        timeBaseDiff = timeStamped.getLastResetTime() - psychopy.core.monotonicClock.getLastResetTime()
+        relTuple = [(k[0],k[1]-timeBaseDiff) for k in targets]
         return relTuple
     elif timeStamped==True:
         return targets
+    elif isinstance(timeStamped, (float, int, long)):
+        relTuple = [(k[0], k[1]-timeStamped) for k in targets]
+        return relTuple
 
 def waitKeys(maxWait=float('inf'), keyList=None, timeStamped=False):
     """
@@ -280,8 +283,6 @@ def waitKeys(maxWait=float('inf'), keyList=None, timeStamped=False):
         # Get keypresses and return if anything is pressed
         keys = getKeys(keyList=keyList, timeStamped=timeStamped)
         if len(keys):
-            if timeStamped != False: logging.data("Key pressed: %s" % keys[0][0])
-            else: logging.data("Key pressed: %s" % keys[0])
             return keys
 
     # If maxWait is exceeded (exits while-loop), return None
@@ -295,6 +296,7 @@ def xydist(p1=[0.0,0.0],p2=[0.0,0.0]):
 
 class Mouse:
     """Easy way to track what your mouse is doing.
+
     It needn't be a class, but since Joystick works better
     as a class this may as well be one too for consistency
 
@@ -307,7 +309,6 @@ class Mouse:
             gives the mouse a particular starting position (pygame `Window` only)
         win : **None** or `Window`
             the window to which this mouse is attached (the first found if None provided)
-
     """
     def __init__(self,
                  visible=True,
@@ -339,7 +340,12 @@ class Mouse:
             mouseButtons = [0,0,0]
         self.setVisible(visible)
         if newPos is not None: self.setPos(newPos)
-
+    @property
+    def units(self):
+        """The units for this mouse
+        (will match the current units for the Window it lives in)
+        """
+        return self.win.units
     def setPos(self,newPos=(0,0)):
         """Sets the current position of the mouse (pygame only),
         in the same units as the :class:`~visual.Window` (0,0) is at centre
@@ -347,7 +353,6 @@ class Mouse:
         :Parameters:
             newPos : (x,y) or [x,y]
                 the new position on the screen
-
         """
         newPosPix = self._windowUnits2pix(numpy.array(newPos))
         if usePygame:
@@ -377,7 +382,7 @@ class Mouse:
         return self.lastPos
 
     def mouseMoved(self, distance=None, reset=False):
-        """Determine whether/how far the mouse has moved
+        """Determine whether/how far the mouse has moved.
 
         With no args returns true if mouse has moved at all since last getPos() call,
         or distance (x,y) can be set to pos or neg distances from x and y to see if moved either x or y that far from lastPos ,
@@ -394,42 +399,45 @@ class Mouse:
         self.getPos() # sets self.lastPos to current position
         if not reset:
             if distance is None:
-                    if self.prevPos[0] <> self.lastPos[0]: return True
-                    if self.prevPos[1] <> self.lastPos[1]: return True
+                if self.prevPos[0] <> self.lastPos[0]: return True
+                if self.prevPos[1] <> self.lastPos[1]: return True
             else:
-                    if isinstance(distance,int) or isinstance(distance,float):
-                        self.movedistance=xydist(self.prevPos,self.lastPos)
-                        if self.movedistance > distance: return True
-                        else: return False
-                    if (self.prevPos[0]+distance[0]) - self.lastPos[0] > 0.0: return True # moved on X-axis
-                    if (self.prevPos[1]+distance[1]) - self.lastPos[0] > 0.0: return True # moved on Y-axis
+                if isinstance(distance,int) or isinstance(distance,float):
+                    self.movedistance = xydist(self.prevPos,self.lastPos)
+                    if self.movedistance > distance: return True
+                    else: return False
+                if (self.prevPos[0]+distance[0]) - self.lastPos[0] > 0.0: return True # moved on X-axis
+                if (self.prevPos[1]+distance[1]) - self.lastPos[0] > 0.0: return True # moved on Y-axis
             return False
-        if isinstance(reset,bool) and reset:
-            # reset is True so just reset the last move time, eg mouseMoved(reset=True) starts/zeroes the move clock
+        if reset is True:
+            # just reset the last move time: starts/zeroes the move clock
             mouseMove.reset() # resets the global mouseMove clock
             return False
         if reset=='here': # set to wherever we are
             self.prevPos=copy.copy(self.lastPos) # lastPos set in getPos()
             return False
         if hasattr(reset,'__len__'): # a tuple or list of (x,y)
-            self.prevPos=copy.copy(reset) # reset to (x,y) to check movement from there
-            if not distance: return False # just resetting prevPos, not checking distance
+            self.prevPos = copy.copy(reset) # reset to (x,y) to check movement from there
+            if not distance:
+                return False # just resetting prevPos, not checking distance
             else: # checking distance of current pos to newly reset prevposition
                 if isinstance(distance,int) or isinstance(distance,float):
-                    self.movedistance=xydist(self.prevPos,self.lastPos)
+                    self.movedistance = xydist(self.prevPos,self.lastPos)
                     if self.movedistance > distance: return True
                     else: return False
                 # distance is x,y tuple, to check if the mouse moved that far on either x or y axis
                 # distance must be (dx,dy), and reset is (rx,ry), current pos (cx,cy): Is cx-rx > dx ?
-                if abs(self.lastPos[0]-self.prevPos[0]) > distance[0]: return True # moved on X-axis
-                if abs(self.lastPos[1]-self.prevPos[1]) > distance[1]: return True # moved on Y-axis
+                if abs(self.lastPos[0]-self.prevPos[0]) > distance[0]:
+                    return True # moved on X-axis
+                if abs(self.lastPos[1]-self.prevPos[1]) > distance[1]:
+                    return True # moved on Y-axis
             return False
         return False
 
     def mouseMoveTime(self):
         global mouseMove
         if mouseMove:
-                return psychopy.core.getTime()-mouseMove.getLastResetTime()
+                return mouseMove.getTime()
         else: return 0 # mouseMove clock not started
 
     def getRel(self):
@@ -468,7 +476,8 @@ class Mouse:
         at (0,0) to prevent it from going off the screen and getting lost!
         You can still use getRel() in that case.
         """
-        if usePygame: mouse.set_visible(visible)
+        if usePygame:
+            mouse.set_visible(visible)
         else:
             if self.win: #use default window if we don't have one
                 w = self.win.winHandle
@@ -557,8 +566,9 @@ class BuilderKeyResponse():
 
 def clearEvents(eventType=None):
     """Clears all events currently in the event buffer.
+
     Optional argument, eventType, specifies only certain types to be
-    cleared
+    cleared.
 
     :Parameters:
         eventType : **None**, 'mouse', 'joystick', 'keyboard'
@@ -566,23 +576,23 @@ def clearEvents(eventType=None):
     """
     #pyglet
     if not havePygame or not display.get_init():
-
         #for each (pyglet) window, dispatch its events before checking event buffer
         wins = pyglet.window.get_platform().get_default_display().get_windows()
-        for win in wins: win.dispatch_events()#pump events on pyglet windows
-        if eventType=='mouse': return # pump pyglet mouse events but don't flush keyboard buffer
+        for win in wins:
+            win.dispatch_events()#pump events on pyglet windows
+        if eventType=='mouse':
+            return # pump pyglet mouse events but don't flush keyboard buffer
         global _keyBuffer
         _keyBuffer = []
-        return
-
-    #for pygame
-    if eventType=='mouse':
-        junk = evt.get([locals.MOUSEMOTION, locals.MOUSEBUTTONUP,
-                        locals.MOUSEBUTTONDOWN])
-    elif eventType=='keyboard':
-        junk = evt.get([locals.KEYDOWN, locals.KEYUP])
-    elif eventType=='joystick':
-        junk = evt.get([locals.JOYAXISMOTION, locals.JOYBALLMOTION,
-              locals.JOYHATMOTION, locals.JOYBUTTONUP, locals.JOYBUTTONDOWN])
     else:
-        junk = evt.get()
+        #for pygame
+        if eventType=='mouse':
+            junk = evt.get([locals.MOUSEMOTION, locals.MOUSEBUTTONUP,
+                            locals.MOUSEBUTTONDOWN])
+        elif eventType=='keyboard':
+            junk = evt.get([locals.KEYDOWN, locals.KEYUP])
+        elif eventType=='joystick':
+            junk = evt.get([locals.JOYAXISMOTION, locals.JOYBALLMOTION,
+                  locals.JOYHATMOTION, locals.JOYBUTTONUP, locals.JOYBUTTONDOWN])
+        else:
+            junk = evt.get()

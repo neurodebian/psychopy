@@ -1,5 +1,5 @@
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 # Author: Jeremy R. Gray, 2012
@@ -10,7 +10,9 @@ from psychopy.app.builder import components #for getInitVals()
 
 thisFolder = path.abspath(path.dirname(__file__))#the absolute path to the folder containing this path
 iconFile = path.join(thisFolder,'microphone.png')
-tooltip = 'Microphone: basic sound capture (fixed onset & duration), okay for spoken words'
+tooltip = _translate('Microphone: basic sound capture (fixed onset & duration), okay for spoken words')
+
+_localized = {'stereo': _translate('Stereo')}
 
 class MicrophoneComponent(BaseComponent):
     """An event class for capturing short sound stimuli"""
@@ -20,34 +22,19 @@ class MicrophoneComponent(BaseComponent):
                  stopType='duration (s)', stopVal=2.0, startEstim='', durationEstim='',
                  stereo=False
                 ):
+        super(MicrophoneComponent, self).__init__(exp, parentName, name=name,
+                    startType=startType, startVal=startVal,
+                    stopType=stopType, stopVal=stopVal,
+                    startEstim=startEstim, durationEstim=durationEstim)
         self.type='Microphone'
         self.url="http://www.psychopy.org/builder/components/microphone.html"
-        self.parentName=parentName
-        self.exp=exp#so we can access the experiment if necess
         self.exp.requirePsychopyLibs(['microphone'])
         #params
-        self.order=[]#order for things (after name and timing params)
-        self.params={}
-        self.params['name']=Param(name, valType='code', hint="Everything needs a name (no spaces or punctuation)",
-            label="Name")
-        self.params['startType']=Param(startType, valType='str',
-            allowedVals=['time (s)', 'frame N', 'condition'],
-            hint="How do you want to define your start point?")
-        self.params['stopType']=Param(stopType, valType='str',
-            allowedVals=['duration (s)'],
-            hint="The duration of the recording in seconds; blank = 0 sec")
-        self.params['startVal']=Param(startVal, valType='code', allowedTypes=[],
-            hint="When does the sound start recording?")
-        self.params['stopVal']=Param(stopVal, valType='code', allowedTypes=[],
-            updates='constant', allowedUpdates=[],
-            hint="")
-        self.params['startEstim']=Param(startEstim, valType='code', allowedTypes=[],
-            hint="(Optional) expected start (s), purely for representing in the timeline")
-        self.params['durationEstim']=Param(durationEstim, valType='code', allowedTypes=[],
-            hint="(Optional) expected duration (s), purely for representing in the timeline")
         self.params['stereo']=Param(stereo, valType='bool',
-            hint="Record two channels (stereo) or one (mono, smaller file)",
-            label="Stereo")
+            hint=_translate("Record two channels (stereo) or one (mono, smaller file)"),
+            label=_localized['stereo'])
+        self.params['stopType'].allowedVals = ['duration (s)']
+        self.params['stopType'].hint = _translate('The duration of the recording in seconds; blank = 0 sec')
     def writeStartCode(self,buff):
         # filename should have date_time, so filename_wav should be unique
         buff.writeIndented("wavDirName = filename + '_wav'\n")
@@ -79,18 +66,17 @@ class MicrophoneComponent(BaseComponent):
         name = self.params['name']
         if len(self.exp.flow._loopList):
             currLoop = self.exp.flow._loopList[-1] #last (outer-most) loop
-        else: currLoop=None
+        else:
+            currLoop = self.exp._expHandler
 
         #write the actual code
-        if currLoop: #need a loop to do the storing of data!
-            buff.writeIndented("# check responses\n" %self.params)
-            buff.writeIndented("if not %(name)s.savedFile:\n"%self.params)
-            buff.writeIndented("    %(name)s.savedFile = None\n" %(self.params))
-            buff.writeIndented("# store data for %s (%s)\n" %(currLoop.params['name'], currLoop.type))
+        buff.writeIndented("# check responses\n" %self.params)
+        buff.writeIndented("if not %(name)s.savedFile:\n"%self.params)
+        buff.writeIndented("    %(name)s.savedFile = None\n" %(self.params))
+        buff.writeIndented("# store data for %s (%s)\n" %(currLoop.params['name'], currLoop.type))
 
-            #always add saved file name
-            buff.writeIndented("%s.addData('%s.filename', %s.savedFile)\n" % (currLoop.params['name'],name,name))
-            #only add loudness / rms if we have a file
-            #buff.writeIndented("if %(name)s.savedFile != None:\n" %(self.params))
-            #buff.writeIndented("    %s.addData('%s.rms', %s.rms)\n" \
-            #                   %(currLoop.params['name'], name, name))
+        #always add saved file name
+        buff.writeIndented("%s.addData('%s.filename', %s.savedFile)\n" % (currLoop.params['name'],name,name))
+        if currLoop.params['name'].val == self.exp._expHandler.name:
+            buff.writeIndented("%s.nextEntry()\n" % self.exp._expHandler.name)
+        # best not to do loudness / rms or other processing here

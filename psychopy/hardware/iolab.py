@@ -1,5 +1,5 @@
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 """This provides a basic ButtonBox class, and imports the `ioLab python library
@@ -20,7 +20,6 @@ except ImportError:
         python (not the Standalone distribution of PsychoPy) then try installing it with:
            > pip install ioLabs""".replace('    ', '')
     logging.error(msg)
-    core.quit()
 
 from psychopy.constants import PRESSED, RELEASED
 btn2str = {0: '0', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7',

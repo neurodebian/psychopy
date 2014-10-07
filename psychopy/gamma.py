@@ -2,12 +2,13 @@
 #this currently requires a pyglet window (to identify the current scr/display)
 
 # Part of the PsychoPy library
-# Copyright (C) 2013 Jonathan Peirce
+# Copyright (C) 2014 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 import numpy, sys, platform, ctypes, ctypes.util
 import pyglet
 from psychopy import logging
+import os
 
 #import platform specific C++ libs for controlling gamma
 if sys.platform=='win32':
@@ -17,6 +18,8 @@ elif sys.platform=='darwin':
 elif sys.platform.startswith('linux'):
     #we need XF86VidMode
     xf86vm=ctypes.CDLL(ctypes.util.find_library('Xxf86vm'))
+
+_TravisTesting = os.environ.get('TRAVIS')=='true' #in Travis-CI testing
 
 def setGamma(pygletWindow=None, newGamma=1.0, rampType=None):
     #make sure gamma is 3x1 array
@@ -41,11 +44,13 @@ def setGammaRamp(pygletWindow, newRamp, nAttempts=3):
     On windows the first attempt to set the ramp doesn't always work. The parameter nAttemps
     allows the user to determine how many attempts should be made before failing
     """
+    if newRamp.shape[0]!=3 and newRamp.shape[1]==3:
+        newRamp= numpy.ascontiguousarray(newRamp.transpose())
     if sys.platform=='win32':
         newRamp= (255.0*newRamp).astype(numpy.uint16)
         newRamp.byteswap(True)#necessary, according to pyglet post from Martin Spacek
         for n in range(nAttempts):
-            success = windll.gdi32.SetDeviceGammaRamp(pygletWindow._dc, newRamp.ctypes)
+            success = windll.gdi32.SetDeviceGammaRamp(0xFFFFFFFF & pygletWindow._dc, newRamp.ctypes) # FB 504
             if success:
                 break
         assert success, 'SetDeviceGammaRamp failed'
@@ -57,18 +62,21 @@ def setGammaRamp(pygletWindow, newRamp, nAttempts=3):
                    newRamp[0,:].ctypes, newRamp[1,:].ctypes, newRamp[2,:].ctypes)
         assert not error, 'CGSetDisplayTransferByTable failed'
 
-    if sys.platform.startswith('linux'):
+    if sys.platform.startswith('linux') and not _TravisTesting:
         newRamp= (65535*newRamp).astype(numpy.uint16)
         success = xf86vm.XF86VidModeSetGammaRamp(pygletWindow._x_display, pygletWindow._x_screen_id, 256,
                     newRamp[0,:].ctypes, newRamp[1,:].ctypes, newRamp[2,:].ctypes)
         assert success, 'XF86VidModeSetGammaRamp failed'
+
+    elif _TravisTesting:
+        logging.warn("It looks like we're running in the Travis-CI testing environment. Hardware gamma table cannot be set")
 
 def getGammaRamp(pygletWindow):
     """Ramp will be returned as 3x256 array in range 0:1
     """
     if sys.platform=='win32':
         origramps = numpy.empty((3, 256), dtype=numpy.uint16) # init R, G, and B ramps
-        success = windll.gdi32.GetDeviceGammaRamp(pygletWindow._dc, origramps.ctypes)
+        success = windll.gdi32.GetDeviceGammaRamp(0xFFFFFFFF & pygletWindow._dc, origramps.ctypes) # FB 504
         if not success:
             raise AssertionError, 'GetDeviceGammaRamp failed'
         origramps=origramps/65535.0#rescale to 0:1

@@ -17,7 +17,11 @@ import zmq.green as zmq
 
 import copy
 import msgpack
-
+try:
+    import msgpack_numpy as m
+    m.patch()
+except:
+    pass
 
 from .. import Computer, Device, DeviceEvent
 from ...constants import DeviceConstants,EventConstants
@@ -50,22 +54,28 @@ class EventPublisher(Device):
     DEVICE_LABEL = 'EVENTPUBLISHER'
     __slots__=[e[0] for e in _newDataTypes]+['_zmq_context','_pub_socket','_sub_listener','_publishing_protocal','_sub_protocal']
     def __init__(self, *args,**kwargs):
-        Device.__init__(self,*args,**kwargs['dconfig'])
-        device_config=self.getConfiguration()
-        
         self._pub_socket=None
-        
-        # setup publisher
-        self._zmq_context = zmq.Context()
-        self._pub_socket = self._zmq_context.socket(zmq.PUB)
-        self._pub_socket.setsockopt(zmq.LINGER, 0)
-        self._publishing_protocal=device_config.get('publishing_protocal',"tcp://127.0.0.1:5555")
-        self._pub_socket.bind(self._publishing_protocal)
+        try:            
+            Device.__init__(self,*args,**kwargs['dconfig'])
+            device_config=self.getConfiguration()
+            
+            
+            # setup publisher
+            self._zmq_context = zmq.Context()
+            self._pub_socket = self._zmq_context.socket(zmq.PUB)
+            self._pub_socket.setsockopt(zmq.LINGER, 0)
+            self._publishing_protocal=device_config.get('publishing_protocal',"tcp://127.0.0.1:5555")
+            self._pub_socket.bind(self._publishing_protocal)
+        except Exception, e:
+            print2err("** Exception during EventPublisher.__init__: ",e)
+            printExceptionDetailsToStdErr()
+            
     def _handleEvent(self,e):
         """
         Publish the Event as long as it was generated locally"
         """
         if e[2]==0:
+            #print2err("PUBLISHING: ",e[:8])
             e_id=e[DeviceEvent.EVENT_TYPE_ID_INDEX]
             
             # Format of received event data:
@@ -154,38 +164,45 @@ class RemoteEventSubscriber(Device):
     DEVICE_LABEL = 'REMOTEEVENTSUBSCRIBER'
     __slots__=[e[0] for e in _newDataTypes]+['_zmq_context','_sub_socket','_subscription_protocal','_subscription_filter','_time_sync_state','_time_sync_manager','_running']
     def __init__(self, *args,**kwargs):
-        Device.__init__(self,*args,**kwargs['dconfig'])
-        device_config=self.getConfiguration()
-        self._subscription_protocal=device_config.get('subscription_protocal',None)
-        if self._subscription_protocal:
-            self._zmq_context = zmq.Context()
-            self._sub_socket = self._zmq_context.socket(zmq.SUB)
-        
-            self._subscription_filter=device_config.get('monitor_event_types',[u''])
-
-            # If sub channel is filtering by category / event type, then auto add
-            # the EXIT category to the sub channels filter list of categories to include.
-            #
-            if len(self._subscription_filter)>0 and self._subscription_filter[0]!='':  
-                self._sub_socket.setsockopt_string(zmq.SUBSCRIBE, u'EXIT')
-        
-            for sf in self._subscription_filter:
-                self._sub_socket.setsockopt_string(zmq.SUBSCRIBE, sf)
-            self._sub_socket.connect(self._subscription_protocal)
-
-            self._time_sync_manager=None
-            if device_config.get('remote_iohub_address'):
-                self._time_sync_state=TimeSyncState()
-                self._time_sync_manager=ioHubTimeGreenSyncManager(device_config.get('remote_iohub_address'),self._time_sync_state)
-                self._time_sync_manager.start()   
+        self._sub_socket=None
+        self._time_sync_manager=None
+        try:
+            Device.__init__(self,*args,**kwargs['dconfig'])
+            device_config=self.getConfiguration()
+            self._subscription_protocal=device_config.get('subscription_protocal',None)
+            if self._subscription_protocal:
+                self._zmq_context = zmq.Context()
+                self._sub_socket = self._zmq_context.socket(zmq.SUB)
             
-            gevent.spawn(self._poll) # really like _run
+                self._subscription_filter=device_config.get('monitor_event_types',[u''])
+    
+                # If sub channel is filtering by category / event type, then auto add
+                # the EXIT category to the sub channels filter list of categories to include.
+                #
+                if len(self._subscription_filter)>0 and self._subscription_filter[0]!='':  
+                    self._sub_socket.setsockopt_string(zmq.SUBSCRIBE, u'EXIT')
+            
+                for sf in self._subscription_filter:
+                    self._sub_socket.setsockopt_string(zmq.SUBSCRIBE, sf)
+                self._sub_socket.connect(self._subscription_protocal)
+    
+                self._time_sync_manager=None
+                if device_config.get('remote_iohub_address'):
+                    self._time_sync_state=TimeSyncState()
+                    self._time_sync_manager=ioHubTimeGreenSyncManager(device_config.get('remote_iohub_address'),self._time_sync_state)
+                    self._time_sync_manager.start()   
+                
+                gevent.spawn(self._poll) # really like _run
+        except Exception, e:
+            print2err("** Exception during RemoteEventSubscriber.__init__: ",e)
+            printExceptionDetailsToStdErr()
             
     def _handleEvent(self,e):
         """
         Handle the Event as long as it was generated remotely...."
         """        
-        if e[2]==1:
+        if e[2]>0:
+            #print2err('SUB RX callback: ',e[0:8])
             Device._handleEvent(self,e)
 
     def _addEventListener(self,l,eventTypeIDs):
@@ -194,10 +211,12 @@ class RemoteEventSubscriber(Device):
             Device._addEventListener(self,l,eventTypeIDs)        
 
     def _poll(self):
+        while self._time_sync_manager is None:
+            gevent.sleep(0.5)
         time_sync_manager=self._time_sync_manager
         time_sync_state=self._time_sync_state
         self._running=True
-        while self._running is True:
+        while self._running is True and self._time_sync_manager:
             try:
                 category,data=self._sub_socket.recv_multipart(0)
                 logged_time=Computer.currentSec()
@@ -222,24 +241,24 @@ class RemoteEventSubscriber(Device):
                     network_delay=time_sync_state.local2RemoteTime(logged_time)-remote_logged_time
                     data[9]+=network_delay
 
-                if data[4]==EventConstants.KEYBOARD_CHAR:
-                    data[-2][0]=0
-                    data[-2][1]=0
-                    data[-2][2]=data[2]
-                    data[-2][3] = Computer._getNextEventID()
-                    data[-2][6]=logged_time
-                    remote_hub_time=data[-2][7]
-                    data[-2][7]=time_sync_state.remote2LocalTime(remote_hub_time)                    
-                    data[-2][8]==data[8]
-                    data[-2][9]+=network_delay
-                    
-                    data[-2]=tuple(data[-2])
-                   
+#                if data[4]==EventConstants.KEYBOARD_CHAR:
+#                    data[-2][0]=0
+#                    data[-2][1]=0
+#                    data[-2][2]=data[2]
+#                    data[-2][3] = Computer._getNextEventID()
+#                    data[-2][6]=logged_time
+#                    remote_hub_time=data[-2][7]
+#                    data[-2][7]=time_sync_state.remote2LocalTime(remote_hub_time)
+#                    data[-2][8]==data[8]
+#                    data[-2][9]+=network_delay
+#                    data[-2]=tuple(data[-2])
+
+                #print2err('SUB RX poll: ',data[0:8])
                 self._nativeEventCallback(data)                
                 #rtime=Computer.currentSec()*1000.0
                 gevent.sleep(0)
                 #print2err('-------------------------')
-            except zmq.ZMQError:
+            except zmq.ZMQError,z:
                 break
             except Exception:
                 printExceptionDetailsToStdErr()
@@ -258,7 +277,7 @@ class RemoteEventSubscriber(Device):
             self._sub_socket.close()
             self._sub_socket=None            
             Device._close(self)
-        if self.time_sync_manager:
-            self.time_sync_manager._close()
+        if self._time_sync_manager:
+            self._time_sync_manager._close()
             self._time_sync_state=None
-            self.time_sync_manager=None
+            self._time_sync_manager=None
