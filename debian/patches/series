@@ -1,4 +1,3 @@
 deb_do_not_regenerate_init
 deb_use_system_serial
-update_matplotlib_test
-wxpython3.0.patch
+wxpython3.0-1.81.00.patch

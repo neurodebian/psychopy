@@ -1,4 +1,14 @@
-psychopy (1.79.00+git16-g30c9343.dfsg-2) unstable; urgency=medium
+psychopy (1.81.00~rc1.dfsg-1) unstable; urgency=medium
+
+  * Fresh upstream release candidate
+  * debian/patches
+    - update_matplotlib_test -- handled upstream
+    - wxpython3.0.patch was refactored into wxpython3.0-1.81.00.patch to
+      keep residual changes (suppressing debug output, and use FD_ prefixes)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 07 Oct 2014 09:51:53 -0400
+
+psychopy (1.79.00+git16-g30c9343.dfsg-2) UNRELEASED; urgency=medium
 
   [ Olly Betts ]
   * Update for wxPython 3.0 (Closes: #759090):
