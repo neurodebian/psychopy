@@ -8,6 +8,8 @@ psychopy (1.81.00~rc1+git43-g7141584.dfsg-1) unstable; urgency=medium
   * debian/control
     - boost policy to 3.9.6
     - remove libavbin0 from build-depends (broken see #750577)
+    - adding python-psutil, python-gevent, python-msgpack, python-yaml
+      into Build-Depends and Recommends
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 07 Oct 2014 12:11:38 -0400
 
