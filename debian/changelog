@@ -5,6 +5,8 @@ psychopy (1.81.00~rc1.dfsg-1) unstable; urgency=medium
     - update_matplotlib_test -- handled upstream
     - wxpython3.0.patch was refactored into wxpython3.0-1.81.00.patch to
       keep residual changes (suppressing debug output, and use FD_ prefixes)
+  * debian/control
+    - boost policy to 3.9.6
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 07 Oct 2014 09:51:53 -0400
 
