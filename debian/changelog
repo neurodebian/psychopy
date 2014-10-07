@@ -1,6 +1,6 @@
-psychopy (1.81.00~rc1.dfsg-1) unstable; urgency=medium
+psychopy (1.81.00~rc1+git43-g7141584.dfsg-1) unstable; urgency=medium
 
-  * Fresh upstream release candidate
+  * Fresh upstream release candidate snapshot
   * debian/patches
     - update_matplotlib_test -- handled upstream
     - wxpython3.0.patch was refactored into wxpython3.0-1.81.00.patch to
@@ -9,7 +9,7 @@ psychopy (1.81.00~rc1.dfsg-1) unstable; urgency=medium
     - boost policy to 3.9.6
     - remove libavbin0 from build-depends (broken see #750577)
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 07 Oct 2014 09:51:53 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 07 Oct 2014 12:11:38 -0400
 
 psychopy (1.79.00+git16-g30c9343.dfsg-2) UNRELEASED; urgency=medium
 
