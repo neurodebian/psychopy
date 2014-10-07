@@ -7,7 +7,7 @@ script shows you the new way to specify fonts.
 #create a window to draw in
 myWin = visual.Window((800.0,800.0),allowGUI=False,winType='pyglet',
             monitor='testMonitor', units ='deg', screen=0)
-myWin.setRecordFrameIntervals()
+myWin.recordFrameIntervals = True
 #choose some fonts. If a list is provided, the first font found will be used.
 fancy = ['Monotype Corsiva', 'Palace Script MT', 'Edwardian Script ITC']
 sans = ['Gill Sans MT', 'Arial','Helvetica','Verdana'] #use the first font found on this list
@@ -44,21 +44,22 @@ mirror = visual.TextStim(myWin, text="mirror mirror",
                         pos=[0, -0.5], alignHoriz='center', flipHoriz=True)
 trialClock = core.Clock()
 t=lastFPSupdate=0;
-while t < 20 and not 'escape' in event.getKeys():#quits after 20 secs
+
+# Continues the loop until one of these keys are pressed
+while not event.getKeys(keyList=['escape', 'q']):
     t=trialClock.getTime()
     
     mirror.draw()
-    rotating.setOri(1,"+")
+    rotating.ori += 1
     rotating.draw()
     
     unicodeStuff.draw()
     longSentence.draw()
     
     if t-lastFPSupdate>1:#update the fps every second
-        fpsText.setText("%i fps" %myWin.fps())
+        fpsText.text = "%i fps" %myWin.fps()
         lastFPSupdate+=1
     fpsText.draw()
     psychopyTxt.draw()
     
     myWin.flip()
-
