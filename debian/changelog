@@ -13,6 +13,7 @@ psychopy (1.81.00.dfsg-1) unstable; urgency=medium
   * debian/rules
     - state that TRAVIS=true while testing under xvfb to skip some tests
       requiring real hardware etc
+    - switch from pysupport
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 13 Oct 2014 08:59:15 -0400
 

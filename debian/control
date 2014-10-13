@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: NeuroDebian Team <team@neuro.debian.net>
 Uploaders: Yaroslav Halchenko <debian@onerussian.com>, Michael Hanke <michael.hanke@gmail.com>
 Build-Depends: cdbs, debhelper (>= 5.0.38),
-               python-support, python, python-setuptools,
+               python, python-setuptools,
                help2man, imagemagick,
                python-configobj,
                xvfb, xauth, libgl1-mesa-dri,
