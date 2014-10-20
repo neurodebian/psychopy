@@ -41,8 +41,8 @@ debian/psychopy.1: debian/psychopy.sh
 ## cleanup
 	rm -f psychopy/__init__.pyc
 
-override_dh_installmanpages:  debian/psychopy.1
-	dh_installmanpages
+override_dh_installman:  debian/psychopy.1
+	dh_installman
 
 override_dh_installchangelogs:
 	dh_installchangelogs psychopy/CHANGELOG.txt

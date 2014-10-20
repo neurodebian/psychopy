@@ -1,2 +1,12 @@
 * Package ioLabs http://github.com/ioLab/python-ioLabs
 * Package labjack https://github.com/labjack/LabJackPython
+* New versioned dependencies 
+12:46  @yoh: mhy: thanks in advance for NEW!  I will upload psychopy 1.81 later today... got one gotcha -- rebuilding now
+12:48   mhy: ah, thanks - I noticed that it should have versioned deps on python-psutil (>= 2.0.0) and python-gevent (>= 1.0.0)
+12:48   mhy: technically we don't need them in unstable but it'd massively help when backporting to know what's required
+12:50  @yoh: mhy: ah -- thanks! I didn't spot it before
+12:51  @yoh: mhy: are you aware of any backward incompatibilities of e.g. python-psutil  ?
+12:52   mhy: not that I know of - but psychopy needs the psutil.cpu_count() function in iohub/devices/__init__.py which was only introduced in 2.0.0 according to the changelog
+12:52   mhy: I'm trying to remember why it needs the newer gevent - give me a second
+12:54   mhy: hmm. something in the test suite fails with older ones but I don't have the log to hand now
+12:54  @yoh: mhy: ok -- gotcha. Thanks -- that is useful
