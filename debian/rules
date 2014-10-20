@@ -6,6 +6,7 @@
 failed_tests_cmd = $(shell dpkg-parsechangelog --count 1 --format rfc822 | awk '/^Distribution:/{print $$2;}' | grep -q -e '\(sid\|unstable\)' && echo ":" || echo ":")
 
 export HOME=$(CURDIR)/build
+DEB_DESTDIR=$(CURDIR)/debian/psychopy
 
 %:
 	dh $@ --with python2 --buildsystem python_distutils
