@@ -1,6 +1,6 @@
 psychopy (1.81.00.dfsg-1) unstable; urgency=medium
 
-  * Fresh upstream release 
+  * Fresh upstream release
   * debian/patches
     - update_matplotlib_test -- handled upstream
     - wxpython3.0.patch was refactored into wxpython3.0-1.81.00.patch to
@@ -8,13 +8,15 @@ psychopy (1.81.00.dfsg-1) unstable; urgency=medium
   * debian/control
     - boost policy to 3.9.6
     - remove libavbin0 from build-depends (broken see #750577)
-    - adding python-psutil, python-gevent, python-msgpack, python-yaml
-      into Build-Depends and Recommends
+    - adding python-psutil, python-gevent, python-msgpack, python-yaml,
+      python-serial into Build-Depends and Recommends
   * debian/rules
     - state that TRAVIS=true while testing under xvfb to skip some tests
       requiring real hardware etc
     - switch away from pysupport to dh_python
     - switch from cdbs to dh, raised compat to 7
+    - for now ignore tests failure(s), they do not exit cleanly
+      see https://github.com/psychopy/psychopy/issues/708
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 13 Oct 2014 22:14:30 -0400
 
