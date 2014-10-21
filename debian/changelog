@@ -1,3 +1,11 @@
+psychopy (1.81.00.dfsg-2) UNRELEASED; urgency=medium
+
+  * debian/control
+    - Added X-Python-Version: >= 2.7 to avoid problems on older systems
+      with unsupported in 2.6 syntax (Thanks to Mark Hymers)
+
+ --
+
 psychopy (1.81.00.dfsg-1) unstable; urgency=medium
 
   * Fresh upstream release
