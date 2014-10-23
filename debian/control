@@ -47,6 +47,7 @@ Recommends: python-wxgtk3.0,
             libavbin0,
             libxxf86vm1,
             ipython,
+Conflicts: libavbin0 (= 7-4+b1)
 Suggests: python-iolabs, python-pyxid
 Provides: ${python:Provides}
 XB-Python-Version: ${python:Versions}
