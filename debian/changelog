@@ -1,4 +1,4 @@
-psychopy (1.81.00.dfsg-2) unstable; urgency=medium
+psychopy (1.81.01.dfsg-1) unstable; urgency=medium
 
   * debian/control
     - Added X-Python-Version: >= 2.7 to avoid problems on older systems
@@ -11,7 +11,7 @@ psychopy (1.81.00.dfsg-2) unstable; urgency=medium
     - fix symlink to demos (now that dh_python doesn't install into
       pyshared)
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 23 Oct 2014 13:53:35 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 23 Oct 2014 14:01:44 -0400
 
 psychopy (1.81.00.dfsg-1) unstable; urgency=medium
 
