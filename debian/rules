@@ -5,6 +5,9 @@
 # TODO:  return back exit 1 upon failures
 failed_tests_cmd = $(shell dpkg-parsechangelog --count 1 --format rfc822 | awk '/^Distribution:/{print $$2;}' | grep -q -e '\(sid\|unstable\)' && echo ":" || echo ":")
 
+PYVER = $(shell pyversions -vd)
+
+export DEBPYTHON_SUPPORTED=$(PYVER)
 export HOME=$(CURDIR)/build
 DEB_DESTDIR=$(CURDIR)/debian/psychopy
 
@@ -40,6 +43,10 @@ debian/psychopy.1: debian/psychopy.sh
 	PYTHONPATH=. help2man -N -n "Creating psychology stimuli in Python" $^ > $@
 ## cleanup
 	rm -f psychopy/__init__.pyc
+
+override_dh_link:
+	dh_link -ppsychopy /usr/lib/python$(PYVER)/dist-packages/psychopy/demos usr/share/doc/psychopy/examples
+	dh_link
 
 override_dh_installman:  debian/psychopy.1
 	dh_installman
