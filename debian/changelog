@@ -1,3 +1,9 @@
+psychopy (1.81.03.dfsg-1) unstable; urgency=medium
+
+  * New upstream bugfix release
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 03 Dec 2014 11:05:04 -0500
+
 psychopy (1.81.01.dfsg-1) unstable; urgency=medium
 
   * debian/control
