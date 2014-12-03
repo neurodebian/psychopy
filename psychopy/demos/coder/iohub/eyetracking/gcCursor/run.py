@@ -14,7 +14,7 @@ Updated: July 30th, Sol
 """
 from psychopy import visual
 from psychopy.data import TrialHandler,importConditions
-from psychopy.iohub import (EventConstants, ioHubExperimentRuntime, module_directory,
+from psychopy.iohub import (ioHubExperimentRuntime, module_directory,
                             getCurrentDateTimeString)
 import os
 
@@ -61,13 +61,26 @@ class ExperimentRuntime(ioHubExperimentRuntime):
         self.hub.createTrialHandlerRecordTable(trials)
 
         # Let's make some short-cuts to the devices we will be using
-        # in this 'example'.
-        tracker=self.hub.devices.tracker
-        display=self.hub.devices.display
-        kb=self.hub.devices.kb
-        mouse=self.hub.devices.mouse
+        # in this demo.
+        try:
+            tracker=self.hub.devices.tracker
+        except:
+            # No eye tracker config found in iohub_config.yaml
+            from psychopy.iohub.util import MessageDialog
+            md = MessageDialog(title="No Eye Tracker Configuration Found",
+                               msg="Update the iohub_config.yaml file by "
+                               "uncommenting\nthe appropriate eye tracker "
+                               "config lines.\n\nPress OK to exit demo.",
+                               showButtons=MessageDialog.OK_BUTTON,
+                               dialogType=MessageDialog.ERROR_DIALOG,
+                               allowCancel=False,
+                               display_index=0)
+            md.show()
+            return 1
 
-        KEYBOARD_PRESS=EventConstants.KEYBOARD_PRESS
+        display=self.hub.devices.display
+        kb=self.hub.devices.keyboard
+        mouse=self.hub.devices.mouse
 
         # Start by running the eye tracker default setup procedure.
         # The details of the setup procedure (calibration, validation, etc)
@@ -131,8 +144,7 @@ class ExperimentRuntime(ioHubExperimentRuntime):
 
         # Wait until a key event occurs after the instructions are displayed
         self.hub.clearEvents('all')
-        while not kb.getEvents():
-            self.hub.wait(0.2)
+        kb.waitForPresses()
 
         # Send some information to the ioDataStore as experiment messages,
         # including the experiment and session id's, the calculated pixels per
@@ -165,8 +177,7 @@ class ExperimentRuntime(ioHubExperimentRuntime):
             # start trial instuctions have been displayed.
             #
             self.hub.clearEvents('all')
-            while not [event for event in kb.getEvents(event_type_id=KEYBOARD_PRESS) if event.char == ' ']:
-                self.hub.wait(0.2)
+            kb.waitForPresses(keys=[' ',])
 
 
             # Space Key has been pressed, start the trial.
@@ -247,10 +258,9 @@ class ExperimentRuntime(ioHubExperimentRuntime):
                 # Check any new keyboard press events by a space key.
                 # If one is found, set the trial end variable and break.
                 # from the loop
-                for event in kb.getEvents(event_type_id=KEYBOARD_PRESS):
-                    if event.char == ' ':
-                        run_trial=False
-                        break
+                if kb.getPresses(keys=[' ',]):
+                    run_trial=False
+                    break
 
             # The trial has ended, so update the trial end time condition value,
             # and send a message to the ioDataStore with the trial end time.
@@ -294,11 +304,9 @@ class ExperimentRuntime(ioHubExperimentRuntime):
         instructions_text_stim.draw()
         flip_time=window.flip()
         self.hub.sendMessageEvent(text="SHOW_DONE_TEXT",sec_time=flip_time)
-
+        self.hub.clearEvents('all')
         # wait until any key is pressed
-        while not kb.getEvents(event_type_id=KEYBOARD_PRESS):
-            self.hub.wait(0.2)
-
+        kb.waitForPresses()
     ### End of experiment logic
 
 

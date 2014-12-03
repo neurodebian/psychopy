@@ -20,6 +20,22 @@ Changelog
 PsychoPy 1.81
 ------------------------------
 
+PsychoPy 1.81.03
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Released Dec 2014
+
+* ADDED: Sounds in Builder can now have a duration set by a variable (changing each repeat). The work on this may cause some systems to have a periodic 'tick' in the sound if they last longer than 10s (probably dependent on sound card and driver)
+* IMPROVED: RatingScale will always display a custom description ('scale') if provided by the user
+* ADDED: Monitor Center can now calibrate non-primary monitors
+* FIXED: components in Builder can now be 'stopped' at the same time as they are started and never show up (previously at least one frame was always required)
+* FIXED: several issues with Bits++ causing a rendering glitch and not being able to calibrate from Monitor Centre
+* FIXED: choice selection boxes stopped working in monitor centre (caused by hardware.crs.bits importing pyglet.gl)
+* FIXED: Bits# can be set to do gamma correction in the PsychoPy LUT ('software') rather than using the on-board gamma table file ('hardware')
+* FIXED: bug with monitor calib files not returning their linearization method correctly
+* ADDED: psychopy.qtgui as alternative to gui which doesn't duffer from problem with choice boxes and pyglet clashing (thanks Sol)
+* FIXED: data files now correctly include the originPath (the path to the script that created them). Thanks Alex Holcombe for the fix
+
 PsychoPy 1.81.02
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
