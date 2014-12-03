@@ -8,6 +8,7 @@
 
 import sys
 import os
+import weakref
 
 # Ensure setting pyglet.options['debug_gl'] to False is done prior to any
 # other calls to pyglet or pyglet submodules, otherwise it may not get picked
@@ -103,8 +104,18 @@ DEBUG = False
 global IOHUB_ACTIVE
 IOHUB_ACTIVE = False
 
+
 #keep track of windows that have been opened
-openWindows = []
+#Use a list of weak references so that we don't stop the window being deleted
+class OpenWinList(list):
+    def append(self, item):
+        list.append(self, weakref.ref(item))
+    def remove(self, item):
+        for ref in self:
+            obj = ref()
+            if obj is None or item==obj:
+                list.remove(self, ref)
+openWindows = OpenWinList()
 
 # can provide a default window for mouse
 psychopy.event.visualOpenWindows = openWindows
@@ -214,6 +225,7 @@ class Window(object):
         """
         #what local vars are defined (these are the init params) for use by __repr__
         self._initParams = dir()
+        self._closed=False
         for unecess in ['self', 'checkTiming', 'rgb', 'dkl', ]:
             self._initParams.remove(unecess)
 
@@ -277,23 +289,6 @@ class Window(object):
         self.viewOri = float(viewOri)
         self.stereo = stereo  # use quad buffer if requested (and if possible)
 
-        # setup bits++ if needed. NB The new preferred method is for this to be
-        # handled by the bits class instead. (we pass the Window to bits not passing
-        # bits to the window)
-        self.bits = None
-        if bitsMode is not None:
-            logging.warn("Use of Window(bitsMode=******) is deprecated. See the Coder>Demos>Hardware demo for new methods")
-            self.bitsMode = bitsMode  # could be [None, 'fast', 'slow']
-            logging.warn("calling Window(...,bitsMode='fast') is deprecated. XXX provide further info")
-            from psychopy.hardware.crs import bits
-            self.bits = self.interface = bits.BitsBox(self)
-            self.haveBits = True
-            if hasattr(self.monitor, 'lineariseLums'):
-                #rather than a gamma value we could use bits++ and provide a
-                # complete linearised lookup table using
-                # monitor.lineariseLums(lumLevels)
-                self.__dict__['gamma'] = None
-
         #load color conversion matrices
         self.dkl_rgb = self.monitor.getDKL_RGB()
         self.lms_rgb = self.monitor.getLMS_RGB()
@@ -337,8 +332,25 @@ class Window(object):
         self.blendMode = self.blendMode
 
         # gamma
+        self.bits = None #this may change in a few lines time!
         self.__dict__['gamma'] = gamma
-        self._setupGamma()
+        self._setupGamma(gamma)
+
+        # setup bits++ if needed. NB The new preferred method is for this to be
+        # handled by the bits class instead. (we pass the Window to bits not passing
+        # bits to the window)
+        if bitsMode is not None:
+            logging.warn("Use of Window(bitsMode=******) is deprecated. See the Coder>Demos>Hardware demo for new methods")
+            self.bitsMode = bitsMode  # could be [None, 'fast', 'slow']
+            logging.warn("calling Window(...,bitsMode='fast') is deprecated. XXX provide further info")
+            from psychopy.hardware.crs.bits import BitsPlusPlus
+            self.bits = self.interface = BitsPlusPlus(self)
+            self.haveBits = True
+            if hasattr(self.monitor, 'lineariseLums'):
+                #rather than a gamma value we could use bits++ and provide a
+                # complete linearised lookup table using
+                # monitor.lineariseLums(lumLevels)
+                self.__dict__['gamma'] = None
 
         self.frameClock = core.Clock()  # from psycho/core
         self.frames = 0  # frames since last fps calc
@@ -375,11 +387,8 @@ class Window(object):
             logging.exp("Created %s = %s" %(self.name, str(self)))
 
     def __del__(self):
-        try:
-            GL.glDeleteTextures(1, self.frameTexture)
-            GL.glDeleteFramebuffersEXT( 1, self.frameBuffer)
-        except:
-            pass
+        if self._closed==False:
+            self.close()
 
     def __str__(self):
         className = 'Window'
@@ -954,6 +963,7 @@ class Window(object):
 
     def close(self):
         """Close the window (and reset the Bits++ if necess)."""
+        self._closed=True
         if (not self.useNativeGamma) and self.origGammaRamp is not None:
             setGammaRamp(self.winHandle, self.origGammaRamp)
         self.mouseVisible = True  # call attributeSetter
@@ -964,7 +974,10 @@ class Window(object):
             if IOHUB_ACTIVE:
                 from psychopy.iohub.client import ioHubConnection
                 ioHubConnection.ACTIVE_CONNECTION.unregisterPygletWindowHandles(self._hw_handle)
-            self.winHandle.close()
+            try:
+                self.winHandle.close()
+            except:
+                pass
         else:
             #pygame.quit()
             pygame.display.quit()
@@ -1076,14 +1089,14 @@ class Window(object):
                         (self.rgb[2]+1.0)/2.0,
                         1.0)
 
-    def _setupGamma(self):
+    def _setupGamma(self, gammaVal):
         """A private method to work out how to handle gamma for this Window
         given that the user might have specified an explicit value, or maybe
         gave a Monitor
         """
         self.origGammaRamp = None
         # determine which gamma value to use (or native ramp)
-        if self.gamma is not None:
+        if gammaVal is not None:
             self._checkGamma()
             self.useNativeGamma = False
         elif not self.monitor.gammaIsDefault():
@@ -1106,7 +1119,7 @@ class Window(object):
 
             if self.autoLog:
                 logging.info('Using gamma: self.gamma' + str(self.gamma))
-            self.__dict__['gamma'] = self.gamma  # using either pygame or bits++
+            self.gamma = gammaVal  # using either pygame or bits++
 
     @attributeSetter
     def gamma(self, gamma):
@@ -1311,7 +1324,7 @@ class Window(object):
             if ioHubConnection.ACTIVE_CONNECTION:
                 winhwnds=[]
                 for w in openWindows:
-                    winhwnds.append(w._hw_handle)
+                    winhwnds.append(w()._hw_handle)
                 if self._hw_handle not in winhwnds:
                     winhwnds.append(self._hw_handle)
                 ioHubConnection.ACTIVE_CONNECTION.registerPygletWindowHandles(*winhwnds)
