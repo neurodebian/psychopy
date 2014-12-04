@@ -1,6 +1,8 @@
 psychopy (1.81.03.dfsg-1) unstable; urgency=medium
 
   * New upstream bugfix release
+  * debian/rules
+    - fix up cleaning (apparently overloading clean:: broke dh_clean)
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 03 Dec 2014 11:05:04 -0500
 

@@ -86,9 +86,10 @@ dfsg-%:
 test::
 	LC_ALL=C.UTF-8 PYTHONPATH=$PWD xvfb-run -s "-screen 0 1280x1024x24 -noreset" nosetests -s -v psychopy/tests 2>&1
 
-clean::
+override_dh_clean::
 	rm -f debian/psychopy.1
 	rm -rf build dist PsychoPy.egg-info
+	dh_clean
 
 # do not actually install demos -- just symlink to them
 #DEB_INSTALL_EXAMPLES_psychopy := psychopy/demos/*
