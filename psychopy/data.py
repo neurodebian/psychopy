@@ -1,21 +1,25 @@
 # -*- coding: utf-8 -*-
 """Routines for handling data structures and analysis"""
 # Part of the PsychoPy library
-# Copyright (C) 2014 Jonathan Peirce
+# Copyright (C) 2015 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 from psychopy import logging
 from psychopy.tools.arraytools import extendArr, shuffleArray
 from psychopy.tools.fileerrortools import handleFileCollision
+from psychopy.tools.filetools import openOutputFile, genDelimiter
 import psychopy
+from pandas import DataFrame, read_csv
 import cPickle, string, sys, os, time, copy
 import numpy
 from scipy import optimize, special
-from contrib.quest import QuestObject  # used for QuestHandler
+from contrib.quest import QuestObject    #used for QuestHandler
+from contrib.psi import PsiObject   #used for PsiHandler
 import inspect #so that Handlers can find the script that called them
 import codecs
 import weakref
 import re
+import warnings
 
 try:
     #import openpyxl
@@ -27,6 +31,7 @@ except ImportError:
 
 _experiments=weakref.WeakValueDictionary()
 _nonalphanumeric_re = re.compile(r'\W') # will match all bad var name chars
+
 
 class ExperimentHandler(object):
     """A container class for keeping track of multiple loops/handlers
@@ -238,7 +243,9 @@ class ExperimentHandler(object):
         self.thisEntry = {}
     def saveAsWideText(self, fileName, delim=None,
                    matrixOnly=False,
-                   appendFile=False):
+                   appendFile=False,
+                   encoding='utf-8',
+                   fileCollisionMethod='rename'):
         """Saves a long, wide-format text file, with one line representing the attributes and data
         for a single trial. Suitable for analysis in R and SPSS.
 
@@ -247,29 +254,23 @@ class ExperimentHandler(object):
 
         If `matrixOnly=True` then the file will not contain a header row, which can be handy if you want to append data
         to an existing file of the same format.
+
+        encoding:
+            The encoding to use when saving a the file. Defaults to `utf-8`.
+
+        fileCollisionMethod:
+            Collision method passed to :func:`~psychopy.tools.fileerrortools.handleFileCollision`
+
         """
+        #set default delimiter if none given
+        if delim is None:
+            delim = genDelimiter(fileName)
+
         #create the file or print to stdout
-        if appendFile:
-            writeFormat = 'a'
-        else:
-            writeFormat = 'w' #will overwrite a file
-        if os.path.exists(fileName) and writeFormat == 'w':
-            logging.warning('Data file, %s, will be overwritten' %fileName)
-
-        if fileName[-4:] in ['.csv', '.CSV']:
-            delim = ','
-        else:
-            delim = '\t'
-
-        if fileName=='stdout':
-            f = sys.stdout
-        elif fileName[-4:] in ['.csv', '.CSV','.dlm','.DLM', '.tsv','.TSV']:
-            f = codecs.open(fileName, writeFormat, encoding="utf-8")
-        else:
-            if delim == ',':
-                f = codecs.open(fileName+'.csv', writeFormat, encoding="utf-8")
-            else:
-                f = codecs.open(fileName+'.dlm', writeFormat, encoding="utf-8")
+        f = openOutputFile(
+            fileName, append=appendFile, delim=delim,
+            fileCollisionMethod=fileCollisionMethod, encoding=encoding
+        )
 
         names = self._getAllParamNames()
         names.extend(self.dataNames)
@@ -294,7 +295,7 @@ class ExperimentHandler(object):
             f.write('\n')
         f.close()
         print "saved data to %r" %f.name
-        self.saveWideText=False
+
     def saveAsPickle(self,fileName, fileCollisionMethod='rename'):
         """Basically just saves a copy of self (with data) to a pickle file.
 
@@ -304,18 +305,28 @@ class ExperimentHandler(object):
 
             fileCollisionMethod: Collision method passed to :func:`~psychopy.tools.fileerrortools.handleFileCollision`
         """
+        # Store the current state of self.savePickle for later use:
+        # We are going to set self.savePickle to False before saving,
+        # so PsychoPy won't try to save it again after loading from
+        # disk.
+        #
+        # After saving, the initial state of self.savePickle is restored.
+        #
+        # See https://groups.google.com/d/msg/psychopy-dev/Z4m_UX88q8U/UGuh1eeyjMEJ
+        # for details.
+        savePickle = self.savePickle
+        self.savePickle = False
+
         #otherwise use default location
         if not fileName.endswith('.psydat'):
             fileName+='.psydat'
-        if os.path.exists(fileName):
-            fileName = handleFileCollision(fileName, fileCollisionMethod)
 
-        #create the file or print to stdout
-        f = open(fileName, 'wb')
+        f = openOutputFile(fileName, append=False,
+                           fileCollisionMethod=fileCollisionMethod)
         cPickle.dump(self, f)
         f.close()
-        #no need to save again
-        self.savePickle=False
+        logging.info('saved data to %s' % f.name)
+        self.savePickle = savePickle
 
     def abort(self):
         """Inform the ExperimentHandler that the run was aborted.
@@ -387,20 +398,22 @@ class _BaseTrialHandler(object):
         #otherwise use default location
         if not fileName.endswith('.psydat'):
             fileName+='.psydat'
-        if os.path.exists(fileName):
-            fileName = handleFileCollision(fileName, fileCollisionMethod)
 
-        #create the file or print to stdout
-        f = open(fileName, 'wb')
+        f = openOutputFile(fileName, append=False,
+                           fileCollisionMethod=fileCollisionMethod)
         cPickle.dump(self, f)
         f.close()
+        logging.info('saved data to %s' % f.name)
+
     def saveAsText(self,fileName,
-                   stimOut=[],
+                   stimOut=None,
                    dataOut=('n','all_mean','all_std', 'all_raw'),
                    delim=None,
                    matrixOnly=False,
                    appendFile=True,
                    summarised=True,
+                   fileCollisionMethod='rename',
+                   encoding='utf-8'
                    ):
         """
         Write a text file with the data and various chosen stimulus attributes
@@ -408,8 +421,7 @@ class _BaseTrialHandler(object):
          :Parameters:
 
             fileName:
-                will have .dlm appended (so you can double-click it to
-                open in excel) and can include path info.
+                will have .tsv appended and can include path info.
 
             stimOut:
                 the stimulus attributes to be output. To use this you need to
@@ -433,7 +445,16 @@ class _BaseTrialHandler(object):
             appendFile:
                 will add this output to the end of the specified file if it already exists
 
+            fileCollisionMethod:
+                Collision method passed to :func:`~psychopy.tools.fileerrortools.handleFileCollision`
+
+            encoding:
+                The encoding to use when saving a the file. Defaults to `utf-8`.
+
         """
+        if stimOut is None:
+            stimOut = []
+
         if self.thisTrialN<1 and self.thisRepN<1:#if both are <1 we haven't started
             if self.autoLog:
                 logging.info('TrialHandler.saveAsText called but no trials completed. Nothing saved')
@@ -445,25 +466,13 @@ class _BaseTrialHandler(object):
 
         #set default delimiter if none given
         if delim is None:
-            if fileName[-4:] in ['.csv','.CSV']:
-                delim=','
-            else:
-                delim='\t'
+            delim = genDelimiter(fileName)
 
         #create the file or print to stdout
-        if appendFile:
-            writeFormat = 'a'
-        else:
-            writeFormat = 'w' #will overwrite a file
-        if fileName == 'stdout':
-            f = sys.stdout
-        elif fileName[-4:] in ['.dlm','.DLM', '.csv', '.CSV']:
-            f = codecs.open(fileName, writeFormat, encoding="utf-8")
-        else:
-            if delim==',':
-                f= codecs.open(fileName+'.csv', writeFormat, encoding="utf-8")
-            else:
-                f=codecs.open(fileName+'.dlm', writeFormat, encoding="utf-8")
+        f = openOutputFile(
+            fileName, append=appendFile, delim=delim,
+            fileCollisionMethod=fileCollisionMethod, encoding=encoding
+        )
 
         #loop through lines in the data matrix
         for line in dataArray:
@@ -479,20 +488,23 @@ class _BaseTrialHandler(object):
             f.close()
             if self.autoLog:
                 logging.info('saved data to %s' %f.name)
-    def printAsText(self, stimOut=[],
+    def printAsText(self, stimOut=None,
                     dataOut=('all_mean', 'all_std', 'all_raw'),
                     delim='\t',
                     matrixOnly=False,
                   ):
         """Exactly like saveAsText() except that the output goes
         to the screen instead of a file"""
+        if stimOut is None:
+            stimOut = []
         self.saveAsText('stdout', stimOut, dataOut, delim, matrixOnly)
 
     def saveAsExcel(self,fileName, sheetName='rawData',
-                    stimOut=[],
+                    stimOut=None,
                     dataOut=('n','all_mean','all_std', 'all_raw'),
                     matrixOnly=False,
                     appendFile=True,
+                    fileCollisionMethod='rename'
                     ):
         """
         Save a summary data file in Excel OpenXML format workbook (:term:`xlsx`) for processing
@@ -532,8 +544,13 @@ class _BaseTrialHandler(object):
                 If False any existing file with this name will be overwritten. If True then a new worksheet will be appended.
                 If a worksheet already exists with that name a number will be added to make it unique.
 
+            fileCollisionMethod: string
+                Collision method passed to :func:`~psychopy.tools.fileerrortools.handleFileCollision`
+                This is ignored if ``append`` is ``True``.
 
         """
+        if stimOut is None:
+            stimOut = []
 
         if self.thisTrialN<1 and self.thisRepN<1:#if both are <1 we haven't started
             if self.autoLog:
@@ -563,8 +580,8 @@ class _BaseTrialHandler(object):
             newWorkbook=False
         else:
             if not appendFile: #the file exists but we're not appending, so will be overwritten
-                if self.autoLog:
-                    logging.warning('Data file, %s, will be overwritten' %fileName)
+                fileName = handleFileCollision(fileName,
+                                               fileCollisionMethod)
             wb = Workbook()#create new workbook
             wb.properties.creator='PsychoPy'+psychopy.__version__
             newWorkbook=True
@@ -1101,14 +1118,16 @@ class TrialHandler(_BaseTrialHandler):
             dataOut.remove(invalidAnal)
         return dataOut, dataAnal, dataHead
 
-
     def saveAsWideText(self,fileName,
-                   delim='\t',
+                   delim=None,
                    matrixOnly=False,
                    appendFile=True,
+                   encoding='utf-8',
+                   fileCollisionMethod='rename'
                   ):
         """
         Write a text file with the session, stimulus, and data values from each trial in chronological order.
+        Also, return a pandas DataFrame containing same information as the file.
 
         That is, unlike 'saveAsText' and 'saveAsExcel':
          - each row comprises information from only a single trial.
@@ -1126,7 +1145,7 @@ class TrialHandler(_BaseTrialHandler):
         :Parameters:
 
             fileName:
-                if extension is not specified, '.csv' will be appended if the delimiter is ',', else '.txt' will be appended.
+                if extension is not specified, '.csv' will be appended if the delimiter is ',', else '.tsv' will be appended.
                 Can include path info.
 
             delim:
@@ -1138,25 +1157,26 @@ class TrialHandler(_BaseTrialHandler):
             appendFile:
                 will add this output to the end of the specified file if it already exists.
 
+            fileCollisionMethod:
+                Collision method passed to :func:`~psychopy.tools.fileerrortools.handleFileCollision`
+
+             encoding:
+                The encoding to use when saving a the file. Defaults to `utf-8`.
+
         """
         if self.thisTrialN<1 and self.thisRepN<1:#if both are <1 we haven't started
             logging.info('TrialHandler.saveAsWideText called but no trials completed. Nothing saved')
             return -1
 
+        #set default delimiter if none given
+        if delim is None:
+            delim = genDelimiter(fileName)
+
         #create the file or print to stdout
-        if appendFile:
-            writeFormat = 'a'
-        else:
-            writeFormat = 'w' #will overwrite a file
-        if fileName == 'stdout':
-            f = sys.stdout
-        elif fileName[-4:] in ['.dlm','.DLM', '.tsv', '.TSV', '.txt', '.TXT', '.csv', '.CSV']:
-            f = codecs.open(fileName, writeFormat, encoding="utf-8")
-        else:
-            if delim==',':
-                f = codecs.open(fileName+'.csv', writeFormat, encoding="utf-8")
-            else:
-                f = codecs.open(fileName+'.txt', writeFormat, encoding="utf-8")
+        f = openOutputFile(
+            fileName, append=appendFile, delim=delim,
+            fileCollisionMethod=fileCollisionMethod, encoding=encoding
+        )
 
         # collect parameter names related to the stimuli:
         if self.trialList[0]:
@@ -1165,6 +1185,12 @@ class TrialHandler(_BaseTrialHandler):
             header = []
         # and then add parameter names related to data (e.g. RT)
         header.extend(self.data.dataTypes)
+        # get the extra 'wide' parameter names into the header line:
+        header.insert(0,"TrialNumber")
+        if (self.extraInfo != None):
+            for key in self.extraInfo:
+                header.insert(0, key)
+        df = DataFrame(columns = header)
 
         # loop through each trial, gathering the actual values:
         dataOut = []
@@ -1192,7 +1218,6 @@ class TrialHandler(_BaseTrialHandler):
 
                 # add a trial number so the original order of the data can always be recovered if sorted during analysis:
                 trialCount += 1
-                nextEntry["TrialNumber"] = trialCount
 
                 # now collect the value from each trial of the variables named in the header:
                 for parameterName in header:
@@ -1202,16 +1227,14 @@ class TrialHandler(_BaseTrialHandler):
                     elif parameterName in self.data:
                         nextEntry[parameterName] = self.data[parameterName][trialTypeIndex][repThisType]
                     else: # allow a null value if this parameter wasn't explicitly stored on this trial:
-                        nextEntry[parameterName] = ''
+                        if parameterName == "TrialNumber":
+                            nextEntry[parameterName] = trialCount
+                        else:
+                            nextEntry[parameterName] = ''
 
                 #store this trial's data
                 dataOut.append(nextEntry)
-
-        # get the extra 'wide' parameter names into the header line:
-        header.insert(0,"TrialNumber")
-        if (self.extraInfo != None):
-            for key in self.extraInfo:
-                header.insert(0, key)
+                df = df.append(nextEntry, ignore_index=True)
 
         if not matrixOnly:
         # write the header row:
@@ -1231,6 +1254,9 @@ class TrialHandler(_BaseTrialHandler):
         if f != sys.stdout:
             f.close()
             logging.info('saved wide-format data to %s' %f.name)
+
+        df= df.convert_objects() # Converts numbers to numeric, such as float64, boolean to bool. Otherwise they all are "object" type, i.e. strings
+        return df
 
     def addData(self, thisType, value, position=None):
         """Add data for the current trial
@@ -1340,14 +1366,12 @@ def importConditions(fileName, returnFieldNames=False, selection=""):
         raise ImportError('Conditions file not found: %s' %os.path.abspath(fileName))
 
     if fileName.endswith('.csv'):
-        #use csv import library to fetch the fieldNames
-        f = open(fileName, 'rU')#the U converts line endings to os.linesep (not unicode!)
-        trialsArr = numpy.recfromcsv(f, case_sensitive=True)
+        trialsArr = read_csv(fileName) # use pandas reader, which can handle commas in fields, etc
+        trialsArr = trialsArr.to_records(index=False) # convert the resulting dataframe to a numpy recarry
         if trialsArr.shape == ():  # convert 0-D to 1-D with one element:
             trialsArr = trialsArr[numpy.newaxis]
         fieldNames = trialsArr.dtype.names
         _assertValidVarNames(fieldNames, fileName)
-        f.close()
         #convert the record array into a list of dicts
         trialList = []
         for trialN, trialType in enumerate(trialsArr):
@@ -1794,8 +1818,10 @@ class StairHandler(_BaseTrialHandler):
             self._nextIntensity = self.minVal
 
     def saveAsText(self,fileName,
-                   delim='\t',
+                   delim=None,
                    matrixOnly=False,
+                   fileCollisionMethod='rename',
+                   encoding='utf-8'
                   ):
         """
         Write a text file with the data
@@ -1804,13 +1830,20 @@ class StairHandler(_BaseTrialHandler):
 
             fileName: a string
                 The name of the file, including path if needed. The extension
-                `.dlm` will be added if not included.
+                `.tsv` will be added if not included.
 
             delim: a string
                 the delimitter to be used (e.g. '\t' for tab-delimitted, ',' for csv files)
 
             matrixOnly: True/False
                 If True, prevents the output of the `extraInfo` provided at initialisation.
+
+            fileCollisionMethod:
+                Collision method passed to :func:`~psychopy.tools.fileerrortools.handleFileCollision`
+
+            encoding:
+                The encoding to use when saving a the file. Defaults to `utf-8`.
+
         """
 
         if self.thisTrialN<1:
@@ -1818,16 +1851,15 @@ class StairHandler(_BaseTrialHandler):
                 logging.debug('StairHandler.saveAsText called but no trials completed. Nothing saved')
             return -1
 
+        #set default delimiter if none given
+        if delim is None:
+            delim = genDelimiter(fileName)
+
         #create the file or print to stdout
-        if fileName=='stdout':
-            f = sys.stdout
-        elif fileName[-4:] in ['.dlm','.DLM', '.csv','.CSV']:
-            f= file(fileName,'w')
-        else:
-            if delim==',':
-                f = file(fileName+'.csv','w')
-            else:
-                f = file(fileName+'.dlm','w')
+        f = openOutputFile(
+            fileName, append=False, delim=delim,
+            fileCollisionMethod=fileCollisionMethod, encoding=encoding
+        )
 
         #write the data
         reversalStr = str(self.reversalIntensities)
@@ -1874,6 +1906,7 @@ class StairHandler(_BaseTrialHandler):
 
     def saveAsExcel(self,fileName, sheetName='data',
                    matrixOnly=False, appendFile=True,
+                   fileCollisionMethod='rename'
                   ):
         """
         Save a summary data file in Excel OpenXML format workbook (:term:`xlsx`) for processing
@@ -1906,6 +1939,10 @@ class StairHandler(_BaseTrialHandler):
                 If False any existing file with this name will be overwritten. If True then a new worksheet will be appended.
                 If a worksheet already exists with that name a number will be added to make it unique.
 
+            fileCollisionMethod: string
+                Collision method passed to :func:`~psychopy.tools.fileerrortools.handleFileCollision`
+                This is ignored if ``append`` is ``True``.
+
         """
 
         if self.thisTrialN<1:
@@ -1930,7 +1967,8 @@ class StairHandler(_BaseTrialHandler):
             newWorkbook=False
         else:
             if not appendFile: #the file exists but we're not appending, so will be overwritten
-                logging.warning('Data file, %s, will be overwritten' %fileName)
+                fileName = handleFileCollision(fileName,
+                                               fileCollisionMethod)
             wb = Workbook()#create new workbook
             wb.properties.creator='PsychoPy'+psychopy.__version__
             newWorkbook=True
@@ -1973,20 +2011,30 @@ class StairHandler(_BaseTrialHandler):
         if self.autoLog:
             logging.info('saved data to %s' %fileName)
 
-    def saveAsPickle(self,fileName):
+    def saveAsPickle(self,fileName, fileCollisionMethod='rename'):
         """Basically just saves a copy of self (with data) to a pickle file.
 
         This can be reloaded if necess and further analyses carried out.
+
+        :Parameters:
+
+            fileCollisionMethod: Collision method passed to :func:`~psychopy.tools.fileerrortools.handleFileCollision`
+
         """
         if self.thisTrialN<1:
             if self.autoLog:
                 logging.debug('StairHandler.saveAsPickle called but no trials completed. Nothing saved')
             return -1
+
         #otherwise use default location
-        f = open(fileName+'.psydat', "wb")
+        if not fileName.endswith('.psydat'):
+            fileName+='.psydat'
+
+        f = openOutputFile(fileName, append=False,
+                           fileCollisionMethod=fileCollisionMethod)
         cPickle.dump(self, f)
         f.close()
-        logging.info('saved data to %s' %f.name)
+        logging.info('saved data to %s' % f.name)
 
 
 class QuestHandler(StairHandler):
@@ -2322,6 +2370,176 @@ class QuestHandler(StairHandler):
             self.finished = False
 
 
+class PsiHandler(StairHandler):
+    """
+    Handler to implement the "Psi" adaptive psychophysical method (Kontsevich & Tyler, 1999).
+
+    This implementation assumes the form of the psychometric function to be a cumulative Gaussian.
+    Psi estimates the two free parameters of the psychometric function, the location (alpha) and slope (beta),
+    using Bayes' rule and grid approximation of the posterior distribution. It chooses stimuli to present by
+    minimizing the entropy of this grid. Because this grid is represented internally as a 4-D array, one
+    must choose the intensity, alpha, and beta ranges carefully so as to avoid a Memory Error. Maximum likelihood
+    is used to estimate Lambda, the most likely location/slope pair. Because Psi estimates the entire
+    psychometric function, any threshold defined on the function may be estimated once Lambda is determined.
+
+    It is advised that Lambda estimates are examined after completion of the Psi procedure. If the
+    estimated alpha or beta values equal your specified search bounds, then the search range most likely did
+    not contain the true value. In this situation the procedure should be repeated with appropriately adjusted bounds.
+
+    Because Psi is a Bayesian method, it can be initialized with a prior from existing research. A function
+    to save the posterior over Lambda as a Numpy binary file is included.
+    """
+
+    def __init__(self,
+                 nTrials,
+                 intensRange, alphaRange, betaRange,
+                 intensPrecision, alphaPrecision, betaPrecision,
+                 delta,
+                 extraInfo=None,
+                 stepType='lin',
+                 TwoAFC=False,
+                 prior=None,
+                 fromFile=False,
+                 name=''):
+
+
+        """
+        Initializes the handler and creates an internal Psi Object for grid approximation.
+
+        Parameters:
+
+            nTrials (int)
+                The number of trials to run.
+
+            intensRange (list)
+                Two element list containing the (inclusive) endpoints of the stimuli intensity range.
+
+            alphaRange  (list)
+                Two element list containing the (inclusive) endpoints of the alpha (location parameter) range.
+
+            betaRange   (list)
+                Two element list containing the (inclusive) endpoints of the beta (slope parameter) range.
+
+            intensPrecision (float or int)
+                If stepType == 'lin', this specifies the step size of the stimuli intensity range.
+                If stepType == 'log', this specifies the number of steps in the stimuli intensity range.
+
+            alphaPrecision  (float)
+                The step size of the alpha (location parameter) range.
+
+            betaPrecision   (float)
+                The step size of the beta (slope parameter) range.
+
+            delta   (float)
+                The guess rate.
+
+            extraInfo   (dict)
+                Optional dictionary object used in PsychoPy's built-in logging system.
+
+            stepType    (str)
+                The type of steps to be used when constructing the stimuli intensity range. If 'lin' then evenly spaced steps are used. If 'log' then logarithmically spaced steps are used.
+                Defaults to 'lin'.
+
+            TwoAFC  (bool)
+                If True then the d' based psychometric function from Kontsevich & Tyler (1999) will be used. If False then a Yes/No task is assumed.
+
+            prior   (numpy.ndarray or str)
+                Optional prior distribution with which to initialize the Psi Object. This can either be a numpy.ndarray object or the path to a numpy binary file (.npy) containing the ndarray.
+
+            fromFile    (str)
+                Flag specifying whether prior is a file pathname or not.
+
+            name    (str)
+                Optional name for the PsiHandler used in PsychoPy's built-in logging system.
+        """
+        # Initialize parent class first
+        StairHandler.__init__(self, startVal=None, nTrials=nTrials, extraInfo=extraInfo, method=None, stepType=stepType, minVal=intensRange[0], maxVal=intensRange[1], name=name)
+
+        # Create Psi object
+        if prior is not None and fromFile:
+            try:
+                prior = numpy.load(prior)
+            except IOError:
+                logging.warning("The specified pickle file could not be read. Using a uniform prior instead.")
+                prior = None
+        self._psi = PsiObject(intensRange, alphaRange, betaRange, intensPrecision, alphaPrecision, betaPrecision, delta, stepType, TwoAFC, prior)
+        self._psi.update(None)
+
+
+    def addResponse(self, result, intensity=None):
+        """Add a 1 or 0 to signify a correct/detected or incorrect/missed trial
+        Supplying an `intensity` value here indicates that you did not use the
+        recommended intensity in your last trial and the staircase will
+        replace its recorded value with the one you supplied here.
+        """
+        self.data.append(result)
+
+        #if needed replace the existing intensity with this custom one
+        if intensity is not None:
+            self.intensities.pop()
+            self.intensities.append(intensity)
+        #add the current data to experiment if possible
+        if self.getExp() is not None:#update the experiment handler too
+            self.getExp().addData(self.name+".response", result)
+        self._psi.update(result)
+
+    def next(self):
+        """Advances to next trial and returns it."""
+        self._checkFinished()
+        if self.finished==False:
+            #update pointer for next trial
+            self.thisTrialN+=1
+            self.intensities.append(self._psi.nextIntensity)
+            return self._psi.nextIntensity
+        else:
+            self._terminate()
+
+    def _checkFinished(self):
+        """checks if we are finished
+        Updates attribute: `finished`
+        """
+        if self.nTrials is not None and len(self.intensities) >= self.nTrials:
+            self.finished = True
+        else:
+            self.finished = False
+
+    def estimateLambda(self):
+        """Returns a tuple of (location, slope)"""
+        return self._psi.estimateLambda()
+
+    def estimateThreshold(self, thresh, lamb=None):
+        """Returns an intensity estimate for the provided probability. The optional argument 'lamb' allows thresholds to be estimated without having to recompute the maximum likelihood lambda."""
+        if lamb is not None:
+            try:
+                if len(lamb) != 2:
+                    warnings.warn("Invalid user-specified lambda pair. A new estimate of lambda will be computed.", SyntaxWarning)
+                    lamb = None
+            except TypeError:
+                warnings.warn("Invalid user-specified lambda pair. A new estimate of lambda will be computed.", SyntaxWarning)
+                lamb = None
+        return self._psi.estimateThreshold(thresh, lamb)
+
+    def savePosterior(self, fileName, fileCollisionMethod='rename'):
+        """
+        Saves the posterior array over probLambda as a pickle file with the specified name.
+
+        :Parameters:
+        fileCollisionMethod : string
+            Collision method passed to
+            :func:`~psychopy.tools.fileerrortools.handleFileCollision`
+
+        """
+        try:
+            if os.path.exists(fileName):
+                fileName = handleFileCollision(
+                    fileName,
+                    fileCollisionMethod=fileCollisionMethod
+                )
+            self._psi.savePosterior(fileName)
+        except IOError:
+            warnings.warn("An error occurred while trying to save the posterior array. Continuing without saving...")
+
+
 class MultiStairHandler(_BaseTrialHandler):
     def __init__(self, stairType='simple', method='random',
             conditions=None, nTrials=50, originPath=None, name='', autoLog=True):
@@ -2555,22 +2773,34 @@ class MultiStairHandler(_BaseTrialHandler):
         self.addResponse(result, intensity)
         if type(result) in [str, unicode]:
             raise TypeError("MultiStairHandler.addData should only receive corr/incorr. Use .addOtherData('datName',val)")
-    def saveAsPickle(self, fileName):
+
+    def saveAsPickle(self, fileName, fileCollisionMethod='rename'):
         """Saves a copy of self (with data) to a pickle file.
 
         This can be reloaded later and further analyses carried out.
+
+        :Parameters:
+
+            fileCollisionMethod: Collision method passed to :func:`~psychopy.tools.fileerrortools.handleFileCollision`
+
         """
         if self.totalTrials<1:
             if self.autoLog:
                 logging.debug('StairHandler.saveAsPickle called but no trials completed. Nothing saved')
             return -1
+
         #otherwise use default location
-        f = open(fileName+'.psydat', "wb")
+        if not fileName.endswith('.psydat'):
+            fileName+='.psydat'
+
+        f = openOutputFile(fileName, append=False,
+                           fileCollisionMethod=fileCollisionMethod)
         cPickle.dump(self, f)
         f.close()
-        if self.autoLog:
-            logging.info('saved data to %s' %f.name)
-    def saveAsExcel(self, fileName, matrixOnly=False, appendFile=False):
+        logging.info('saved data to %s' % f.name)
+
+    def saveAsExcel(self, fileName, matrixOnly=False, appendFile=False,
+                    fileCollisionMethod='rename'):
         """
         Save a summary data file in Excel OpenXML format workbook (:term:`xlsx`) for processing
         in most spreadsheet packages. This format is compatible with
@@ -2599,21 +2829,31 @@ class MultiStairHandler(_BaseTrialHandler):
                 If False any existing file with this name will be overwritten. If True then a new worksheet will be appended.
                 If a worksheet already exists with that name a number will be added to make it unique.
 
+            fileCollisionMethod: string
+                Collision method passed to :func:`~psychopy.tools.fileerrortools.handleFileCollision`
+                This is ignored if ``append`` is ``True``.
+
         """
         if self.totalTrials<1:
             if self.autoLog:
                 logging.debug('StairHandler.saveAsExcel called but no trials completed. Nothing saved')
             return -1
+
         append=appendFile
         for thisStair in self.staircases:
             #make a filename
             label = thisStair.condition['label']
-            thisStair.saveAsExcel(fileName=fileName, sheetName=label,
-                matrixOnly=matrixOnly, appendFile=append)
+            thisStair.saveAsExcel(
+                fileName, sheetName=label, matrixOnly=matrixOnly,
+                appendFile=append, fileCollisionMethod='rename'
+            )
             append = True
+
     def saveAsText(self,fileName,
-                   delim='\t',
-                   matrixOnly=False):
+                   delim=None,
+                   matrixOnly=False,
+                   fileCollisionMethod='rename',
+                   encoding='utf-8'):
         """
         Write out text files with the data.
 
@@ -2626,13 +2866,20 @@ class MultiStairHandler(_BaseTrialHandler):
 
             fileName: a string
                 The name of the file, including path if needed. The extension
-                `.dlm` will be added if not included.
+                `.tsv` will be added if not included.
 
             delim: a string
                 the delimitter to be used (e.g. '\t' for tab-delimitted, ',' for csv files)
 
             matrixOnly: True/False
                 If True, prevents the output of the `extraInfo` provided at initialisation.
+
+            fileCollisionMethod:
+                Collision method passed to :func:`~psychopy.tools.fileerrortools.handleFileCollision`
+
+            encoding:
+                The encoding to use when saving a the file. Defaults to `utf-8`.
+
         """
         if self.totalTrials<1:
             if self.autoLog:
@@ -2642,8 +2889,11 @@ class MultiStairHandler(_BaseTrialHandler):
             #make a filename
             label = thisStair.condition['label']
             thisFileName = fileName+"_"+label
-            thisStair.saveAsText(fileName=thisFileName, delim=delim,
-                matrixOnly=matrixOnly)
+            thisStair.saveAsText(
+                fileName=thisFileName, delim=delim, matrixOnly=matrixOnly,
+                fileCollisionMethod=fileCollisionMethod, encoding=encoding
+            )
+
     def printAsText(self,
                    delim='\t',
                    matrixOnly=False):

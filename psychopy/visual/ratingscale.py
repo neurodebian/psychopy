@@ -3,7 +3,7 @@
 '''A class for getting numeric or categorical ratings, e.g., a 1-to-7 scale.'''
 
 # Part of the PsychoPy library
-# Copyright (C) 2014 Jonathan Peirce
+# Copyright (C) 2015 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 import sys
@@ -775,6 +775,7 @@ class RatingScale(MinimalStim):
                     self.labels.append(TextStim(win=self.win, text=unicode(label), font=textFont,
                         pos=[self.tickPositions[i//self.autoRescaleFactor], vertPosTmp],
                         height=self.textSizeSmall, color=self.textColor, autoLog=False))
+        self.origScaleDescription = scale
         self.setDescription(scale) # do after having set the relevant things
 
     def setDescription(self, scale=None, log=True):

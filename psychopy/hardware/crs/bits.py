@@ -2,7 +2,7 @@
 #coding=utf-8
 
 # Part of the PsychoPy library
-# Copyright (C) 2014 Jonathan Peirce
+# Copyright (C) 2015 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 #Acknowledgements:
@@ -49,26 +49,25 @@ try:
 except:
     import ConfigParser as configparser
 
-#bits++ modes
+#Bits++ modes
 bits8BITPALETTEMODE=  0x00000001  #/* normal vsg mode */
 NOGAMMACORRECT     =  0x00004000  #/* Gamma correction mode */
 GAMMACORRECT       =  0x00008000  #/* Gamma correction mode */
 VIDEOENCODEDCOMMS  =  0x00080000 # needs to be set so that LUT is read from screen
 
 class BitsPlusPlus(object):
-    """The main class to control a bits++ box.
+    """The main class to control a Bits++ box.
 
     This is usually a class added within the window object and is typically accessed from there.
     e.g.::
 
         from psychopy import visual
-        win = visual.Window([800,600], mode='bits++')
-        win.bits.setContrast(0.5)#use bits++ to reduce the whole screen contrast by 50%
+        from psychopy.hardware import crs
 
-    :params:
-        - rampType: 'cfgFile', None or an integer
-            if 'cfgFile' then we'll look for a valid config in the userPrefs folder
-            if an integer then this will be used during win.setGamma(rampType=rampType)
+        win = visual.Window([800,600])
+        bits = crs.BitsPlusPlus(win, mode='bits++')
+        bits.setContrast(0.5)#use bits++ to reduce the whole screen contrast by 50%
+
     """
     def __init__(self,
                     win,
@@ -77,6 +76,33 @@ class BitsPlusPlus(object):
                     nEntries=256,
                     mode='bits++',
                     rampType = 'configFile'):
+        """
+        :Parameters:
+            contrast=1.0,
+                The contrast to be applied to the LUT. See :func:`BitsPlusPlus.setLUT`
+                and :func:`BitsPlusPlus.setContrast` for flexibility on setting
+                just a section of the LUT to a different value
+
+            gamma=None,
+                The value used to correct the gamma in the LUT
+
+            nEntries: 256
+                [DEPRECATED feature]
+
+            mode : 'bits++' (or 'mono++' or 'color++')
+                Note that, unlike the Bits#, this only affects the way the
+                window is rendered, it does not switch the state of the Bits++
+                device itself (because unlike the Bits# have no way to
+                communicate with it).
+                The mono++ and color++ are only supported in PsychoPy 1.82.00
+                onwards. Even then they suffer from not having gamma correction
+                applied on Bits++ (unlike Bits# which can apply a gamma table
+                in the device hardware).
+
+            rampType : 'configFile', None or an integer
+                if 'configFile' then we'll look for a valid config in the userPrefs folder
+                if an integer then this will be used during win.setGamma(rampType=rampType):
+                """
         self.win = win
         self.contrast=contrast
         self.nEntries=nEntries
@@ -99,10 +125,10 @@ class BitsPlusPlus(object):
         if init():
             setVideoMode(NOGAMMACORRECT|VIDEOENCODEDCOMMS)
             self.initialised=True
-            logging.debug('found and initialised bits++')
+            logging.debug('Found and initialised Bits++')
         else:
             self.initialised=False
-            logging.warning("couldn't initialise bits++")
+            logging.warning("Couldn't initialise Bits++")
 
         #do the processing
         self._HEADandLUT = np.zeros((524,1,3),np.uint8)
@@ -132,7 +158,7 @@ class BitsPlusPlus(object):
             self.win.winHandle.setGamma(self.win.winHandle, rampType=rampType)
 
     def setLUT(self,newLUT=None, gammaCorrect=True, LUTrange=1.0):
-        """Sets the LUT to a specific range of values in Bits++ mode only
+        """Sets the LUT to a specific range of values in 'bits++' mode only
 
         Note that, if you leave gammaCorrect=True then any LUT values you supply
         will automatically be gamma corrected.
@@ -216,7 +242,7 @@ class BitsPlusPlus(object):
         self._HEADandLUTstr = self._HEADandLUT.tostring()
 
     def _drawLUTtoScreen(self):
-        """(private) Used to set the LUT in Bits++ mode.
+        """(private) Used to set the LUT in 'bits++' mode.
 
         Should not be needed by user if attached to a ``psychopy.visual.Window()``
         since this will automatically draw the LUT as part of the screen refresh.
@@ -249,7 +275,7 @@ class BitsPlusPlus(object):
         GL.glMatrixMode( GL.GL_MODELVIEW )
 
     def setContrast(self,contrast,LUTrange=1.0, gammaCorrect=None):
-        """Set the contrast of the LUT for bits++ mode only
+        """Set the contrast of the LUT for 'bits++' mode only
 
         :Parameters:
             contrast : float in the range 0:1
@@ -321,48 +347,88 @@ class BitsPlusPlus(object):
 class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
     """A class to support functions of the Bits#
 
-    This device uses the CDC (serial port) connection to the bits box. To use it
-    you must have followed the instructions from CRS Ltd to get your box into
+    This device uses the CDC (serial port) connection to the Bits box. To use it
+    you must have followed the instructions from CRS Ltd. to get your box into
     the CDC communication mode.
 
-    On windows you must specify the COM port name.
-    On OSX, if you don't specify a port then the first match of /dev/tty.usbmodemfa* will be used
-    ON linux, if you don't specify a port then /dev/ttyS0 will be used
+    Typical usage (also see demo in Coder view demos>hardware>BitsBox )::
 
-    :params:
+        from psychopy import visual
+        from psychopy.hardware import crs
 
-    win: a PsychoPy :ref:`~psychopy.visual.Window` object (required)
+        win = visual.Window([1024,768], useFBO=True) #we need to be rendering to framebuffer
+        bits = crs.BitsSharp(win, mode = 'mono++')
+        # You can continue using your window as normal and OpenGL shaders will
+        # convert the output as needed
 
-    portName: the (virtual) serial port to which the device is connected. If None
-        then PsychoPy will search available serial ports and test communication
+        print bits.info
+        if not bits.OK:
+            print 'failed to connect to Bits box'
+            core.quit()
 
-    mode: 'bits++', 'color++', 'mono++', 'status'
+        core.wait(0.1)
+        # now, you can change modes using
+        bits.mode = 'mono++' # 'color++', 'mono++', 'bits++', 'status'
 
-    checkConfigLevel: integer
-        Allows you to specify how much checking of the device is done to ensure
-        a valid identity look-up table. If you specify one level and it fails
-        then the check will be escalated to the next level (e.g. if we check
-        level 1 and find that it fails we try to find a new LUT):
-            0 don't check at all
-            1 check that the graphics driver and OS version haven't changed since last LUT calibration
-            2 check that the current LUT calibration still provides identity (requires switch to status mode)
-            3 search for a new identity look-up table (requires switch to status mode)
     """
     name='CRS Bits#'
-    def __init__(self, win=None, portName=None, mode='', checkConfigLevel=1, gammaCorrect = 'hardware', gamma = None):
+    def __init__(self, win=None, portName=None, mode='', checkConfigLevel=1,
+                 gammaCorrect = 'hardware', gamma = None,
+                 noComms=False):
+        """
+        :Parameters:
+
+            win : a PsychoPy :class:`~psychopy.visual.Window` object (required)
+
+            portName : the (virtual) serial port to which the device is connected. If None
+                then PsychoPy will search available serial ports and test communication
+                (on OSX, the first match of `/dev/tty.usbmodemfa*` will be used and on
+                linux `/dev/ttyS0` will be used
+
+            mode : 'bits++', 'color++', 'mono++', 'status'
+
+            checkConfigLevel : integer
+                Allows you to specify how much checking of the device is done to ensure
+                a valid identity look-up table. If you specify one level and it fails
+                then the check will be escalated to the next level (e.g. if we check
+                level 1 and find that it fails we try to find a new LUT):
+
+                    - 0 don't check at all
+                    - 1 check that the graphics driver and OS version haven't changed since last LUT calibration
+                    - 2 check that the current LUT calibration still provides identity (requires switch to status mode)
+                    - 3 search for a new identity look-up table (requires switch to status mode)
+
+            gammaCorrect : string governing how gamma correction is performed
+                'hardware': use the gamma correction file stored on the hardware
+                'FBO': gamma correct using shaders when rendering the FBO to back buffer
+                'bitsMode': in bits++ mode there is a user-controlled LUT that we can use for gamma correction
+
+            noComms : bool
+                If True then don't try to communicate with the device at all (passive mode).
+                This can be useful if you want to debug the system without actually
+                having a Bits# connected.
+
+        """
 
         #import pyglet.GL late so that we can import bits.py without it initially
         global GL, visual
         from psychopy import visual
         import pyglet.gl as GL
 
-        #look for device on valid serial ports
-        serialdevice.SerialDevice.__init__(self, port=portName, baudrate=19200,
-                 byteSize=8, stopBits=1,
-                 parity="N", #'N'one, 'E'ven, 'O'dd, 'M'ask,
-                 eol='\n',
-                 maxAttempts=1, pauseDuration=0.1,
-                 checkAwake=True)
+        if noComms:
+            self.noComms = True
+            self.OK = True
+            self.sendMessage = self._nullSendMessage
+            self.getResponse = self._nullGetResponse
+        else:
+            self.noComms = False
+            #look for device on valid serial ports
+            serialdevice.SerialDevice.__init__(self, port=portName, baudrate=19200,
+                     byteSize=8, stopBits=1,
+                     parity="N", #'N'one, 'E'ven, 'O'dd, 'M'ask,
+                     eol='\n',
+                     maxAttempts=1, pauseDuration=0.1,
+                     checkAwake=True)
         if not self.OK:
             return
 
@@ -401,6 +467,12 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
             self.config = None # makes no sense if we have a window?
             logging.warning("%s was not given any PsychoPy win" %(self))
 
+    #some empty methods that we can use to replace serial methods if noComms
+    def _nullSendMessage(self, message, autoLog=True):
+        pass
+    def _nullGetResponse(self, length=1, timeout=0.1):
+        pass
+
     def __del__(self):
         """If the user discards this object then close the serial port so it is released"""
         if hasattr(self, 'com'):
@@ -415,6 +487,8 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
     def getInfo(self):
         """Returns a python dictionary of info about the Bits Sharp box
         """
+        if self.noComms:
+            return {'ProductType':'Bits#','SerialNumber':'n/a','FirmwareDate':'n/a'}
         self.read(timeout=0.5) #clear input buffer
         info={}
         #get product ('Bits_Sharp'?)
@@ -462,17 +536,25 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
             self.setLUT()
             logging.info('Switched %s to %s mode' %(self.info['ProductType'], self.__dict__['mode']))
         elif value.startswith('mono'):
+            if not self.win.useFBO:
+                raise Exception, "Mono++ mode requires a PsychoPy Window with useFBO=True"
             self.sendMessage('$monoPlusPlus\r')
             self.__dict__['mode'] = 'mono++'
             logging.info('Switched %s to %s mode' %(self.info['ProductType'], self.__dict__['mode']))
         elif value.startswith('colo'):
+            if not self.win.useFBO:
+                raise Exception, "Color++ mode requires a PsychoPy Window with useFBO=True"
             self.sendMessage('$colorPlusPlus\r')
             self.__dict__['mode'] = 'color++'
             logging.info('Switched %s to %s mode' %(self.info['ProductType'], self.__dict__['mode']))
         elif value.startswith('auto'):
+            if not self.win.useFBO:
+                raise Exception, "Auto++ mode requires a PsychoPy Window with useFBO=True"
             self.sendMessage('$autoPlusPlus\r')
             self.__dict__['mode'] = 'auto++'
             logging.info('Switched %s to %s mode' %(self.info['ProductType'], self.__dict__['mode']))
+        else:
+            raise AttributeError, "Bits# doesn't know how to use mode %r. Should be 'mono++', 'color++' etc" %value
 
     def setLUT(self,newLUT=None, gammaCorrect=False, LUTrange=1.0, contrast=None):
         """SetLUT is only really needed for bits++ mode of bits# to set the
@@ -507,7 +589,7 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
 
     @property
     def gammaCorrectFile(self):
-        """The gamma correction file to be used
+        """Get/set the gamma correction file to be used (as stored on the device)
         """
         return self.__dict__['gammaCorrectFile']
     @gammaCorrectFile.setter
@@ -517,7 +599,7 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
 
     @property
     def monitorEDID(self):
-        """Stores/sets the EDID file for the monitor.
+        """Get/set the EDID file for the monitor.
         The edid files will be located in the EDID subdirectory of the flash disk.
         The file “automatic.edid” will be the file read from the connected monitor
         """
@@ -529,7 +611,7 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
 
     #functions
     def beep(self, freq=800, dur=1):
-        """Make a beep with the internal
+        """Make a beep of a given frequency and duration
         """
         self.sendMessage('$Beep=[%i, %.4f]\r' %(freq, dur))
 
@@ -571,6 +653,8 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
     def read(self, timeout=0.1):
         """Get the current waiting characters from the serial port if there are any
         """
+        if self.noComms:
+            return
         self.com.setTimeout(timeout)
         nChars = self.com.inWaiting()
         raw = self.com.read(nChars)
@@ -580,8 +664,12 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
 
     #TO DO: The following are either not yet implemented (or not tested)
     def start(self):
+        """[Not currently implemented] Used to begin event collection by the device
+        """
         raise NotImplemented
     def stop(self):
+        """[Not currently implemented] Used to stop event collection by the device
+        """
         raise NotImplemented
 
     def checkConfig(self, level=1, demoMode=False, logFile=''):
@@ -602,6 +690,8 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
 
                     3: force a fresh search for the identity LUT
         """
+        if self.noComms:
+            demoMode = True
         prevMode = self.mode
         #if we haven't fetched a config yet then do so
         if not self.config:
@@ -616,19 +706,22 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
                 self._warnTesting()
             else:
                 self.mode = prevMode
+                self.win.winHandle.setGammaRamp(self.win.winHandle, self.config.identityLUT)
                 logging.info("Bits# config matches current system: %s on %s" %(self.config.gfxCard, self.config.os))
                 return 1
         #it didn't so switch to doing the test
         if level==2:
             errs = self.config.testLUT(demoMode=demoMode)
+            if demoMode:
+                return 1
             if (errs**2).sum() != 0:
                 level=3
-                logging.info("Bits# found a config file but the LUT didn't work as identity. We'll try to find a working one.")
+                logging.info("The current LUT didn't work as identity. We'll try to find a working one.")
             else:
                 self.config.identityLUT = self.win.winHandle.getGammaRamp(self.win.winHandle).transpose()
                 self.config.save()
                 self.mode = prevMode
-                logging.info("We found a LUT in the config file and it worked as identity")
+                logging.info("We found a LUT and it worked as identity")
                 return 1
         if level==3:
             ok = self.config.findIdentityLUT(demoMode=demoMode, logFile=logFile)
@@ -768,7 +861,7 @@ class Config(object):
         #use bits sharp to test
         if demoMode:
             return [0]*256
-        pixels = bits.getVideoLine(lineN=5, nPixels=256)
+        pixels = bits.getVideoLine(lineN=50, nPixels=256)
         errs = pixels-expected
         if self.logFile:
             for ii, channel in enumerate('RGB'):
@@ -778,7 +871,7 @@ class Config(object):
                 self.logFile.write('\n')
         return errs
 
-    def findIdentityLUT(self, maxIterations = 1000, errCorrFactor = 1.0/2048, # amount of correction done for each iteration
+    def findIdentityLUT(self, maxIterations = 1000, errCorrFactor = 1.0/5000, # amount of correction done for each iteration
         nVerifications = 50, #number of repeats (successful) to check dithering has been eradicated
         demoMode = True, #generate the screen but don't go into status mode
         logFile = '',
@@ -808,8 +901,11 @@ class Config(object):
 
         if plotResults:
             pyplot.Figure()
+            pyplot.subplot(1,2,1)
             pyplot.plot([0,255],[0,255], '-k')
             errPlot = pyplot.plot(range(256), range(256), '.r')[0]
+            pyplot.subplot(1,2,2)
+            pyplot.plot(200,0.01, '.w')
             pyplot.show(block=False)
 
         lowestErr = 1000000000
@@ -827,6 +923,8 @@ class Config(object):
                 bestLUTname = LUTname
         if lowestErr==0:
             print "The %r identity LUT produced zero error. We'll use that!" %(LUTname)
+            self.identityLUT = LUTs[bestLUTname]
+            self.save() #it worked so save this configuration for future
             return
 
         print "Best was %r LUT (mean err = %.3f). Optimising that..." %(bestLUTname, lowestErr)
@@ -843,6 +941,12 @@ class Config(object):
             errProgression.append(meanErr)
             if plotResults:
                 errPlot.set_ydata(range(256)+errs[:,0])
+                pyplot.subplot(1,2,2)
+                if meanErr == 0:
+                    point='.k'
+                else:
+                    point='.r'
+                pyplot.plot(n,meanErr,'.k')
                 pyplot.draw()
             if meanErr>0:
                 print "%.3f" %meanErr,
@@ -894,7 +998,7 @@ class Config(object):
     #Some properties for which we need weakref pointers, not std properties
     @property
     def bits(self):
-        """The bits box to which this config object refers
+        """The Bits box to which this config object refers
         """
         if self.__dict__.get('bits') is None:
             return None
@@ -909,7 +1013,7 @@ def init():
 
     This only ever worked on windows and BitsSharp doesn't need it at all
 
-    Note that, by default, bits++ will perform gamma correction
+    Note that, by default, Bits++ will perform gamma correction
     that you don't want (unless you have the CRS calibration device)
     (Recommended that you use the BitsPlusPlus class rather than
     calling this directly)
@@ -923,7 +1027,7 @@ def init():
     return retVal
 
 def setVideoMode(videoMode):
-    """set the video mode of the bits++ (win32 only)
+    """Set the video mode of the Bits++ (win32 only)
 
     bits8BITPALETTEMODE         =  0x00000001  #normal vsg mode
 
@@ -942,7 +1046,7 @@ def setVideoMode(videoMode):
         return 1
 
 def reset(noGamma=True):
-    """reset the bits++ box via the USB cable by initialising again
+    """Reset the Bits++ box via the USB cable by initialising again
     Allows the option to turn off gamma correction
     """
     OK = init()

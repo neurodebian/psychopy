@@ -9,8 +9,11 @@ import json
 import os,sys
 
 import psychopy.iohub
+from psychopy.iohub import Computer
+Computer.is_iohub_process = True
 from psychopy.iohub.server import ioServer
-from psychopy.iohub import Computer, updateDict,printExceptionDetailsToStdErr, print2err, MonotonicClock, load, dump, Loader, Dumper
+
+from psychopy.iohub import updateDict,printExceptionDetailsToStdErr, print2err, MonotonicClock, load, Loader
 
 def run(rootScriptPathDir,configFilePath):
     psychopy.iohub.EXP_SCRIPT_DIRECTORY = rootScriptPathDir
@@ -45,11 +48,15 @@ def run(rootScriptPathDir,configFilePath):
         s.log('Receiving datagrams on :9000')
         s.udpService.start()
 
+
+        if Computer.system == 'win32':
+            gevent.spawn(s.pumpMsgTasklet, s.config.get('windows_msgpump_interval', 0.00375))
+
         if hasattr(gevent,'run'):
             for m in s.deviceMonitors:
                 m.start()
     
-            gevent.spawn(s.processDeviceEvents, 0.001)
+            gevent.spawn(s.processEventsTasklet, 0.01)
 
             sys.stdout.write("IOHUB_READY\n\r\n\r")
 
@@ -62,10 +69,13 @@ def run(rootScriptPathDir,configFilePath):
             gevent.run()
         else:
             glets=[]
+            if Computer.system == 'win32':
+                glets.append(gevent.spawn(s.pumpMsgTasklet, s.config.get('windows_msgpump_interval', 0.00375)))
+
             for m in s.deviceMonitors:
                 m.start()
                 glets.append(m)
-            glets.append(gevent.spawn(s.processDeviceEvents,0.001))
+            glets.append(gevent.spawn(s.processEventsTasklet,0.01))
     
             sys.stdout.write("IOHUB_READY\n\r\n\r")
             sys.stdout.flush()
@@ -110,8 +120,6 @@ if __name__ == '__main__':
         configFileName=None
         rootScriptPathDir=None
         initial_offset=psychopy.iohub.getTime()
-
-    Computer.is_iohub_process=True
 
     try:
         import psutil
