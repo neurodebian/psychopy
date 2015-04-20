@@ -10,7 +10,6 @@ Distributed under the terms of the GNU General Public License (GPL version 3 or 
 .. moduleauthor:: Sol Simpson <sol@isolver-software.com> + contributors, please see credits section of documentation.
 .. fileauthor:: Sol Simpson <sol@isolver-software.com>
 """
-
 import gevent
 from gevent.server import DatagramServer
 from gevent import Greenlet
@@ -24,10 +23,13 @@ from psychopy.iohub import print2err, printExceptionDetailsToStdErr, ioHubError
 from psychopy.iohub import DeviceConstants, EventConstants
 from psychopy.iohub import Computer, DeviceEvent, import_device
 from psychopy.iohub.devices.deviceConfigValidation import validateDeviceConfiguration
-from psychopy.iohub.net import MAX_PACKET_SIZE
 currentSec= Computer.currentSec
 
-import json
+try:
+    import ujson as json
+except:
+    import json
+
 import msgpack
 try:
     import msgpack_numpy as m
@@ -37,8 +39,13 @@ except:
 
 import psutil
 
+MAX_PACKET_SIZE = 64*1024
+
 class udpServer(DatagramServer):
     def __init__(self,ioHubServer,address,coder='msgpack'):
+        global MAX_PACKET_SIZE
+        import psychopy.iohub.net
+        MAX_PACKET_SIZE = psychopy.iohub.net.MAX_PACKET_SIZE
         self.iohub=ioHubServer
         self.feed=None
         self._running=True
@@ -128,6 +135,7 @@ class udpServer(DatagramServer):
             
     def handleGetEvents(self,replyTo):
         try:
+            self.iohub.processDeviceEvents()
             currentEvents=list(self.iohub.eventBuffer)
             self.iohub.eventBuffer.clear()
 
@@ -369,14 +377,40 @@ class udpServer(DatagramServer):
             return self.iohub.emrt_file._addRowToConditionVariableTable(experiment_id,session_id,data)
         return False
 
-    def clearEventBuffer(self):
-        return self.iohub.clearEventBuffer()
+    def clearEventBuffer(self, clear_device_level_buffers=False):
+        """
 
-    def enableHighPriority(self,disable_gc=True):
-        return Computer.enableHighPriority(disable_gc)
+        :param clear_device_level_buffers:
+        :return:
+        """
+        r = self.iohub.clearEventBuffer()
+        if clear_device_level_buffers is True:
+            for device in self.iohub.devices:
+                try:
+                    device.clearEvents(call_proc_events=False)
+                except:
+                    pass
 
-    def disableHighPriority(self):
-        return Computer.disableHighPriority()
+    def getTime(self):
+        """
+        See Computer.getTime documentation, where current process will be
+        the ioHub Server process.
+        """
+        return Computer.getTime()
+
+    def setPriority(self, level='normal', disable_gc=False):
+        """
+        See Computer.setPriority documentation, where current process will be
+        the ioHub Server process.
+        """
+        return Computer.setPriority(level, disable_gc)
+
+    def getPriority(self):
+        """
+        See Computer.getPriority documentation, where current process will be
+        the ioHub Server process.
+        """
+        return Computer.getPriority()
 
     def getProcessAffinity(self):
         return Computer.getCurrentProcessAffinity()
@@ -392,7 +426,7 @@ class udpServer(DatagramServer):
 
     def shutDown(self):
         try:
-            self.disableHighPriority()
+            self.setPriority('normal')
             self.iohub.shutdown()
             self._running=False
             self.stop()
@@ -422,6 +456,7 @@ class DeviceMonitor(Greenlet):
                 
     def __del__(self):
         self.device = None
+
 
 class ioServer(object):
     eventBuffer=None
@@ -534,6 +569,15 @@ class ioServer(object):
                     device_errors[error_type]=error_list                
                     self._all_device_config_errors[device_module_path]=device_errors
 
+    def pumpMsgTasklet(self, sleep_interval):
+        import pythoncom
+        while self._running:
+            stime=Computer.getTime()
+            if pythoncom.PumpWaitingMessages() == 1:
+                break
+            dur = sleep_interval - (Computer.getTime()-stime)
+            gevent.sleep(max(0.0, dur))
+
     def createNewMonitoredDevice(self,device_class_name,deviceConfig):
         #print2err("#### createNewMonitoredDevice: ",device_class_name)
         self._all_device_config_errors=dict()
@@ -589,64 +633,24 @@ class ioServer(object):
         deviceDict=ioServer.deviceDict
         iohub=self
         if device_class_name in ('Mouse','Keyboard'):
-            if Computer.system == 'win32':  
-                if self._hookDevice is None:
-                    iohub.log("Creating pyHook Monitors....")
-                    #print2err("Creating pyHook Monitor....")
-    
-                    class pyHookDevice(object):
-                        def __init__(self):
-                            import pyHook
-                            self._hookManager=pyHook.HookManager()
-                            
-                            self._mouseHooked=False
-                            self._keyboardHooked=False
-                            
-                            if device_class_name == 'Mouse':
-                                #print2err("Hooking Mouse.....")
-                                self._hookManager.MouseAll = deviceDict['Mouse']._nativeEventCallback
-                                self._hookManager.HookMouse()
-                                self._mouseHooked=True
-                            elif device_class_name == 'Keyboard':
-                                #print2err("Hooking Keyboard.....")
-                                self._hookManager.KeyAll = deviceDict['Keyboard']._nativeEventCallback
-                                self._hookManager.HookKeyboard()
-                                self._keyboardHooked=True
-    
-                            #iohub.log("WindowsHook PumpEvents Periodic Timer Created.")
-                
-                        def _poll(self):
-                            import pythoncom
-                            # PumpWaitingMessages returns 1 if a WM_QUIT message was received, else 0
-                            if pythoncom.PumpWaitingMessages() == 1:
-                                raise KeyboardInterrupt()               
-        
-                        def __del__(self):
-                            #if self._mouseHooked and self._hookManager:
-                            #    self._hookManager.UnhookMouse()
-                            #elif self._keyboardHooked and self._hookManager:
-                            #    self._hookManager.UnhookKeyboard()
-                            self._hookManager=None
-                    #print2err("Creating pyHook Monitor......")
-                    self._hookDevice=pyHookDevice()
-                    hookMonitor=DeviceMonitor(self._hookDevice, self.config.get('windows_msgpump_interval', 0.00375))
-                    self.deviceMonitors.append(hookMonitor)
-                
-                    #print2err("Created pyHook Monitor.")
-                else:
-                    #print2err("UPDATING pyHook Monitor....")
-                    if device_class_name == 'Mouse' and self._hookDevice._mouseHooked is False:
-                        #print2err("Hooking Mouse.....")
-                        self._hookDevice._hookManager.MouseAll = deviceDict['Mouse']._nativeEventCallback
-                        self._hookDevice._hookManager.HookMouse()
-                        self._hookDevice._mouseHooked=True
-                    elif device_class_name == 'Keyboard' and self._hookDevice._keyboardHooked is False:
-                        #print2err("Hooking Keyboard.....")
-                        self._hookDevice._hookManager.KeyAll = deviceDict['Keyboard']._nativeEventCallback
-                        self._hookDevice._hookManager.HookKeyboard()
-                        self._hookDevice._keyboardHooked=True
-                
-                    #print2err("Finished Updating pyHook Monitor.")
+            if Computer.system == 'win32':
+                import pyHook
+                if self._hookManager is None:
+                    iohub.log("Creating pyHook HookManager....")
+                    #print2err("Creating pyHook HookManager....")
+                    self._hookManager = pyHook.HookManager()
+                    self._hookManager.keyboard_hook = False
+
+                if device_class_name == 'Mouse' and self._hookManager.mouse_hook is False:
+                    #print2err("Hooking Mouse.....")
+                    self._hookManager.MouseAll = ioServer.deviceDict['Mouse']._nativeEventCallback
+                    self._hookManager.HookMouse()
+
+                if device_class_name == 'Keyboard' and self._hookManager.keyboard_hook is False:
+                    #print2err("Hooking Keyboard.....")
+                    self._hookManager.KeyAll = ioServer.deviceDict['Keyboard']._nativeEventCallback
+                    self._hookManager.HookKeyboard()
+
                 
             elif Computer.system == 'linux2':
                 # TODO: consider switching to xlib-ctypes implementation of xlib
@@ -839,12 +843,14 @@ class ioServer(object):
             pytablesfile.flush()
             pytablesfile.close()
             
-    def processDeviceEvents(self,sleep_interval):
+    def processEventsTasklet(self,sleep_interval):
         while self._running:
-            self._processDeviceEventIteration()
-            gevent.sleep(sleep_interval)
+            stime=Computer.getTime()
+            self.processDeviceEvents()
+            dur = sleep_interval - (Computer.getTime()-stime)
+            gevent.sleep(max(0.0, dur))
 
-    def _processDeviceEventIteration(self):
+    def processDeviceEvents(self):
         for device in self.devices:
             try:
                 events = device._getNativeEventBuffer()
@@ -876,7 +882,9 @@ class ioServer(object):
     def _handleEvent(self,event):
         self.eventBuffer.append(event)
 
-    def clearEventBuffer(self):
+    def clearEventBuffer(self, call_proc_events=True):
+        if call_proc_events is True:
+            self.processDeviceEvents()
         l= len(self.eventBuffer)
         self.eventBuffer.clear()
         return l
@@ -901,12 +909,13 @@ class ioServer(object):
             if Computer.system=='linux2':
                 if self._hookManager:
                     self._hookManager.cancel()
+
             elif Computer.system=='win32':
-                if self._hookDevice and self._hookDevice._hookManager:
-                    #self._hookDevice._hookManager = None #.UnhookMouse()
-                    #self._hookDevice._hookManager.UnhookKeyboard()
-                    self._hookDevice._hookManager = None
-                    self._hookDevice = None
+                del self._hookManager
+                #if self._hookManager:
+                #    self._hookManager.UnhookMouse()
+                #    self._hookManager.UnhookKeyboard()
+
                     
             while len(self.deviceMonitors) > 0:
                 m=self.deviceMonitors.pop(0)

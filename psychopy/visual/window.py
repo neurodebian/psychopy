@@ -3,7 +3,7 @@
 '''A class representing a window for displaying one or more stimuli'''
 
 # Part of the PsychoPy library
-# Copyright (C) 2014 Jonathan Peirce
+# Copyright (C) 2015 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 import sys
@@ -539,7 +539,6 @@ class Window(object):
             thisStim.draw()
 
         flipThisFrame = self._startOfFlip()
-
         if self.useFBO:
             if flipThisFrame:
                 self._prepareFBOrender()
@@ -810,6 +809,8 @@ class Window(object):
             GL.glReadBuffer(GL.GL_BACK)
         else:
             GL.glReadBuffer(GL.GL_FRONT)
+            if self.useFBO:
+                GL.glBindFramebufferEXT(GL.GL_FRAMEBUFFER_EXT, 0)
 
         #fetch the data with glReadPixels
         #pyglet.gl stores the data in a ctypes buffer
@@ -820,6 +821,9 @@ class Window(object):
 
         im = im.transpose(Image.FLIP_TOP_BOTTOM)
         im = im.convert('RGB')
+
+        if self.useFBO and buffer == 'front':
+            GL.glBindFramebufferEXT(GL.GL_FRAMEBUFFER_EXT, self.frameBuffer)
 
         return im
 
@@ -964,27 +968,41 @@ class Window(object):
     def close(self):
         """Close the window (and reset the Bits++ if necess)."""
         self._closed=True
+        try:
+            openWindows.remove(self)
+        except:
+            pass
         if (not self.useNativeGamma) and self.origGammaRamp is not None:
             setGammaRamp(self.winHandle, self.origGammaRamp)
         self.mouseVisible = True  # call attributeSetter
         if self.winType == 'pyglet':
+            _hw_handle = None
+            try:
+                _hw_handle = self._hw_handle
+                self.winHandle.close()
+            except:
+                pass
             # If iohub is running, inform it to stop looking for this win id
             # when filtering kb and mouse events (if the filter is enabled of course)
-            #
-            if IOHUB_ACTIVE:
-                from psychopy.iohub.client import ioHubConnection
-                ioHubConnection.ACTIVE_CONNECTION.unregisterPygletWindowHandles(self._hw_handle)
             try:
-                self.winHandle.close()
+                if IOHUB_ACTIVE and _hw_handle:
+                    from psychopy.iohub.client import ioHubConnection
+                    ioHubConnection.ACTIVE_CONNECTION.unregisterPygletWindowHandles(_hw_handle)
             except:
                 pass
         else:
             #pygame.quit()
             pygame.display.quit()
-        if self.bits is not None:
-            self.bits.reset()
-        openWindows.remove(self)
-        logging.flush()
+
+        try:
+            if self.bits is not None:
+                self.bits.reset()
+        except:
+            pass
+        try:
+            logging.flush()
+        except:
+            pass
 
     def fps(self):
         """Report the frames per second since the last call to this function

@@ -3,7 +3,7 @@
 '''Provides class BaseVisualStim and mixins; subclass to get visual stimuli'''
 
 # Part of the PsychoPy library
-# Copyright (C) 2014 Jonathan Peirce
+# Copyright (C) 2015 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
 # Ensure setting pyglet.options['debug_gl'] to False is done prior to any
@@ -780,7 +780,7 @@ class TextureMixin(object):
                             data.shape[1],data.shape[0], 0, # [JRG] for non-square, want data.shape[1], data.shape[0]
                             pixFormat, dataType, texture)
         GL.glTexEnvi(GL.GL_TEXTURE_ENV, GL.GL_TEXTURE_ENV_MODE, GL.GL_MODULATE)#?? do we need this - think not!
-
+        GL.glBindTexture(GL.GL_TEXTURE_2D, 0)#unbind our texture so that it doesn't affect other rendering
         return wasLum
 
     def clearTextures(self):
