@@ -1,6 +1,6 @@
 --- a/psychopy/app/coder/coder.py
 +++ b/psychopy/app/coder/coder.py
-@@ -1799,7 +1799,7 @@ class CoderFrame(wx.Frame):
+@@ -1798,7 +1798,7 @@ class CoderFrame(wx.Frame):
              initPath=''
          dlg = wx.FileDialog(
              self, message=_translate("Open file ..."),
@@ -9,7 +9,7 @@
              )
  
          if dlg.ShowModal() == wx.ID_OK:
-@@ -1927,7 +1927,7 @@ class CoderFrame(wx.Frame):
+@@ -1929,7 +1929,7 @@ class CoderFrame(wx.Frame):
          #open dlg
          dlg = wx.FileDialog(
              self, message=_translate("Save file as ..."), defaultDir=initPath,
@@ -122,7 +122,7 @@
 +        return result, selections
 --- a/psychopy/monitors/MonitorCenter.py
 +++ b/psychopy/monitors/MonitorCenter.py
-@@ -1088,6 +1088,8 @@ class GammaDlg(wx.Dialog):
+@@ -1099,6 +1099,8 @@ class GammaDlg(wx.Dialog):
  
  class MonitorCenter(wx.App):
      def OnInit(self):
