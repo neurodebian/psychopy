@@ -1,6 +1,8 @@
 psychopy (1.82.01.dfsg-1) unstable; urgency=medium
 
   * Fresh upstream bugfix release
+  * debian/control
+    - python-pandas was added to both Build-depends and Recommends
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 20 Apr 2015 16:23:01 -0400
 

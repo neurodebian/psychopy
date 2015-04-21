@@ -19,6 +19,7 @@ Build-Depends: debhelper (>= 7),
                python-msgpack,
                python-yaml,
                python-pytest,
+               python-pandas,
 Vcs-Git: git://git.debian.org/git/pkg-exppsy/psychopy.git
 Vcs-Browser: http://git.debian.org/?p=pkg-exppsy/psychopy.git
 Standards-Version: 3.9.6
@@ -44,6 +45,7 @@ Recommends: python-wxgtk3.0,
             python-gevent,
             python-msgpack,
             python-yaml,
+            python-pandas,
             libavbin0,
             libxxf86vm1,
             ipython,
