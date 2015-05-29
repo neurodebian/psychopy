@@ -1,3 +1,13 @@
+psychopy (1.82.01.dfsg-2) unstable; urgency=medium
+
+  * debian/control
+    - added configobj explicitly to depends, and xlib to recommends
+      (used by iohub)
+  * debian/patches/up_skip_wizard_hangingwx
+    - to skip test on WX < 3.0 since leads to hanging
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 29 May 2015 12:13:49 -0400
+
 psychopy (1.82.01.dfsg-1) unstable; urgency=medium
 
   * Fresh upstream bugfix release
