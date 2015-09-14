@@ -1,6 +1,8 @@
 psychopy (1.82.02.dfsg-1) unstable; urgency=medium
 
   * Fresh upstram bugfix release
+  * debian/rules
+    - make tests less verbose (removed -v, added -q)
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 14 Sep 2015 15:41:28 -0400
 
