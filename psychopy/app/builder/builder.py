@@ -1654,10 +1654,9 @@ class ComponentsPanel(scrolledpanel.ScrolledPanel):
             panelWidth = 3*24+50
         scrolledpanel.ScrolledPanel.__init__(self,frame,id,size=(panelWidth,10*self.dpi))
         self.sizer=wx.BoxSizer(wx.VERTICAL)
-        self.components=components.getAllComponents()
         self.components=experiment.getAllComponents(self.app.prefs.builder['componentsFolders'])
         categories = ['Favorites']
-        categories.extend(components.getAllCategories())
+        categories.extend(components.getAllCategories(self.app.prefs.builder['componentsFolders']))
         #get rid of hidden components
         for hiddenComp in self.frame.prefs['hiddenComponents']:
             if hiddenComp in self.components:
@@ -1674,7 +1673,10 @@ class ComponentsPanel(scrolledpanel.ScrolledPanel):
             if sys.platform.startswith('linux'): # Localized labels on PlateButton may be corrupted in Ubuntu.
                 label = categ
             else:
-                label = _localized[categ]
+                if categ in _localized.keys():
+                    label = _localized[categ]
+                else:
+                    label = categ
             sectionBtn = platebtn.PlateButton(self,-1,label,
                 style=platebtn.PB_STYLE_DROPARROW, name=categ)
             sectionBtn.Bind(wx.EVT_LEFT_DOWN, self.onSectionBtn) #mouse event must be bound like this
@@ -2029,8 +2031,6 @@ class ParamCtrls:
         else:
             #create the full set of ctrls
             val = unicode(param.val)
-            if fieldName == 'conditionsFile':
-                val = getAbbrev(val)
             self.valueCtrl = wx.TextCtrl(parent,-1,val,size=wx.Size(self.valueWidth,-1))
             # focus seems to get reset elsewhere, try "git grep -n SetFocus"
             if fieldName in ['allowedKeys', 'image', 'movie', 'scaleDescription', 'sound', 'Begin Routine']:
@@ -2715,12 +2715,12 @@ class _BaseParamsDlg(wx.Dialog):
             used = namespace.exists(newName)
             same_as_old_name = bool(newName == self.params['name'].val)
             if used and not same_as_old_name:
-                return _translate("That name is in use (it's a %s). Try another name.") % namespace._localized(used), False
+                return _translate("That name is in use (it's a %s). Try another name.") % namespace._localized[used], False
             elif not namespace.isValid(newName): # valid as a var name
                 return _translate("Name must be alpha-numeric or _, no spaces"), False
             elif namespace.isPossiblyDerivable(newName): # warn but allow, chances are good that its actually ok
                 msg = namespace.isPossiblyDerivable(newName)
-                return namespace._localized(msg), True
+                return namespace._localized[msg], True
             else:
                 return "", True
     def checkName(self, event=None):
@@ -3057,7 +3057,7 @@ class DlgLoopProperties(_BaseParamsDlg):
         if 'conditionsFile' in self.currentCtrls.keys(): # as set via DlgConditions
             valCtrl = self.currentCtrls['conditionsFile'].valueCtrl
             valCtrl.Clear()
-            valCtrl.WriteText(getAbbrev(self.conditionsFile))
+            valCtrl.WriteText(self.conditionsFile)
         # still need to do namespace and internal updates (see end of onBrowseTrialsFile)
 
     def setCtrls(self, ctrlType):
@@ -3111,7 +3111,7 @@ class DlgLoopProperties(_BaseParamsDlg):
                                                         returnFieldNames=True)
                 needUpdate = True
             except ImportError, msg:
-                msg = str(msg)
+                msg = unicode(msg)
                 if msg.startswith('Could not open'):
                     self.currentCtrls['conditions'].setValue(_translate('Could not read conditions from:\n') + newFullPath.split(os.path.sep)[-1])
                     logging.error('Could not open as a conditions file: %s' % newFullPath)
@@ -3139,7 +3139,7 @@ class DlgLoopProperties(_BaseParamsDlg):
                 if isSameFilePathAndName:
                     logging.info('Assuming reloading file: same filename and duplicate condition names in file: %s' % self.conditionsFile)
                 else:
-                    self.currentCtrls['conditionsFile'].setValue(getAbbrev(newPath))
+                    self.currentCtrls['conditionsFile'].setValue(newPath)
                     self.currentCtrls['conditions'].setValue(
                         'Warning: Condition names conflict with existing:\n['+duplCondNamesStr+
                         ']\nProceed anyway? (= safe if these are in old file)')
@@ -3148,7 +3148,7 @@ class DlgLoopProperties(_BaseParamsDlg):
             self.duplCondNames = duplCondNames # add after self.show() in __init__
 
             if needUpdate or 'conditionsFile' in self.currentCtrls.keys() and not duplCondNames:
-                self.currentCtrls['conditionsFile'].setValue(getAbbrev(newPath))
+                self.currentCtrls['conditionsFile'].setValue(newPath)
                 self.currentCtrls['conditions'].setValue(self.getTrialsSummary(self.conditions))
 
     def getParams(self):
@@ -3268,11 +3268,15 @@ class DlgExperimentProperties(_BaseParamsDlg):
         if self.paramCtrls['Full-screen window'].valueCtrl.GetValue():
             #get screen size for requested display
             num_displays = wx.Display.GetCount()
-            if int(self.paramCtrls['Screen'].valueCtrl.GetValue())>num_displays:
+            try:
+                screen_value=int(self.paramCtrls['Screen'].valueCtrl.GetValue())
+            except ValueError:
+                screen_value=1#param control currently contains no integer value
+            if screen_value<1 or screen_value>num_displays:
                 logging.error("User requested non-existent screen")
                 screenN=0
             else:
-                screenN=int(self.paramCtrls['Screen'].valueCtrl.GetValue())-1
+                screenN=screen_value-1
             size=list(wx.Display(screenN).GetGeometry()[2:])
             #set vals and disable changes
             self.paramCtrls['Window size (pixels)'].valueCtrl.SetValue(unicode(size))
@@ -3884,6 +3888,9 @@ class BuilderFrame(wx.Frame):
     def __init__(self, parent, id=-1, title='PsychoPy (Experiment Builder)',
                  pos=wx.DefaultPosition, fileName=None,frameData=None,
                  style=wx.DEFAULT_FRAME_STYLE, app=None):
+
+        if fileName is not None:
+            fileName = fileName.decode(sys.getfilesystemencoding())
 
         self.app=app
         self.dpi=self.app.dpi
@@ -4844,8 +4851,11 @@ class ReadmeFrame(wx.Frame):
         else:
             self.Show()
 def getAbbrev(longStr, n=30):
-    """for a filename (or any string actually), give the first
-    10 characters, an ellipsis and then n-10 of the final characters"""
+    """For a filename (or any string actually), give the first
+    10 characters, an ellipsis and then n-10 of the final characters.
+    This was previously used to abbreviate the path to a conditions file
+    in the loop dialog but this caused more problems than it solved, so
+    this is no longer used there."""
     if len(longStr)>35:
         return longStr[0:10]+'...'+longStr[(-n+10):]
     else:

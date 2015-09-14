@@ -293,7 +293,8 @@ class ExperimentHandler(object):
                 else:
                     f.write(delim)
             f.write('\n')
-        f.close()
+        if f != sys.stdout:
+            f.close()
         print "saved data to %r" %f.name
 
     def saveAsPickle(self,fileName, fileCollisionMethod='rename'):
@@ -1187,7 +1188,9 @@ class TrialHandler(_BaseTrialHandler):
         header.extend(self.data.dataTypes)
         # get the extra 'wide' parameter names into the header line:
         header.insert(0,"TrialNumber")
-        if (self.extraInfo != None):
+        # this is wide format, so we want fixed information
+        # (e.g. subject ID, date, etc) repeated every line if it exists:
+        if self.extraInfo is not None:
             for key in self.extraInfo:
                 header.insert(0, key)
         df = DataFrame(columns = header)
@@ -1210,11 +1213,7 @@ class TrialHandler(_BaseTrialHandler):
                 repThisType=repsPerType[trialTypeIndex]#what repeat are we on for this trial type?
 
                 # create a dictionary representing each trial:
-                # this is wide format, so we want fixed information (e.g. subject ID, date, etc) repeated every line if it exists:
-                if (self.extraInfo != None):
-                    nextEntry = self.extraInfo.copy()
-                else:
-                    nextEntry = {}
+                nextEntry = {}
 
                 # add a trial number so the original order of the data can always be recovered if sorted during analysis:
                 trialCount += 1
@@ -1226,6 +1225,8 @@ class TrialHandler(_BaseTrialHandler):
                         nextEntry[parameterName] = self.trialList[trialTypeIndex][parameterName]
                     elif parameterName in self.data:
                         nextEntry[parameterName] = self.data[parameterName][trialTypeIndex][repThisType]
+                    elif self.extraInfo is not None and parameterName in self.extraInfo:
+                        nextEntry[parameterName] = self.extraInfo[parameterName]
                     else: # allow a null value if this parameter wasn't explicitly stored on this trial:
                         if parameterName == "TrialNumber":
                             nextEntry[parameterName] = trialCount
@@ -1366,7 +1367,8 @@ def importConditions(fileName, returnFieldNames=False, selection=""):
         raise ImportError('Conditions file not found: %s' %os.path.abspath(fileName))
 
     if fileName.endswith('.csv'):
-        trialsArr = read_csv(fileName) # use pandas reader, which can handle commas in fields, etc
+        with open(fileName, 'rU') as fileUniv:
+            trialsArr = read_csv(fileUniv, encoding='utf-8') # use pandas reader, which can handle commas in fields, etc
         trialsArr = trialsArr.to_records(index=False) # convert the resulting dataframe to a numpy recarry
         if trialsArr.shape == ():  # convert 0-D to 1-D with one element:
             trialsArr = trialsArr[numpy.newaxis]

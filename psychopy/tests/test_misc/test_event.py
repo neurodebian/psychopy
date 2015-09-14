@@ -1,7 +1,7 @@
 
 
 from psychopy.visual import Window, ShapeStim
-from psychopy import event, core
+from psychopy import event, core, monitors
 from psychopy.constants import NOT_STARTED
 import pyglet, pygame
 import pytest
@@ -170,11 +170,12 @@ class _baseTest:
         m.getPressed(getTime=True)
 
     def test_isPressedIn(self):
-        pytest.skip()
+        #pytest.skip()
 
         m = event.Mouse(self.win, newPos=(0,0))
         s = ShapeStim(self.win, vertices=[[10,10],[10,-10],[-10,-10],[-10,10]], autoLog=False)
-        assert s.contains(m.getPos())  # or cant test
+        if not s.contains(m.getPos()):
+            pytest.skip()  # or cant test
 
         event.mouseButtons = [1, 1, 1]
         assert m.isPressedIn(s)
@@ -197,7 +198,11 @@ class _baseTest:
 class TestPygletNorm(_baseTest):
     @classmethod
     def setup_class(self):
-        self.win = Window([128,128], winType='pyglet', pos=[50,50], autoLog=False)
+        mon = monitors.Monitor('testMonitor')
+        mon.setDistance(10.0) #exagerate the effect of flatness by setting the monitor close
+        mon.setWidth(40.0)
+        mon.setSizePix([1024,768])
+        self.win = Window([128,128], monitor=mon, winType='pyglet', pos=[50,50], autoLog=False)
         assert pygame.display.get_init() == 0
 
 class xxxTestPygameNorm(_baseTest):
