@@ -175,7 +175,8 @@ class Experiment(object):
                     "import numpy as np  # whole numpy lib is available, prepend 'np.'\n" +
                     "from numpy import %s\n" % ', '.join(_numpyImports) +
                     "from numpy.random import %s\n" % ', '.join(_numpyRandomImports) +
-                    "import os  # handy system and path functions\n")
+                    "import os  # handy system and path functions\n" + 
+                    "import sys # to get file system encoding\n")
         script.write("\n")
         self.settings.writeStartCode(script) #present info dlg, make logfile
         self.flow.writeStartCode(script) #writes any components with a writeStartCode()
@@ -414,8 +415,8 @@ class Experiment(object):
                         name=componentNode.get('name'),
                         parentName=routineNode.get('name'), exp=self)
                 else:
-                    from components._base import UnknownComponent
-                    component = UnknownComponent(
+                    #create UnknownComponent instead
+                    component=getAllComponents(self.prefsBuilder['componentsFolders'])['UnknownComponent'](\
                         name=componentNode.get('name'),
                         parentName=routineNode.get('name'), exp=self)
                 # check for components that were absent in older versions of the builder and change the default behavior
