@@ -1,0 +1,73 @@
+From: Jeremy R. Gray <jrgray@gmail.com>
+Subject: RF: support pillow 3.x (tobytes, frombytes)
+
+--- a/psychopy/tools/imagetools.py
++++ b/psychopy/tools/imagetools.py
+@@ -24,12 +24,16 @@ def array2image(a):
+     # http://www.pythonware.com
+     #
+     if a.dtype.kind in ['u','I', 'B']:
+-            mode = "L"
++        mode = "L"
+     elif a.dtype.kind == numpy.float32:
+-            mode = "F"
++        mode = "F"
+     else:
+-            raise ValueError, "unsupported image mode"
+-    return Image.fromstring(mode, (a.shape[1], a.shape[0]), a.tostring())
++        raise ValueError, "unsupported image mode"
++    try:
++        im = Image.fromstring(mode, (a.shape[1], a.shape[0]), a.tostring())
++    except Exception:
++        im = Image.frombytes(mode, (a.shape[1], a.shape[0]), a.tostring())
++    return im
+ 
+ 
+ def image2array(im):
+@@ -41,11 +45,16 @@ def image2array(im):
+ #     http://www.pythonware.com
+ 
+     if im.mode not in ("L", "F"):
+-            raise ValueError, "can only convert single-layer images"
++        raise ValueError, "can only convert single-layer images"
++    try:
++        imdata = im.tostring()
++    except Exception:
++        imdata = im.tobytes()
+     if im.mode == "L":
+-            a = numpy.fromstring(im.tostring(), numpy.uint8)
++        a = numpy.fromstring(imdata, numpy.uint8)
+     else:
+-            a = numpy.fromstring(im.tostring(), numpy.float32)
++        a = numpy.fromstring(imdata, numpy.float32)
++
+     a.shape = im.size[1], im.size[0]
+     return a
+ 
+--- a/psychopy/visual/window.py
++++ b/psychopy/visual/window.py
+@@ -821,8 +821,10 @@ class Window(object):
+         bufferDat = (GL.GLubyte * (4 * self.size[0] * self.size[1]))()
+         GL.glReadPixels(0, 0, self.size[0], self.size[1],
+                         GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, bufferDat)
+-        im = Image.fromstring(mode='RGBA', size=self.size, data=bufferDat)
+-
++        try:
++            im = Image.fromstring(mode='RGBA', size=self.size, data=bufferDat)
++        except Exception:
++            im = Image.frombytes(mode='RGBA', size=self.size, data=bufferDat)
+         im = im.transpose(Image.FLIP_TOP_BOTTOM)
+         im = im.convert('RGB')
+ 
+@@ -951,7 +953,10 @@ class Window(object):
+         # not right
+         #GL.glGetTexImage(GL.GL_TEXTURE_1D, 0,
+         #                 GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, bufferDat)
+-        im = Image.fromstring(mode='RGBA', size=(horz, vert), data=bufferDat)
++        try:
++            im = Image.fromstring(mode='RGBA', size=(horz, vert), data=bufferDat)
++        except:
++            im = Image.frombytes(mode='RGBA', size=(horz, vert), data=bufferDat)
+         region = im.transpose(Image.FLIP_TOP_BOTTOM)
+ 
+         if power2 or squarePower2:  # use to avoid interpolation in PatchStim
