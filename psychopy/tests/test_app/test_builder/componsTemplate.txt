@@ -1426,6 +1426,18 @@ MovieComponent.units.label:Units
 MovieComponent.units.readOnly:False
 MovieComponent.units.updates:None
 MovieComponent.units.valType:str
+MovieComponent.No audio.default:False
+MovieComponent.No audio.staticUpdater:None
+MovieComponent.No audio.categ:Basic
+MovieComponent.No audio.val:False
+MovieComponent.No audio.allowedTypes:[]
+MovieComponent.No audio.hint:Prevent the audio stream from being loaded/processed (moviepy and opencv only)
+MovieComponent.No audio.allowedUpdates:None
+MovieComponent.No audio.allowedVals:[]
+MovieComponent.No audio.label:No audio
+MovieComponent.No audio.readOnly:False
+MovieComponent.No audio.updates:None
+MovieComponent.No audio.valType:bool
 MovieComponent.startType.default:'time (s)'
 MovieComponent.startType.staticUpdater:None
 MovieComponent.startType.categ:Basic
@@ -1474,10 +1486,10 @@ MovieComponent.startVal.label:Start
 MovieComponent.startVal.readOnly:False
 MovieComponent.startVal.updates:None
 MovieComponent.startVal.valType:code
-MovieComponent.backend.default:'avbin'
+MovieComponent.backend.default:'moviepy'
 MovieComponent.backend.staticUpdater:None
 MovieComponent.backend.categ:Basic
-MovieComponent.backend.val:avbin
+MovieComponent.backend.val:moviepy
 MovieComponent.backend.allowedTypes:[]
 MovieComponent.backend.hint:What underlying lib to use for loading movies
 MovieComponent.backend.allowedUpdates:None
