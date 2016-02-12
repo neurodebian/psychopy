@@ -1,6 +1,6 @@
 --- a/psychopy/app/coder/coder.py
 +++ b/psychopy/app/coder/coder.py
-@@ -1798,7 +1798,7 @@ class CoderFrame(wx.Frame):
+@@ -1794,7 +1794,7 @@ class CoderFrame(wx.Frame):
              initPath=''
          dlg = wx.FileDialog(
              self, message=_translate("Open file ..."),
@@ -9,7 +9,7 @@
              )
  
          if dlg.ShowModal() == wx.ID_OK:
-@@ -1929,7 +1929,7 @@ class CoderFrame(wx.Frame):
+@@ -1925,7 +1925,7 @@ class CoderFrame(wx.Frame):
          #open dlg
          dlg = wx.FileDialog(
              self, message=_translate("Save file as ..."), defaultDir=initPath,
@@ -36,7 +36,7 @@
      dlg = wx.Dialog(None)
 --- a/psychopy/app/preferencesDlg.py
 +++ b/psychopy/app/preferencesDlg.py
-@@ -285,7 +285,12 @@ class PrefCtrls:
+@@ -341,7 +341,12 @@ class PrefCtrls:
  if __name__=='__main__':
      import preferences
      if wx.version() < '2.9':
@@ -52,7 +52,7 @@
      app.prefs=preferences.Preferences()#don't do this normally - use the existing psychopy.prefs instance
 --- a/psychopy/app/_psychopyApp.py
 +++ b/psychopy/app/_psychopyApp.py
-@@ -83,6 +83,9 @@ class PsychoPyApp(wx.App):
+@@ -88,6 +88,9 @@ class PsychoPyApp(wx.App):
              If set to True then startup wizard won't appear and stdout/stderr
              won't be redirected to the Coder
          """
@@ -64,7 +64,7 @@
  
 --- a/psychopy/gui.py
 +++ b/psychopy/gui.py
-@@ -264,7 +264,7 @@ def fileSaveDlg(initFilePath="", initFil
+@@ -269,7 +269,7 @@ def fileSaveDlg(initFilePath="", initFil
              #"shelved files (*.shelf)|*.shelf"
      global app  # avoid recreating for every gui
      app = ensureWxApp()
@@ -73,7 +73,7 @@
      if dlg.ShowModal() == OK:
          #get names of images and their directory
          outName = dlg.GetFilename()
-@@ -307,7 +307,7 @@ def fileOpenDlg(tryFilePath="",
+@@ -312,7 +312,7 @@ def fileOpenDlg(tryFilePath="",
      global app  # avoid recreating for every gui
      app = ensureWxApp()
      dlg = wx.FileDialog(None, prompt, tryFilePath, tryFileName, allowed,
@@ -122,7 +122,7 @@
 +        return result, selections
 --- a/psychopy/monitors/MonitorCenter.py
 +++ b/psychopy/monitors/MonitorCenter.py
-@@ -1099,6 +1099,8 @@ class GammaDlg(wx.Dialog):
+@@ -1100,6 +1100,8 @@ class GammaDlg(wx.Dialog):
  
  class MonitorCenter(wx.App):
      def OnInit(self):

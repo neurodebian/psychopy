@@ -1,6 +1,13 @@
+psychopy (1.83.03.dfsg-1) unstable; urgency=medium
+
+  * Fresh upstream bugfix (on top of minor not packaged) release
+  * debian/patches -- refreshed
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 12 Feb 2016 08:39:20 -0500
+
 psychopy (1.82.02.dfsg-1) unstable; urgency=medium
 
-  * Fresh upstram bugfix release
+  * Fresh upstream bugfix release
   * debian/rules
     - make tests less verbose (removed -v, added -q)
 
