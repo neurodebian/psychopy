@@ -1090,6 +1090,18 @@ KeyboardComponent.store.label:Store
 KeyboardComponent.store.readOnly:False
 KeyboardComponent.store.updates:constant
 KeyboardComponent.store.valType:str
+KeyboardComponent.syncScreenRefresh.default:True
+KeyboardComponent.syncScreenRefresh.staticUpdater:None
+KeyboardComponent.syncScreenRefresh.categ:Basic
+KeyboardComponent.syncScreenRefresh.val:True
+KeyboardComponent.syncScreenRefresh.allowedTypes:[]
+KeyboardComponent.syncScreenRefresh.hint:A reaction time to a visual stimulus should be based on when the screen flipped
+KeyboardComponent.syncScreenRefresh.allowedUpdates:[]
+KeyboardComponent.syncScreenRefresh.allowedVals:[]
+KeyboardComponent.syncScreenRefresh.label:sync RT with screen
+KeyboardComponent.syncScreenRefresh.readOnly:False
+KeyboardComponent.syncScreenRefresh.updates:constant
+KeyboardComponent.syncScreenRefresh.valType:bool
 MicrophoneComponent.order:['name']
 MicrophoneComponent.stereo.default:False
 MicrophoneComponent.stereo.staticUpdater:None
@@ -1414,6 +1426,18 @@ MovieComponent.units.label:Units
 MovieComponent.units.readOnly:False
 MovieComponent.units.updates:None
 MovieComponent.units.valType:str
+MovieComponent.No audio.default:False
+MovieComponent.No audio.staticUpdater:None
+MovieComponent.No audio.categ:Basic
+MovieComponent.No audio.val:False
+MovieComponent.No audio.allowedTypes:[]
+MovieComponent.No audio.hint:Prevent the audio stream from being loaded/processed (moviepy and opencv only)
+MovieComponent.No audio.allowedUpdates:None
+MovieComponent.No audio.allowedVals:[]
+MovieComponent.No audio.label:No audio
+MovieComponent.No audio.readOnly:False
+MovieComponent.No audio.updates:None
+MovieComponent.No audio.valType:bool
 MovieComponent.startType.default:'time (s)'
 MovieComponent.startType.staticUpdater:None
 MovieComponent.startType.categ:Basic
@@ -1462,14 +1486,14 @@ MovieComponent.startVal.label:Start
 MovieComponent.startVal.readOnly:False
 MovieComponent.startVal.updates:None
 MovieComponent.startVal.valType:code
-MovieComponent.backend.default:'avbin'
+MovieComponent.backend.default:'moviepy'
 MovieComponent.backend.staticUpdater:None
 MovieComponent.backend.categ:Basic
-MovieComponent.backend.val:avbin
+MovieComponent.backend.val:moviepy
 MovieComponent.backend.allowedTypes:[]
 MovieComponent.backend.hint:What underlying lib to use for loading movies
 MovieComponent.backend.allowedUpdates:None
-MovieComponent.backend.allowedVals:['avbin', 'opencv']
+MovieComponent.backend.allowedVals:['moviepy', 'avbin', 'opencv']
 MovieComponent.backend.label:backend
 MovieComponent.backend.readOnly:False
 MovieComponent.backend.updates:None
@@ -1570,14 +1594,14 @@ ParallelOutComponent.startType.label:start type
 ParallelOutComponent.startType.readOnly:False
 ParallelOutComponent.startType.updates:None
 ParallelOutComponent.startType.valType:str
-ParallelOutComponent.address.default:u'/dev/parport0'
+ParallelOutComponent.address.default:u'0x0378'
 ParallelOutComponent.address.staticUpdater:None
 ParallelOutComponent.address.categ:Basic
-ParallelOutComponent.address.val:/dev/parport0
+ParallelOutComponent.address.val:0x0378
 ParallelOutComponent.address.allowedTypes:[]
 ParallelOutComponent.address.hint:Parallel port to be used (you can change these options in preferences>general)
 ParallelOutComponent.address.allowedUpdates:None
-ParallelOutComponent.address.allowedVals:[u'/dev/parport0', u'/dev/parport1', u'LabJack U3']
+ParallelOutComponent.address.allowedVals:[u'0x0378', u'0x03BC', u'/dev/parport0', u'/dev/parport1', u'LabJack U3']
 ParallelOutComponent.address.label:Port address
 ParallelOutComponent.address.readOnly:False
 ParallelOutComponent.address.updates:None
@@ -3254,6 +3278,18 @@ cedrusButtonBoxComponent.store.label:Store
 cedrusButtonBoxComponent.store.readOnly:False
 cedrusButtonBoxComponent.store.updates:constant
 cedrusButtonBoxComponent.store.valType:str
+cedrusButtonBoxComponent.syncScreenRefresh.default:True
+cedrusButtonBoxComponent.syncScreenRefresh.staticUpdater:None
+cedrusButtonBoxComponent.syncScreenRefresh.categ:Basic
+cedrusButtonBoxComponent.syncScreenRefresh.val:True
+cedrusButtonBoxComponent.syncScreenRefresh.allowedTypes:[]
+cedrusButtonBoxComponent.syncScreenRefresh.hint:A reaction time to a visual stimulus should be based on when the screen flipped
+cedrusButtonBoxComponent.syncScreenRefresh.allowedUpdates:[]
+cedrusButtonBoxComponent.syncScreenRefresh.allowedVals:[]
+cedrusButtonBoxComponent.syncScreenRefresh.label:sync RT with screen
+cedrusButtonBoxComponent.syncScreenRefresh.readOnly:False
+cedrusButtonBoxComponent.syncScreenRefresh.updates:constant
+cedrusButtonBoxComponent.syncScreenRefresh.valType:bool
 ioLabsButtonBoxComponent.order:['forceEndRoutine', 'active', 'lights', 'store', 'storeCorrect', 'correctAns']
 ioLabsButtonBoxComponent.correctAns.default:'0'
 ioLabsButtonBoxComponent.correctAns.staticUpdater:None
@@ -3434,3 +3470,15 @@ ioLabsButtonBoxComponent.store.label:Store
 ioLabsButtonBoxComponent.store.readOnly:False
 ioLabsButtonBoxComponent.store.updates:constant
 ioLabsButtonBoxComponent.store.valType:str
+ioLabsButtonBoxComponent.syncScreenRefresh.default:True
+ioLabsButtonBoxComponent.syncScreenRefresh.staticUpdater:None
+ioLabsButtonBoxComponent.syncScreenRefresh.categ:Basic
+ioLabsButtonBoxComponent.syncScreenRefresh.val:True
+ioLabsButtonBoxComponent.syncScreenRefresh.allowedTypes:[]
+ioLabsButtonBoxComponent.syncScreenRefresh.hint:A reaction time to a visual stimulus should be based on when the screen flipped
+ioLabsButtonBoxComponent.syncScreenRefresh.allowedUpdates:[]
+ioLabsButtonBoxComponent.syncScreenRefresh.allowedVals:[]
+ioLabsButtonBoxComponent.syncScreenRefresh.label:sync RT with screen
+ioLabsButtonBoxComponent.syncScreenRefresh.readOnly:False
+ioLabsButtonBoxComponent.syncScreenRefresh.updates:constant
+ioLabsButtonBoxComponent.syncScreenRefresh.valType:bool
