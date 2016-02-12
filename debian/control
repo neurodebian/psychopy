@@ -50,9 +50,8 @@ Recommends: python-wxgtk3.0,
             python-pandas,
             libxxf86vm1,
             ipython,
-Suggests: libavbin0,
 Conflicts: libavbin0 (= 7-4+b1)
-Suggests: python-iolabs, python-pyxid
+Suggests: python-iolabs, python-pyxid, libavbin0,
 Provides: ${python:Provides}
 XB-Python-Version: ${python:Versions}
 Description: environment for creating psychology stimuli in Python
