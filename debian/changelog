@@ -2,6 +2,8 @@ psychopy (1.83.03.dfsg-1) unstable; urgency=medium
 
   * Fresh upstream bugfix (on top of minor not packaged) release
   * debian/patches -- refreshed
+  * debian/psychopy.desktop - full path to pixmap (Closes: #693477)
+    Thanks Kevin Mitchell
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 12 Feb 2016 08:39:20 -0500
 
