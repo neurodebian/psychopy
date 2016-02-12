@@ -1,6 +1,8 @@
-psychopy (1.83.03.dfsg-1) unstable; urgency=medium
+psychopy (1.83.04.dfsg-1) unstable; urgency=medium
 
   * Fresh upstream bugfix (on top of minor not packaged) release
+    - 1.83.x includes new MovieStim3 which should have improved movie
+      support, thus (Closes: #730810)
   * debian/patches -- refreshed
   * debian/psychopy.desktop - full path to pixmap (Closes: #693477)
     Thanks Kevin Mitchell

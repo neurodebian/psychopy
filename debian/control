@@ -48,9 +48,9 @@ Recommends: python-wxgtk3.0,
             python-yaml,
             python-xlib,
             python-pandas,
-            libavbin0,
             libxxf86vm1,
             ipython,
+Suggests: libavbin0,
 Conflicts: libavbin0 (= 7-4+b1)
 Suggests: python-iolabs, python-pyxid
 Provides: ${python:Provides}
