@@ -1,4 +1,6 @@
 version=3
+# used only to monitor for new releases -- all stripping to .dfsg
+# happens within Git VCS
 opts="versionmangle=s/-//,dversionmangle=s/.dfsg$//" \
-  http://code.google.com/p/psychopy/downloads/list \
-  http://psychopy\.googlecode\.com/files/PsychoPy-([\d\.]*)\.zip
+  https://github.com/psychopy/psychopy/releases \
+  .*archive/([\d\.]*)\.tar\.gz
