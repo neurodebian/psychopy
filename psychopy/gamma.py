@@ -38,7 +38,7 @@ def setGamma(pygletWindow=None, newGamma=1.0, rampType=None):
 
 def setGammaRamp(pygletWindow, newRamp, nAttempts=3):
     """Sets the hardware look-up table, using platform-specific ctypes functions.
-    For use with pyglet windows only (pygame has its ow routines for this).
+    For use with pyglet windows only (pygame has its own routines for this).
     Ramp should be provided as 3x256 or 3x1024 array in range 0:1.0
 
     On windows the first attempt to set the ramp doesn't always work. The parameter nAttemps
@@ -58,7 +58,11 @@ def setGammaRamp(pygletWindow, newRamp, nAttempts=3):
     if sys.platform=='darwin':
         newRamp= (newRamp).astype(numpy.float32)
         LUTlength=newRamp.shape[1]
-        error =carbon.CGSetDisplayTransferByTable(pygletWindow._screen.id, LUTlength,
+        try:
+            _screen_ID = pygletWindow._screen.id  # pyglet1.2alpha1
+        except AttributeError:
+            _screen_ID = pygletWindow._screen._cg_display_id  # pyglet1.2
+        error = carbon.CGSetDisplayTransferByTable(_screen_ID, LUTlength,
                    newRamp[0,:].ctypes, newRamp[1,:].ctypes, newRamp[2,:].ctypes)
         assert not error, 'CGSetDisplayTransferByTable failed'
 
@@ -84,7 +88,11 @@ def getGammaRamp(pygletWindow):
     if sys.platform=='darwin':
         origramps = numpy.empty((3, 256), dtype=numpy.float32) # init R, G, and B ramps
         n = numpy.empty([1],dtype=numpy.int)
-        error =carbon.CGGetDisplayTransferByTable(pygletWindow._screen.id, 256,
+        try:
+            _screen_ID = pygletWindow._screen.id  # pyglet1.2alpha1
+        except AttributeError:
+            _screen_ID = pygletWindow._screen._cg_display_id  # pyglet1.2
+        error = carbon.CGGetDisplayTransferByTable(_screen_ID, 256,
                    origramps[0,:].ctypes, origramps[1,:].ctypes, origramps[2,:].ctypes, n.ctypes);
         if error:
             raise AssertionError, 'CGSetDisplayTransferByTable failed'
@@ -102,7 +110,7 @@ def getGammaRamp(pygletWindow):
 def createLinearRamp(win, rampType=None):
     """Generate the Nx3 values for a linear gamma ramp on the current platform.
     This uses heuristics about known graphics cards to guess the 'rampType' if
-    none is exlicitly given.
+    none is explicitly given.
 
     Much of this work is ported from LoadIdentityClut.m, written by Mario Kleiner
     for the psychtoolbox
@@ -165,5 +173,3 @@ def createLinearRamp(win, rampType=None):
         ramp[512:] = ramp[512:]-1/256.0
     logging.info('Using gamma ramp type: %i' %rampType)
     return ramp
-
-

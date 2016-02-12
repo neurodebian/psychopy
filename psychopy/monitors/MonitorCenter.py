@@ -654,10 +654,14 @@ class MainFrame(wx.Frame):
         self.unSavedMonitor=True
     def onChangeScrDist(self, event):
         newVal = unicodeToFloat(self.ctrlScrDist.GetValue())
+        if newVal == 0:
+            newVal = None # zero means "not set" but can't be used in calculations
         self.currentMon.setDistance( newVal )
         self.unSavedMonitor=True
     def onChangeScrWidth(self, event):
         newVal = unicodeToFloat(self.ctrlScrWidth.GetValue())
+        if newVal == 0:
+            newVal = None # zero means "not set" but can't be used in calculations
         self.currentMon.setWidth( newVal )
         self.unSavedMonitor=True
     def onChangeScrPixHoriz(self, event):
@@ -964,9 +968,6 @@ class MainFrame(wx.Frame):
             plt.plot(nm,spectraRGB[2,:], 'b-', linewidth=2)
         figureCanvas.draw()#update the canvas
         plotWindow.addCanvas(figureCanvas)
-
-    def onClosePlotWindow(self, event):
-        print event
 
 class GammaLumValsDlg(wx.Dialog):
     '''a dialogue to manually get the luminance values recorded for each level'''

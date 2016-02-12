@@ -1,5 +1,6 @@
 """Tests for psychopy.data.DataHandler"""
-import os, sys, glob
+from __future__ import print_function
+import os, glob
 from os.path import join as pjoin
 import shutil
 from pytest import raises
@@ -41,9 +42,9 @@ class TestTrialHandler:
         f.close()
         expected_header = u"n,with_underscore_mean,with_underscore_raw,with_underscore_std,order"
         if expected_header != header:
-            print base_data_filename
-            print repr(expected_header),type(expected_header),len(expected_header)
-            print repr(header), type(header), len(header)
+            print(base_data_filename)
+            print(repr(expected_header),type(expected_header),len(expected_header))
+            print(repr(header), type(header), len(header))
         assert expected_header == unicode(header)
 
     def test_psydat_filename_collision_renaming(self):
@@ -64,7 +65,7 @@ class TestTrialHandler:
             matches = len(glob.glob(os.path.join(self.temp_dir, self.rootName + "*.psydat")))
             assert matches==count, "Found %d matching files, should be %d" % (matches, count)
     def test_psydat_filename_collision_overwriting(self):
-        for count in range(1,20):
+        for count in [1, 10, 20]:
             trials = data.TrialHandler([], 1, autoLog=False)
             trials.data.addDataType('trialType')
             for trial in trials:#need to run trials or file won't be saved

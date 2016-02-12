@@ -44,7 +44,7 @@ class SettingsComponent(object):
         if filename.startswith("u'xxxx"):
             filename = filename.replace("xxxx", self.exp.prefsBuilder['savedDataFolder'].strip())
         else:
-            print filename[0:6]
+            print(filename[0:6])
         #params
         self.params={}
         self.order=['expName','Show info dlg','Experiment info',
@@ -163,9 +163,9 @@ class SettingsComponent(object):
             expInfo = '{}'
         try:
             expInfoDict = eval('dict(' + expInfo + ')')
-        except SyntaxError, err:
+        except SyntaxError:
             logging.error('Builder Expt: syntax error in "Experiment info" settings (expected a dict)')
-            raise SyntaxError, 'Builder: error in "Experiment info" settings (expected a dict)'
+            raise AttributeError('Builder: error in "Experiment info" settings (expected a dict)')
         buff.writeIndented("expInfo = %s\n" % expInfo)
         if self.params['Show info dlg'].val:
             buff.writeIndented("dlg = gui.DlgFromDict(dictionary=expInfo, title=expName)\n")
@@ -230,7 +230,11 @@ class SettingsComponent(object):
                if thisComp.type=='RatingScale': allowGUI = True # to have a mouse; BUT might not want it shown in other routines
 
         requestedScreenNumber = int(self.params['Screen'].val)
-        if requestedScreenNumber > wx.Display.GetCount():
+        try:
+            nScreens = wx.Display.GetCount()
+        except:
+		    nScreens = 10 #will fail if application hasn't been created (e.g. in test environments)
+        if requestedScreenNumber > nScreens:
             logging.warn("Requested screen can't be found. Writing script using first available screen.")
             screenNumber = 0
         else:
