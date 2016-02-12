@@ -5,6 +5,8 @@ psychopy (1.83.04.dfsg-1) unstable; urgency=medium
   * debian/psychopy.desktop - full path to pixmap (Closes: #693477)
     Thanks Kevin Mitchell
   * debian/watch - adjusted to use github location
+  * debian/control
+    - python-opencv to Build-Depends and Recommends
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 12 Feb 2016 08:39:20 -0500
 
