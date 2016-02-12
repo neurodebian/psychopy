@@ -9,14 +9,14 @@
 import os, sys
 
 #version info for PsychoPy
-__version__='1.82.02'
+__version__='1.83.04'
 __license__='GNU GPLv3 (or more recent equivalent)'
 __author__='Jonathan Peirce'
 __author_email__='jon@peirce.org.uk'
 __maintainer_email__='psychopy-dev@googlegroups.com'
 __users_email__='psychopy-users@googlegroups.com'
 __url__='http://www.psychopy.org'
-__downloadUrl__='http://code.google.com/p/psychopy/downloads'
+__downloadUrl__='https://github.com/psychopy/psychopy/releases/'
 __git_sha__='n/a'
 __build_platform__='n/a'
 
@@ -29,7 +29,7 @@ if __git_sha__=='n/a':
     try:
         thisFileLoc = os.path.split(__file__)[0]
         output = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'],
-                                         cwd=thisFileLoc)
+                                         cwd=thisFileLoc, stderr=subprocess.PIPE)
     except:
         output=False
     if output:

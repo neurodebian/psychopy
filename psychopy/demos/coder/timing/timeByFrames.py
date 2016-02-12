@@ -12,7 +12,7 @@ from psychopy import visual, logging, core, event
 visual.useFBO=True#if available (try without for comparison)
 
 import matplotlib
-#matplotlib.use('WXAgg')#change this to control the plotting 'back end'
+matplotlib.use('Qt4Agg')#change this to control the plotting 'back end'
 import pylab
 
 nIntervals=500
@@ -36,6 +36,7 @@ for frameN in range(nIntervals+1):
         break
     win.logOnFlip(msg='frame=%i' %frameN, level=logging.EXP)
     win.flip()
+win.fullscr=False
 win.close()
 
 #calculate some values

@@ -5,10 +5,10 @@ There are a number of further resources to help learn/teach about PsychoPy.
 
 If you also have PsychoPy materials/course then please let us know so that we can link to them from here too!
 
-:ref:`P4N`
+Workshops
 ---------------------------------------------------------------
 
-There will be a 3-day workshop in April 2014 at Nottingham University. It won't be *only* about PsychoPy, but about Python for science more generally and focussing on coding rather than using the Builder interface. We hope this year to run intermediate and novice sessions in parallel (rather than novice only).
+- **P4N: Python for Neuroscience** There is usually a 3-day Python bootcamp at Nottingham University in April. It won't be *only* about PsychoPy, but about Python for science more generally and focussing on coding rather than using the Builder interface. For further info see :ref:`P4N`
 
 .. _youtube:
 
@@ -35,7 +35,7 @@ Materials for Coder
 
 - `Gary Lupyan <http://sapir.psych.wisc.edu/>`_ runs a class on programming experiments using Python/PsychoPy and makes his lecture materials available `on this wiki <http://sapir.psych.wisc.edu/wiki/index.php/Psych711>`_
 
-- The `GestaltReVision group (University of Leuven) wiki <http://gestaltrevision.be/wiki/python>`_ offers a `one-day crash course to Python and PsychoPy on a IPython Notebook <http://nbviewer.ipython.org/7036997>`_, and has lots of great information taking you from basic programming to advanced techniques.
+- The `GestaltReVision group (University of Leuven) <http://gestaltrevision.be>`_ offers a `three-day crash course to Python and PsychoPy on a IPython Notebook <http://nbviewer.ipython.org/github/gestaltrevision/python_for_visres/blob/master/index.ipynb>`_, and has lots of great information taking you from basic programming to advanced techniques.
 
 - Radboud University, Nijmegen also has a `PsychoPy programming course <https://www.socsci.ru.nl/~wilberth/nocms/psychopy/print.php>`_
 

@@ -40,17 +40,18 @@ setup(app=['psychopy/app/psychopyApp.py'],
                                   'pyo','greenlet','vlc',
                                   'PyQt4','zmq','tornado',
                                   'psutil',#for iohub
-                                  'pysoundcard','pysoundfile',
+                                  'pysoundcard','soundfile',
                                   'cv2',
                                   'xlwt', #writes different formats of excel files (pandas)
                                   ],
                               packages=['wx','pyglet','pygame','OpenGL','psychopy','pytz',
                                 'scipy','matplotlib','lxml','xml','openpyxl',
+                                'moviepy', 'imageio',
                                 'coverage',#for unit testing
                                 'serial','IPython',
                                 'egi','labjack','pylink',#handy external science interfaces
                                 'pyxid',
-                                #'PIL','Image',
+                                'PIL',#'Image',
                                 'objc','Quartz','AppKit','QTKit','Cocoa','Foundation','CoreFoundation',
                                 'pyolib',
                                 'pandas','tables',#'cython',
@@ -58,6 +59,7 @@ setup(app=['psychopy/app/psychopyApp.py'],
                                 #these aren't needed, but liked
                                 'psychopy_ext','pyfilesec','rusocsci',
                                 'bidi', #for right-left language conversions
+                                'requests', #for efficient uploading to servers
                                 ],
                               excludes=[],#anything we need to forcibly exclude?
                               resources=resources,
