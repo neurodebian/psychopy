@@ -1,3 +1,11 @@
+psychopy (1.83.04.dfsg-2) unstable; urgency=medium
+
+  * CPed changeset_46fe7ee7a8526a927819e961fbb4404110a87293.diff to overcome
+    syntax error during installation.  Thanks Christopher J Markiewicz for the
+    report!
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 19 Feb 2016 13:06:09 -0500
+
 psychopy (1.83.04.dfsg-1) unstable; urgency=medium
 
   * Fresh upstream bugfix (on top of minor not packaged) release
