@@ -1,1 +1,2 @@
 debian/psychopy.desktop usr/share/applications
+psychopy/app/Resources/psychopy.png usr/share/pixmaps
