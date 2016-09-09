@@ -10,9 +10,10 @@ PsychoPy is an open-source application to allow the presentation of stimuli and 
 News
 ====================
 
-**Latest version**: 1.82.01 was released Feb 2015. See the full :doc:`changelog`
+**Latest version**: 1.84.0 was released Aug 2016. See the full :doc:`changelog` with new Projects menu for syncing with http://osf.io. Also various bug fixes and updated standalone packages
 
-See complete :doc:`changelog` for complete list of additions and fixes
+**We've got a new forum**: To discuss anything PsychoPy (features, bugs, tips or
+announcements) go to the new `PsychoPy forum <http://discourse.psychopy.org>`_ Many thanks to the good people at `Discourse.org <http://www.discourse.org>`_ for creating such lovely software and hosting it for us!
 
 .. title:: Home
 
@@ -28,6 +29,6 @@ Contents
    resources/resources
 
 Please remember to :ref:`cite PsychoPy <citingPsychoPy>`
-       
+
 .. |TM| unicode:: U+2122
     :ltrim:
