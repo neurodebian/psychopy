@@ -10,7 +10,7 @@ from tempfile import mkdtemp
 
 thisDir,filename = os.path.split(os.path.abspath(__file__))
 fixturesPath = os.path.join(thisDir,'..','data')
-class TestXLSX:
+class TestXLSX(object):
     def setup_class(self):
         self.temp_dir = mkdtemp(prefix='psychopy-tests-testdata')
         self.name = os.path.join(self.temp_dir,'testXlsx')
@@ -47,8 +47,6 @@ def test_TrialTypeImport():
         trialXLSX = fromXLSX[trialN]
         assert trialXLSX.keys()==trialCSV.keys()
         for header in trialCSV.keys():
-            if trialXLSX[header] is None and numpy.isnan(trialCSV[header]):
-                trialCSV[header]=None#this is ok
             if trialXLSX[header] != trialCSV[header]:
                 print(header, trialCSV[header], trialXLSX[header])
             assert trialXLSX[header] == trialCSV[header]
