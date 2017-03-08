@@ -12,6 +12,8 @@
 /.ropeproject/history
 /.ropeproject/objectdb
 /.spyderproject
+/.spyproject
+/.vscode
 
 # Compiled source #
 ###################
@@ -65,6 +67,7 @@ psychopy/*/*/*/data/*.xlsx
 psychopy/*/*/*/data/*.psydat
 psychopy/demos/*/*/*.pickle
 psychopy/demos/*/*/*.psydat
+psychopy/demos/*/*/html
 
 psychopy/tests/*Out.*
 psychopy/tests/data/*_local.png
@@ -78,6 +81,7 @@ docs/source/changelog.rst
 sitePrefs.cfg
 appData.cfg
 
+*lastrun.py
 *.iohpid
 *.paths
 *.EDF
