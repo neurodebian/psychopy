@@ -1,8 +1,12 @@
-psychopy (1.83.04.dfsg-3) UNRELEASED; urgency=medium
+psychopy (1.85.00.dfsg-1) experimental; urgency=medium
 
   * use .png for the psychopy icon within .desktop file
+  * debian/patches
+    - dropped all changesets picked up from upstream
+    - dropped wx patch -- by now upstream is probably supporting it
+      better than we would with that patch
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 19 May 2016 10:06:03 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 08 Mar 2017 19:00:05 -0500
 
 psychopy (1.83.04.dfsg-2) unstable; urgency=medium
 

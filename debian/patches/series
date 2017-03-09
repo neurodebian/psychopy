@@ -1,6 +1,3 @@
-changeset_46fe7ee7a8526a927819e961fbb4404110a87293.diff
-changeset_8f1737e13da4a3bb3e825655b5d096bf5973824c.diff
 up_skip_wizard_hangingwx
 deb_do_not_regenerate_init
 deb_use_system_serial
-wxpython3.0-1.81.00.patch
