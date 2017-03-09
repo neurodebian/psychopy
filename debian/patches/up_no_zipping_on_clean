@@ -1,0 +1,11 @@
+--- a/setup.py
++++ b/setup.py
+@@ -7,7 +7,7 @@ import glob, os, sys
+ from sys import platform, argv
+ 
+ # compress psychojs to a zip file for packaging
+-if '-noJS' in argv:  # only takes 0.5s but could skip if you prefer
++if '-noJS' in argv or 'clean' in argv:  # only takes 0.5s but could skip if you prefer
+     pass
+ else:
+     import shutil
