@@ -1,4 +1,4 @@
-psychopy (1.85.02.dfsg-1) unstable; urgency=medium
+psychopy (1.85.2.dfsg-1) unstable; urgency=medium
 
   * Fresh upstream release
     - for now disabling JS (psychojs) support
