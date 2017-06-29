@@ -142,8 +142,9 @@ class Experiment(object):
         # this can be checked by the builder that this is an experiment and a
         # compatible version
         self.psychopyVersion = __version__
-        self.psychopyLibs = ['gui', 'visual', 'core',
-                             'data', 'event', 'logging', 'sound']
+        # What libs are needed (make sound come first)
+        self.psychopyLibs = ['sound', 'gui', 'visual', 'core',
+                             'data', 'event', 'logging']
         _settingsComp = getComponents(fetchIcons=False)['SettingsComponent']
         self.settings = _settingsComp(parentName='', exp=self)
         # this will be the xml.dom.minidom.doc object for saving
@@ -675,7 +676,7 @@ class Experiment(object):
             :return: dict of 'asb' and 'rel' paths or None
             """
             thisFile={}
-            if filePath[0] == "/" or filePath[1]==":":
+            if len(filePath)>2 and (filePath[0] == "/" or filePath[1]==":"):
                 thisFile['abs'] = filePath
                 thisFile['rel'] = os.path.relpath(filePath, srcRoot)
             else:
@@ -708,13 +709,15 @@ class Experiment(object):
             conds = data.importConditions(thisFile['abs'])  # load the abs path
             for thisCond in conds:  # thisCond is a dict
                 for param, val in thisCond.items():
-                    if isinstance(val, basestring):
-                        thisFile = getPaths(val)
-                    if thisFile:
-                        paths.append(thisFile)
-                        # if it's a possible condidtions file then recursive
+                    if isinstance(val, basestring) and len(val):
+                        subFile = getPaths(val)
+                    else:
+                        subFile = None
+                    if subFile:
+                        paths.append(subFile)
+                        # if it's a possible conditions file then recursive
                         if thisFile['abs'][-4:] in ["xlsx", ".csv"]:
-                            contained = findPathsInFile(thisFile['abs'])
+                            contained = findPathsInFile(subFile['abs'])
                             paths.extend(contained)
             return paths
 
@@ -1052,15 +1055,15 @@ class TrialHandler(object):
                 "      trialList:psychoJS.data.importConditions({params[conditionsFile]}),\n"
                 "      seed:{seed}, name:'{params[name]}'}});\n"
                 "    thisExp.addLoop({params[name]}); // add the loop to the experiment\n"
-                "    {thisName} = {params[name]}.trialList[0]; // so we can initialise stimuli with some values\n"
+                "    {thisName} = {params[name]}.trialList[{params[name]}.trialSequence[0]]; // so we can initialise stimuli with some values\n"
                 "    // abbreviate parameter names if possible (e.g. rgb={thisName}.rgb)\n"
                 "    abbrevNames({thisName});\n"
                 .format(params=self.params, thisName=self.thisName, seed=seed))
         buff.writeIndentedLines(code)
         # for the scheduler
         code = ("    // Schedule each of the trials in the list to occur\n"
-                "    for (var i = 0; i < {params[name]}.trialList.length; ++i) {{\n"
-                "      {thisName} = {params[name]}.trialList[i];\n"
+                "    for (var i = 0; i < {params[name]}.trialSequence.length; ++i) {{\n"
+                "      {thisName} = {params[name]}.trialList[{params[name]}.trialSequence[i]];\n"
                 "      thisScheduler.add(abbrevNames({thisName}));\n"
                 .format(params=self.params, thisName=self.thisName, seed=seed))
         buff.writeIndentedLines(code)
@@ -1085,6 +1088,11 @@ class TrialHandler(object):
                     "      thisScheduler.add({name}LoopEnd);\n"
                     .format(params=self.params, name=thisChild.params['name'])
                     )
+        if self.params['isTrials'].val == True:
+            code += (
+                   "      thisScheduler.add(recordLoopIteration({name}));\n"
+                   .format(name=self.params['name'])
+                   )
         buff.writeIndentedLines(code)
         code = ("    }}\n"
                 "  }} catch (exception) {{\n"
@@ -1145,7 +1153,7 @@ class TrialHandler(object):
                 "    params = Object.keys({params[name]}.trialList[0]);\n"
                 "  }}\n\n"
                 "  // save data for this loop\n"
-                "  thisExp.save({{stimOut: params, dataOut: ['n','all_mean','all_std', 'all_raw']}});\n"
+                "  thisExp.loopEnded({params[name]});\n"
                 "  return psychoJS.NEXT;\n"
                 "  }}\n"
                 .format(params=self.params))
@@ -1819,14 +1827,14 @@ class Flow(list):
                             "flowScheduler.add({params[name]}RoutineEnd);\n"
                             .format(params=thisEntry.params))
             else:  # we are already in a loop so don't code here just count
-                code =""
+                code = ""
                 if thisEntry.getType() == 'LoopInitiator':
                     loopStack.append(thisEntry.loop)
                 elif thisEntry.getType() == 'LoopTerminator':
                     loopStack.remove(thisEntry.loop)
-            # also flow should close when done
-            code += "flowScheduler.add(quitPsychoJS);\n"
             script.writeIndentedLines(code)
+        # quit when all routines are finished
+        script.writeIndented("flowScheduler.add(quitPsychoJS);\n")
         # handled all the flow entries
         code = ("\n// quit if user presses Cancel in dialog box:\n"
                 "dialogCancelScheduler.add(quitPsychoJS);\n"
@@ -2156,7 +2164,7 @@ class Routine(list):
 
         code = ("//------Ending Routine '{name}'-------\n"
                 "for (var i = 0; i < {name}Components.length; ++i) {{\n"
-                '  thisComponent = trialComponents[i];\n'
+                '  thisComponent = {name}Components[i];\n'
                 '  if ("setAutoDraw" in thisComponent) {{\n'
                 "    thisComponent.setAutoDraw(false);\n"
                 "  }}\n"

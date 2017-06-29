@@ -218,7 +218,7 @@ class Window(object):
             multiSample : True or *False*
                 If True and your graphics driver supports multisample buffers,
                 multiple color samples will be taken per-pixel, providing an
-                anti-aliased image through spatial filtering. 
+                anti-aliased image through spatial filtering.
                 (Cannot be changed after opening a window, pyglet only)
             numSamples : *2* or integer >2
                 A single value specifying the number of samples per pixel if
@@ -547,6 +547,23 @@ class Window(object):
         if clear:
             self.frameIntervals = []
             self.frameClock.reset()
+
+    def _setCurrent(self):
+        """Make this window current.
+        """
+        if self != globalVars.currWindow and self.winType == 'pyglet':
+            self.winHandle.switch_to()
+            globalVars.currWindow = self
+
+            # if we are using an FBO, bind it
+            if self.useFBO:
+                GL.glBindFramebufferEXT(GL.GL_FRAMEBUFFER_EXT,
+                                        self.frameBuffer)
+                GL.glReadBuffer(GL.GL_COLOR_ATTACHMENT0_EXT)
+                GL.glDrawBuffer(GL.GL_COLOR_ATTACHMENT0_EXT)
+                GL.glActiveTexture(GL.GL_TEXTURE0)
+                GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
+                GL.glEnable(GL.GL_STENCIL_TEST)
 
     def onResize(self, width, height):
         """A default resize event handler.
@@ -1014,7 +1031,7 @@ class Window(object):
                 numpyFrames.append(numpy.array(frame))
             clip = ImageSequenceClip(numpyFrames, fps=fps)
             if fileExt == '.gif':
-                clip.write_gif(fileName, fps=15)
+                clip.write_gif(fileName, fps=fps, fuzz=0, opt='nq')
             else:
                 clip.write_videofile(fileName, codec=codec)
         elif len(self.movieFrames) == 1:
@@ -1398,7 +1415,7 @@ class Window(object):
                             'card does not appear to support GL_STEREO')
             self.stereo = False
 
-        # multisampling 
+        # multisampling
         sample_buffers = 0
         aa_samples = 0
 
