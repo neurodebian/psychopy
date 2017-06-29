@@ -352,9 +352,9 @@ class SettingsComponent(object):
         osfDataFolder = 'data'
         # is email a defined parameter for this version
         if 'email' in self.params:
-            email = str(self.params['email'])
+            email = repr(self.params['email'].val)
         else:
-            email = ''
+            email = "''"
         if projLabel in projectCatalog:  # this is the psychopy  descriptive label (id+title)
             proj = projectCatalog[projLabel]
             osfID = proj.osf.id
@@ -631,7 +631,17 @@ class SettingsComponent(object):
                 "}\n"
                 )
         buff.writeIndentedLines(abbrevFunc)
+        recordLoopIterationFunc = ("\nfunction recordLoopIteration(currentLoop) {\n"
+                    "  return function () {\n"
+                    "    currentLoop.updateAttributesAtBegin();\n"
+                    "    thisExp.nextEntry();\n"
+                    "    return psychoJS.NEXT;\n"
+                    "  }\n"
+                    "}\n"
+                )
+        buff.writeIndentedLines(recordLoopIterationFunc)
         quitFunc = ("\nfunction quitPsychoJS() {\n"
+                    "    thisExp.save();\n"
                     "    win.close()\n"
                     "    psychoJS.core.quit();\n"
                     "    return psychoJS.QUIT;\n"

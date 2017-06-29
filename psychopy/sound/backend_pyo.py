@@ -16,6 +16,7 @@ except ImportError as err:
     # convert this import error to our own, pyo probably not installed
     raise exceptions.DependencyError(repr(err))
 
+import sys
 import threading
 pyoSndServer = None
 
@@ -53,6 +54,7 @@ def getDevices(kind=None):
 
     The dict keys are names and items are dicts of properties
     """
+    osEncoding = sys.getfilesystemencoding()
     inputs, outputs = pyo.pa_get_devices_infos()
     if kind is None:
         allDevs = inputs.update(outputs)
@@ -63,7 +65,8 @@ def getDevices(kind=None):
     devs = {}
     for ii in allDevs:  # in pyo this is a dict but keys are ii ! :-/
         dev = allDevs[ii]
-        devs[dev['name']] = dev
+        devName = dev['name'].decode(osEncoding) # convert to unicode
+        devs[devName] = dev
         dev['id'] = ii
     return devs
 

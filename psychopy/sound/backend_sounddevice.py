@@ -140,7 +140,7 @@ class _SoundStream(object):
         self.sounds = []  # list of dicts for sounds currently playing
         self.takeTimeStamp = False
         self.frameN = 1
-        self.frameTimes = range(5)  # DEBUGGING: store the last 5 callbacks
+        # self.frameTimes = range(5)  # DEBUGGING: store the last 5 callbacks
         if not travisCI:  # travis-CI testing does not have a sound device
             self._sdStream = sd.OutputStream(samplerate=sampleRate,
                                              blocksize=self.blockSize,
@@ -189,23 +189,22 @@ class _SoundStream(object):
                 self.sounds.remove(thisSound)
                 thisSound._EOS()
             # check if that took a long time
-            t1 = time.time()
-            if (t1-t0) > 0.001:
-                logging.info("buffer_callback took {:.3f}ms that frame"
-                             .format((t1-t0)*1000))
-        self.frameTimes.pop(0)
-        if hasattr(self, 'lastFrameTime'):
-            self.frameTimes.append(time.time()-self.lastFrameTime)
-        self.lastFrameTime = time.time()
-        if self.takeTimeStamp:
-            logging.info("Callback durations: {}".format(self.frameTimes))
-            logging.info("blocksize = {}".format(blockSize))
-            self.takeTimeStamp = False
+            # t1 = time.time()
+            # if (t1-t0) > 0.001:
+            #     logging.debug("buffer_callback took {:.3f}ms that frame"
+            #                  .format((t1-t0)*1000))
+        # self.frameTimes.pop(0)
+        # if hasattr(self, 'lastFrameTime'):
+        #     self.frameTimes.append(time.time()-self.lastFrameTime)
+        # self.lastFrameTime = time.time()
+        # if self.takeTimeStamp:
+        #     logging.debug("Callback durations: {}".format(self.frameTimes))
+        #     self.takeTimeStamp = False
 
     def add(self, sound):
-        t0 = time.time()
+        # t0 = time.time()
         self.sounds.append(sound)
-        logging.info("took {} ms to add".format((time.time()-t0)*1000))
+        # logging.debug("took {} ms to add".format((time.time()-t0)*1000))
 
     def remove(self, sound):
         if sound in self.sounds:
@@ -360,7 +359,7 @@ class SoundDeviceSound(_SoundBase):
         self.sampleRate = f.samplerate
         if self.channels == -1:  # if channels was auto then set to file val
             self.channels = f.channels
-        info = sf.info(filename)  # needed for duration?
+        fileDuration = float(len(f))/f.samplerate  # needed for duration?
         # process start time
         if self.startTime and self.startTime > 0:
             startFrame = self.startTime*self.sampleRate
@@ -371,10 +370,9 @@ class SoundDeviceSound(_SoundBase):
         # process stop time
         if self.stopTime and self.stopTime > 0:
             requestedDur = self.stopTime - self.t
-            maxDur = info.duration
-            self.duration = min(requestedDur, maxDur)
+            self.duration = min(requestedDur, fileDuration)
         else:
-            self.duration = info.duration - self.t
+            self.duration = fileDuration - self.t
         # can now calculate duration in frames
         self.durationFrames = int(round(self.duration*self.sampleRate))
         # are we preloading or streaming?
@@ -382,8 +380,8 @@ class SoundDeviceSound(_SoundBase):
             # no buffer - stream from disk on each call to nextBlock
             pass
         elif self.preBuffer == -1:
-            # no buffer - stream from disk on each call to nextBlock
-            sndArr = self.sndFile.read(frames=len(self.sndFile))
+            # full pre-buffer. Load requested duration to memory
+            sndArr = self.sndFile.read(frames=int(self.sampleRate*self.duration))
             self.sndFile.close()
             self._setSndFromArray(sndArr)
 
@@ -398,20 +396,17 @@ class SoundDeviceSound(_SoundBase):
 
     def _setSndFromArray(self, thisArray):
 
-        self.sndArr = np.asarray(thisArray)
-        if self.channels == -1:
-            self.sndArr.shape = [len(thisArray), 1]
-        elif self.channels == 2 and thisArray.ndim == 1:
-            # make mono sound into stereo
-            self.sndArr.shape = [len(thisArray),1]  # give correct N dimensions
+        self.sndArr = np.asarray(thisArray) * self.volume
+        if thisArray.ndim == 1:
+            self.sndArr.shape = [len(thisArray),1]  # make 2D for broadcasting
+        if self.channels == 2 and self.sndArr.shape[1] == 1:  # mono -> stereo
             self.sndArr = self.sndArr.repeat(2,axis=1)
-        elif self.channels == 1 and thisArray.ndim == 1:
-            self.sndArr.shape = [len(thisArray), 1]  # make size 2D for broad
+        elif self.sndArr.shape[1] == 1:  # if channels in [-1,1] then pass
+            pass
         else:
-            self.sndArr = np.asarray(thisArray)
             try:
                 self.sndArr.shape = [len(thisArray), 2]
-            except:
+            except ValueError:
                 raise ValueError("Failed to format sound with shape {} "
                                  "into sound with channels={}"
                                  .format(self.sndArr.shape, self.channels))
@@ -485,7 +480,7 @@ class SoundDeviceSound(_SoundBase):
                 num=self.blockSize, endpoint=False
                 )
             xx.shape = [self.blockSize, 1]
-            block = np.sin(xx)
+            block = np.sin(xx) * self.volume
             # if run beyond our desired t then set to zeros
             if stopT > self.secs:
                 tRange = np.linspace(startT, stopT,
