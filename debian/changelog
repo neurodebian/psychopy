@@ -2,6 +2,8 @@ psychopy (1.85.02.dfsg-1) unstable; urgency=medium
 
   * Fresh upstream release
     - for now disabling JS (psychojs) support
+  * debian/rules
+    - run tests using py.test directly
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 29 Jun 2017 11:42:30 -0700
 
