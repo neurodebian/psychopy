@@ -1,4 +1,11 @@
-psychopy (1.85.00.dfsg-1) experimental; urgency=medium
+psychopy (1.85.02.dfsg-1) unstable; urgency=medium
+
+  * Fresh upstream release
+    - for now disabling JS (psychojs) support
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 29 Jun 2017 11:42:30 -0700
+
+psychopy (1.85.00.dfsg-1) UNRELEASED; urgency=medium
 
   * use .png for the psychopy icon within .desktop file
   * debian/patches
