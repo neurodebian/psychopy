@@ -10,6 +10,7 @@ PYVER = $(shell pyversions -vd)
 export DEBPYTHON_SUPPORTED=$(PYVER)
 export HOME=$(CURDIR)/build
 DEB_DESTDIR=$(CURDIR)/debian/psychopy
+XVFB_RUN=xvfb-run -s "-screen 0 1024x768x24 -ac +extension GLX +render -noreset"
 
 %:
 	dh $@ --with python2 --buildsystem python_distutils
@@ -20,8 +21,7 @@ ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	echo "I: Running tests using default Python"
 	cd build \
 		&& USER=nobody TRAVIS=true \
-		xvfb-run -s "-screen 0 1024x768x24 -ac +extension GLX +render -noreset" \
-        python -m pytest --tb=line -s -m "not needs_sound" ../psychopy || { echo "TESTS FAILED"; $(failed_tests_cmd); }
+		$(XVFB_RUN) python -m pytest --tb=line -s -m "not needs_sound" ../psychopy || { echo "TESTS FAILED"; $(failed_tests_cmd); }
 endif
 ## Fix up permissions on images -- pushed upstream, but left here
 ## just to make sure everything is ok
@@ -40,7 +40,7 @@ endif
 
 debian/psychopy.1: debian/psychopy.sh
 	chmod +x $^
-	PYTHONPATH=. help2man -N -n "Creating psychology stimuli in Python" $^ > $@
+	PYTHONPATH=. $(XVFB_RUN) help2man -N -n "Creating psychology stimuli in Python" $^ > $@
 ## cleanup
 	rm -f psychopy/__init__.pyc
 

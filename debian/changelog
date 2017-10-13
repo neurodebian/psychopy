@@ -1,16 +1,17 @@
 psychopy (1.85.2.dfsg-1) unstable; urgency=medium
 
-  * Fresh upstream release
+  * New upstream release
     - for now disabling JS (psychojs) support
   * debian/rules
     - run tests using py.test directly
   * debian/rules
     - python-requests to b-depends and recommends
+    - wrap running help2man under xvfb as well
   * debian/control
     - added python-future to *Depends since pyglet needs it (I guess misses
       some Depends as well)
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 12 Sep 2017 18:57:55 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 12 Oct 2017 22:32:19 -0400
 
 psychopy (1.85.00.dfsg-1) UNRELEASED; urgency=medium
 
