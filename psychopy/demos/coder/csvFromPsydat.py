@@ -1,9 +1,11 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 """utility for creating a .csv file from a .psydat file
 
 edit the file name, then run the script
 """
+from __future__ import print_function
 
 import os
 from psychopy.tools.filetools import fromFile

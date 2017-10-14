@@ -5,6 +5,9 @@ Maybe not worth doing if TrialHandler2 is going to have weights eventually.
 """
 
 from __future__ import print_function
+from builtins import str
+from builtins import range
+from builtins import object
 import os, glob
 from os.path import join as pjoin
 import shutil
@@ -43,14 +46,14 @@ class TestTrialHandlerExt(object):
 
         # Make sure the header line is correct
         f = open(data_filename, 'rb')
-        header = f.readline().replace('\n','')
+        header = f.readline().replace(b'\n',b'')
         f.close()
         expected_header = u"n,with_underscore_mean,with_underscore_raw,with_underscore_std,order"
         if expected_header != header:
             print(base_data_filename)
             print(repr(expected_header),type(expected_header),len(expected_header))
             print(repr(header), type(header), len(header))
-        assert expected_header == unicode(header)
+        assert expected_header == str(header)
 
     def test_psydat_filename_collision_renaming(self):
         for count in range(1,20):
@@ -165,6 +168,31 @@ class TestTrialHandlerExt(object):
         utils.compareTextFiles(pjoin(self.temp_dir, 'testRandom.csv'),
                                pjoin(fixturesPath,'corrRandom.csv'))
 
-if __name__=='__main__':
+    def test_comparison_equals(self):
+        t1 = data.TrialHandlerExt([dict(foo=1)], 2)
+        t2 = data.TrialHandlerExt([dict(foo=1)], 2)
+        assert t1 == t2
+
+    def test_comparison_equals_after_iteration(self):
+        t1 = data.TrialHandlerExt([dict(foo=1)], 2)
+        t2 = data.TrialHandlerExt([dict(foo=1)], 2)
+        t1.__next__()
+        t2.__next__()
+        assert t1 == t2
+
+    def test_comparison_not_equal(self):
+        t1 = data.TrialHandlerExt([dict(foo=1)], 2)
+        t2 = data.TrialHandlerExt([dict(foo=1)], 3)
+        assert t1 != t2
+
+    def test_comparison_not_equal_after_iteration(self):
+        t1 = data.TrialHandlerExt([dict(foo=1)], 2)
+        t2 = data.TrialHandlerExt([dict(foo=1)], 3)
+        t1.__next__()
+        t2.__next__()
+        assert t1 != t2
+
+
+if __name__ == '__main__':
     import pytest
     pytest.main()

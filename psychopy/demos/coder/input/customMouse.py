@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 """
@@ -7,6 +7,7 @@ and ability to change the pointer.
 """
 
 from __future__ import division
+from __future__ import print_function
 
 # author Jeremy Gray
 

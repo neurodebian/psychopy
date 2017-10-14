@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 """
@@ -12,7 +12,9 @@ line is slightly different to the documentation on LabJack's website
 """
 
 from __future__ import division
+from __future__ import print_function
 
+from builtins import range
 from psychopy import visual, core, event, sound
 from labjack import u3
 

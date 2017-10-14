@@ -12,14 +12,11 @@ PsychoPy is unique in giving you a choice of interface: use the **Builder interf
 News
 ====================
 
-**Workshops**: Time is running out to book onto our **three** :ref:`officialWorkshops` :
- - 26-28 Apr 2017: :ref:`PEP1` to get skills in programming, rather than running experiments *per se*
+**PsychoPy is going Professional and Online!**
 
- - 3-5 May 2017: :ref:`BEP` to get up and running fast with building flexible experiments **including a session on running ONLINE PsychoPy studies**
+We're delighted to announce that `The Wellcome Trust <http://www.wellcome.ac.uk>`_ has granted us a sum of money that will allow us to hire a full-time developer, meaning that we will become more professional than ever and, critically, also funding for `Ilixa Ltd. <http://www.ilixa.com>`_ to complete the job of building the online experiment system that many of you have been waiting for! See the `discourse post <https://discourse.psychopy.org/t/wellcome-trust-funding-psychopy-is-going-properly-online/>`_ for further details of what we're planning.
 
- - 12-14 July 2017: :ref:`PEP2` to write better Python code: more reusable, better timed, just better!
-
-**Latest version**: 1.85.0 was released Feb 2017 with initial proof-of-concept of online experiments. Beware - these are bound to be buggy so only use if you know what you're doing. And :ref:`READ THE DOCS <online>`. See the full :doc:`changelog`
+**Latest version**: 1.85.3 was released August 2017 with initial proof-of-concept of online experiments. Beware - these are bound to be buggy so only use if you know what you're doing. And :ref:`READ THE DOCS <online>`. See the full :doc:`changelog`
 
 .. title:: Home
 

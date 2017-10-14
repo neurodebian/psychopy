@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 """
@@ -8,7 +8,9 @@ This is for win32 only.
 """
 
 from __future__ import division
+from __future__ import print_function
 
+from builtins import range
 from psychopy import visual, core
 from psychopy import parallel
 
