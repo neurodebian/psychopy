@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 """
@@ -14,7 +14,9 @@ arguments are the arguments exactly as you would normally use them
 """
 
 from __future__ import division
+from __future__ import print_function
 
+from builtins import range
 from psychopy import visual, core
 import numpy
 
@@ -26,7 +28,7 @@ clock = core.Clock()  # a clock to check times from
 # a function to be called on selected frames
 def printFrame(frameN, tReceived):
     tPrinted = clock.getTime()
-    print frameN, tReceived, tPrinted
+    print(frameN, tReceived, tPrinted)
 
 for frame in range(100):
     core.wait(numpy.random.random()/200)  # wait 0-5ms

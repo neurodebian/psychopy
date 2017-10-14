@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 """
@@ -6,7 +6,9 @@ Demo of TrialHandler
 """
 
 from __future__ import division
+from __future__ import print_function
 
+from builtins import range
 from random import random
 from psychopy import data
 

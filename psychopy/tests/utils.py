@@ -1,3 +1,7 @@
+from __future__ import print_function
+from __future__ import division
+from builtins import str
+from builtins import range
 from os.path import abspath, basename, dirname, isfile, join as pjoin
 import os.path
 import shutil
@@ -44,7 +48,7 @@ def compareScreenshot(fileName, win, crit=5.0):
         expected = Image.open(fileName)
         expDat = np.array(expected.getdata())
         imgDat = np.array(frame.getdata())
-        rms = (((imgDat-expDat)**2).sum()/len(imgDat))**0.5
+        rms = np.std(imgDat-expDat)
         filenameLocal = fileName.replace('.png','_local.png')
         if rms >= crit/2:
             #there was SOME discrepency
@@ -109,12 +113,12 @@ def compareTextFiles(pathToActual, pathToCorrect, delim=None):
                             print(lineCorrect)
                         assert wordActual==wordCorrect, "Values at (%i,%i) differ: %s != %s " \
                             %(lineN, wordN, repr(wordActual), repr(wordCorrect))
-    except AssertionError, err:
+    except AssertionError as err:
         pathToLocal, ext = os.path.splitext(pathToCorrect)
         pathToLocal = pathToLocal+'_local'+ext
         shutil.copyfile(pathToActual,pathToLocal)
         print("txtActual!=txtCorr: Saving local copy to %s" %pathToLocal)
-        raise AssertionError, err
+        raise AssertionError(err)
 
 def compareXlsxFiles(pathToActual, pathToCorrect):
     from openpyxl.reader.excel import load_workbook
@@ -125,7 +129,7 @@ def compareXlsxFiles(pathToActual, pathToCorrect):
 
     for wsN, expWS in enumerate(expBook.worksheets):
         actWS = actBook.worksheets[wsN]
-        for key, expVal in expWS._cells.items():
+        for key, expVal in list(expWS._cells.items()):
             actVal = actWS._cells[key].value
             expVal = expVal.value
             # intercept lists-of-floats, which might mismatch by rounding error
@@ -161,7 +165,7 @@ def compareXlsxFiles(pathToActual, pathToCorrect):
         pathToLocal = pathToLocal+'_local'+ext
         shutil.copyfile(pathToActual,pathToLocal)
         logging.warning("xlsxActual!=xlsxCorr: Saving local copy to %s" %pathToLocal)
-        raise IOError, error
+        raise IOError(error)
 
 _travisTesting = bool(str(os.environ.get('TRAVIS')).lower() == 'true')  # in Travis-CI testing
 

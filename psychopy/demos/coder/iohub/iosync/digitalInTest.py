@@ -33,6 +33,7 @@ IMPORTANT: Input voltage to a digital input pin must be between 0.0 V and 3.3 V
 or you may damage the Teensy 3. The Teensy 3.1 supports digital inputs up to
 5 V.
 """
+from __future__ import print_function
 import time
 from psychopy import core
 from psychopy.iohub import launchHubServer
@@ -41,7 +42,7 @@ getTime=core.getTime
 try:
     psychopy_mon_name='testMonitor'
     exp_code='events'
-    sess_code='S_{0}'.format(long(time.mktime(time.localtime())))
+    sess_code='S_{0}'.format(int(time.mktime(time.localtime())))
     iohub_config={
     "psychopy_monitor_name":psychopy_mon_name,
     "mcu.iosync.MCU":dict(serial_port='auto',monitor_event_types=['DigitalInputEvent',]),
@@ -58,7 +59,7 @@ try:
     while not kb.getEvents():   
         mcu_events=  mcu.getEvents()
         for mcu_evt in mcu_events:
-            print'{0}\t{1}'.format(mcu_evt.time,mcu_evt.state)
+            print('{0}\t{1}'.format(mcu_evt.time,mcu_evt.state))
         core.wait(0.002,0)
     io.clearEvents('all')
 except Exception:

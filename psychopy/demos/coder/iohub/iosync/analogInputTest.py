@@ -26,6 +26,7 @@ Analog input channels which are not connected to anything 'float'. If you want
 unused channels to be fixed at ground, connect each unused channel to the GND
 pin.
 """
+from __future__ import print_function
 
 
 import time
@@ -39,7 +40,7 @@ mcu=None
 try:
     psychopy_mon_name='testMonitor'
     exp_code='events'
-    sess_code='S_{0}'.format(long(time.mktime(time.localtime())))
+    sess_code='S_{0}'.format(int(time.mktime(time.localtime())))
     iohub_config={
     "psychopy_monitor_name":psychopy_mon_name,
     "mcu.iosync.MCU":dict(serial_port='auto',monitor_event_types=['AnalogInputEvent',]),#['DigitalInputEvent']),
@@ -53,7 +54,7 @@ try:
     mcu.enableEventReporting(True)
     io.clearEvents("all")
     i=0
-    print "Saving Analog Data to File. Press 'escape' Key to Quit..."
+    print("Saving Analog Data to File. Press 'escape' Key to Quit...")
     aout=file('analog_output.txt','w')
     while not kb.getKeys(keys=['escape',]):
         mcu_events = mcu.getEvents()

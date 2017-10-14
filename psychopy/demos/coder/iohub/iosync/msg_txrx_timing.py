@@ -25,7 +25,9 @@ Each test iteration does the following(in sudo code):
 
 When the data has been collected, a plot is displayed with the results.
 """
+from __future__ import print_function
 # How many request - reply iterations should be run.
+from builtins import range
 repetitions = 10000
 
 import numpy as np
@@ -64,8 +66,8 @@ for i in range(repetitions):
         if response:
             if response['id'] != request['id']:
                 # This should never happen. ;)
-                print "ERROR: Got Response %d; looking for %d"%(response['id'],
-                                                                request['id'])
+                print("ERROR: Got Response %d; looking for %d"%(response['id'],
+                                                                request['id']))
                 response = None
 
             # Collect time request was sent (tx_time) and time response was

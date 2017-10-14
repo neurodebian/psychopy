@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 ################
 # see notes at bottom for requirements
+from __future__ import print_function
 import glob
 import os
 import sys
@@ -63,6 +64,7 @@ setup(
                       'pysoundcard', 'soundfile', 'sounddevice',
                       'cv2',
                       'xlwt',  # writes excel files for pandas
+                      'UserString',
                       ],
             packages=['wx', 'pyglet', 'pygame', 'OpenGL', 'psychopy', 'pytz',
                       'scipy', 'matplotlib', 'lxml', 'xml', 'openpyxl',
@@ -88,7 +90,7 @@ setup(
                       # these aren't needed, but liked
                       'psychopy_ext', 'pyfilesec', 'rusocsci',
                       'bidi',  # for right-left language conversions
-                      'future', 'json_tricks',  # for Py3 conversion (json_tricks allows saving arrays/dates in json)
+                      'future', 'past', 'lib2to3', 'json_tricks',  # for Py3 conversion (json_tricks allows saving arrays/dates in json)
                       ],
             excludes=['bsddb', 'jinja2', 'IPython','ipython_genutils','nbconvert',
                       'OpenGL','OpenGL.WGL','OpenGL.raw.WGL.*',

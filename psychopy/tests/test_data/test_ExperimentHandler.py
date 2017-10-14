@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from builtins import object
 from psychopy import data, logging
 from numpy import random
 import os, glob, shutil
@@ -118,6 +119,26 @@ class TestExperimentHandler(object):
         trials.saveAsWideText(fileName)
         exp.saveAsWideText(fileName)
         exp.saveAsPickle(fileName)
+
+    def test_comparison_equals(self):
+        e1 = data.ExperimentHandler()
+        e2 = data.ExperimentHandler()
+        assert e1 == e2
+
+    def test_comparison_not_equal(self):
+        e1 = data.ExperimentHandler()
+        e2 = data.ExperimentHandler(name='foo')
+        assert e1 != e2
+
+    def test_comparison_equals_with_same_TrialHandler_attached(self):
+        e1 = data.ExperimentHandler()
+        e2 = data.ExperimentHandler()
+        t = data.TrialHandler([dict(foo=1)], 2)
+
+        e1.addLoop(t)
+        e2.addLoop(t)
+
+        assert e1 == e2
 
 
 if __name__ == '__main__':
