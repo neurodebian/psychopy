@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 """
@@ -9,7 +9,9 @@ key lines: 29, 50, 61: mic = microphone.AdvAudioCapture(), mic.record(), mic.get
 """
 
 from __future__ import division
+from __future__ import print_function
 
+from builtins import range
 from psychopy import microphone, sound, core, visual, event
 from matplotlib import pyplot
 import numpy as np
@@ -34,8 +36,8 @@ microphone.switchOn()
 mic = microphone.AdvAudioCapture()
 
 # identify the hardware microphone in use:
-names, idx = sound.pyo.pa_get_input_devices()
-inp = sound.pyo.pa_get_default_input()
+names, idx = sound.backend.pyo.pa_get_input_devices()
+inp = sound.backend.pyo.pa_get_default_input()
 msg = 'Speaker vol > 0\nAny key to start...\n\n"%s"' % names[idx.index(inp)]
 
 instr = visual.TextStim(win, msg, color=-1, height=0.05)
@@ -79,7 +81,7 @@ for i in range(10):
         msg2.draw()
         win.flip()
         data, sampleRate = microphone.readWavFile(filename)
-        plotYX(data, range(len(data)), "time domain @ %iHz" % sampleRate)
+        plotYX(data, list(range(len(data))), "time domain @ %iHz" % sampleRate)
         mag, freqV = microphone.getDft(data, sampleRate)
         plotYX(mag, freqV, "frequency domain (marker at %i Hz)" % mic.getMarkerInfo()[0])
 

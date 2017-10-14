@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 """
@@ -8,9 +8,12 @@ offline, without requiring a scanner (or a hardware sync pulse generator).
 """
 
 from __future__ import division
+from __future__ import print_function
 
 # Author: Jeremy R. Gray
 
+from builtins import str
+from builtins import range
 from psychopy import visual, event, core, gui
 from psychopy.hardware.emulator import launchScan
 
@@ -37,7 +40,7 @@ for i in range(-1 * MR_settings['skip'], 0):
 counter = visual.TextStim(win, height=.05, pos=(0, 0), color=win.rgb + 0.5)
 output += u"  0    0.000 sync  [Start of scanning run, vol 0]\n"
 
-# launch: operator selects Scan or Test (emulate); see API docuwmentation
+# launch: operator selects Scan or Test (emulate); see API documentation
 vol = launchScan(win, MR_settings, globalClock=globalClock)
 counter.setText(u"%d volumes\n%.3f seconds" % (0, 0.0))
 counter.draw()
@@ -59,7 +62,7 @@ while globalClock.getTime() < duration:
             vol += 1
         else:
             # handle keys (many fiber-optic buttons become key-board key-presses)
-            output += u"%3d  %7.3f %s\n" % (vol-1, globalClock.getTime(), unicode(key))
+            output += u"%3d  %7.3f %s\n" % (vol-1, globalClock.getTime(), str(key))
             if key == 'escape':
                 output += u'user cancel, '
                 break

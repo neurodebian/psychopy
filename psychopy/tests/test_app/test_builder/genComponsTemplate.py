@@ -1,3 +1,4 @@
+from __future__ import print_function
 import sys, os
 
 import wx
@@ -5,7 +6,7 @@ if wx.version() < '2.9':
     tmpApp = wx.PySimpleApp()
 else:
     tmpApp = wx.App(False)
-from psychopy.app import builder
+from psychopy.app import builder, projects
 from psychopy.app.builder.components import getAllComponents
 
 # usage: generate or compare all Component.param settings & options
@@ -16,6 +17,9 @@ from psychopy.app.builder.components import getAllComponents
 
 # ignore attributes that are there because inherit from object
 ignoreObjectAttribs = True
+
+origProjectCatalog = projects.projectCatalog
+projects.projectCatalog = {}
 
 # should not need a wx.App with fetchIcons=False
 try:
@@ -34,6 +38,7 @@ except Exception:
 
 exp = builder.experiment.Experiment()
 relPath = os.path.join(os.path.split(__file__)[0], 'componsTemplate.txt')
+
 if not '--out' in sys.argv:
     target = open(relPath, 'rU').read()
     targetLines = target.splitlines()
@@ -57,6 +62,9 @@ if not '--out' in sys.argv:
                'label',  # comment-out to not ignore labels when checking
                'categ'
                ]
+for field in dir(param):
+    if field.startswith("__"):
+        ignore.append(field)
 fields = set(dir(param)).difference(ignore)
 
 mismatches = []
@@ -75,7 +83,7 @@ for compName in sorted(allComp):
             err = order + ' <==> NEW (no matching param in original)'
         print(err.encode('utf8'))
         mismatches.append(err)
-    for parName in comp.params.keys():
+    for parName in comp.params:
         # default is what you get from param.__str__, which returns its value
         default = '%s.%s.default:%s' % (compName, parName, comp.params[parName])
         out.append(default)
@@ -108,3 +116,6 @@ for compName in sorted(allComp):
                 mismatches.append(err)
 
 #return mismatches
+
+# revert project catalog to original
+projects.ProjectCatalog = origProjectCatalog

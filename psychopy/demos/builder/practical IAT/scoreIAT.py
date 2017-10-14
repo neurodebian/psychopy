@@ -1,4 +1,5 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 """Scoring script for MSU-PsychoPy version of IAT task.
 
@@ -6,6 +7,8 @@ Authors: Jeremy R. Gray & Nate Pasmanter, 2013
 """
 
 from __future__ import division
+from __future__ import print_function
+from builtins import range
 import pandas as pd
 import glob, os, sys
 
@@ -162,4 +165,4 @@ def batchScoreIAT(path='.', write_file=False):
 
 if __name__ == '__main__':
     for f in sys.argv[1:]:
-        print(f, scoreIAT(f))
+        print((f, scoreIAT(f)))

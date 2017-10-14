@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 """
@@ -12,7 +12,9 @@ might try to update
 """
 
 from __future__ import division
+from __future__ import print_function
 
+from builtins import range
 from psychopy import visual, logging, core, event
 visual.useFBO = True  # if available (try without for comparison)
 
@@ -35,7 +37,7 @@ for frameN in range(nIntervals + 1):
     myStim.setPhase(0.1, '+')
     myStim.draw()
     if event.getKeys():
-        print 'stopped early'
+        print('stopped early')
         break
     win.logOnFlip(msg='frame=%i' %frameN, level=logging.EXP)
     win.flip()
