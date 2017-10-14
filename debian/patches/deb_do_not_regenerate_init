@@ -8,10 +8,10 @@ longer.
 
 --- a/setup.py
 +++ b/setup.py
-@@ -16,6 +16,7 @@ else:
- #regenerate __init__.py only if we're in the source repos (not in a source zip file)
+@@ -49,6 +49,7 @@ else:
+ # regenerate __init__.py only if we're in the source repos (not in a source zip file)
  try:
-     import createInitFile#won't exist in a sdist.zip
+     import createInitFile  # won't exist in a sdist.zip
 +    raise Exception("createInitFile is shipped in Debian .orig.tar.gz but __init__.py should pristine")
      writeNewInit=True
  except:

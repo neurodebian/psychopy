@@ -1,7 +1,7 @@
 --- a/setup.py
 +++ b/setup.py
-@@ -7,7 +7,7 @@ import glob, os, sys
- from sys import platform, argv
+@@ -40,7 +40,7 @@ if PY3:  # doesn't exist on py2
+ 
  
  # compress psychojs to a zip file for packaging
 -if '-noJS' in argv:  # only takes 0.5s but could skip if you prefer
