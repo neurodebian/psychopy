@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function
-from __future__ import division
+from __future__ import absolute_import, division, print_function
 
 from builtins import object
 import numpy as np
@@ -17,7 +16,7 @@ class _baseFunctionFit(object):
     """
 
     def __init__(self, xx, yy, sems=1.0, guess=None, display=1,
-                 expectedMin=0.5):
+                 expectedMin=0.5, optimize_kws=None):
         super(_baseFunctionFit, self).__init__()
         self.xx = np.array(xx)
         self.yy = np.array(yy)
@@ -27,6 +26,9 @@ class _baseFunctionFit(object):
             self.sems.shape = (1,)  # otherwise we can't get len (in numpy 1.13)
         self.expectedMin = expectedMin
         self.guess = guess
+        self.optimize_kws = {}
+        if optimize_kws is not None:
+            self.optimize_kws = optimize_kws
         # for holding error calculations:
         self.ssq = 0
         self.rms = 0
@@ -49,7 +51,8 @@ class _baseFunctionFit(object):
         else:
             sems = self.sems
         self.params, self.covar = optimize.curve_fit(
-            self._eval, self.xx, self.yy, p0=self.guess, sigma=sems)
+            self._eval, self.xx, self.yy, p0=self.guess, sigma=sems, 
+            **self.optimize_kws)
         self.ssq = self._getErr(self.params, self.xx, self.yy, 1.0)
         self.chi = self._getErr(self.params, self.xx, self.yy, self.sems)
         self.rms = self.ssq/len(self.xx)
