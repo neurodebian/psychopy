@@ -12,6 +12,11 @@ export HOME=$(CURDIR)/build
 DEB_DESTDIR=$(CURDIR)/debian/psychopy
 XVFB_RUN=xvfb-run -s "-screen 0 1024x768x24 -ac +extension GLX +render -noreset"
 
+# Avoid any network interactions
+export http_proxy=http://127.0.0.1:9/
+export https_proxy=http://127.0.0.1:9/
+
+
 %:
 	dh $@ --with python2 --buildsystem python_distutils
 

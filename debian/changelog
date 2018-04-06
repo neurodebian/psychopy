@@ -1,6 +1,8 @@
 psychopy (1.90.1.dfsg-1) unstable; urgency=medium
 
   * Fresh upstream release
+  * debian/rules
+    - export http*_proxy dummy variables to avoid network
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 06 Apr 2018 00:24:58 -0400
 
