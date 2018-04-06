@@ -1,17 +1,16 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
+# Part of the PsychoPy library
+# Copyright (C) 2015 Jonathan Peirce
+# Distributed under the terms of the GNU General Public License (GPL).
 
 """This module has tools for fetching data about the system or the
 current Python process. Such info can be useful for understanding
 the context in which an experiment was run.
 """
 
-# Part of the PsychoPy library
-# Copyright (C) 2015 Jonathan Peirce
-# Distributed under the terms of the GNU General Public License (GPL).
-
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import division
+from __future__ import absolute_import, division, print_function
 
 from builtins import str
 import sys
@@ -38,6 +37,7 @@ from psychopy import visual, logging, core, data, web
 from psychopy.core import shellCall
 from psychopy.platform_specific import rush
 from psychopy import __version__ as psychopyVersion
+from psychopy.constants import PY3
 
 
 class RunTimeInfo(dict):
@@ -229,9 +229,6 @@ class RunTimeInfo(dict):
     def _setSystemInfo(self):
         """System info
         """
-        # system encoding
-        osEncoding = sys.getfilesystemencoding()
-
         # machine name
         self['systemHostName'] = platform.node()
 
@@ -274,7 +271,7 @@ class RunTimeInfo(dict):
         # when last rebooted?
         try:
             lastboot = shellCall("who -b").split()
-            self['systemRebooted'] = b' '.join(lastboot[2:])
+            self['systemRebooted'] = ' '.join(lastboot[2:])
         except Exception:  # windows
             sysInfo = shellCall('systeminfo').splitlines()
             lastboot = [line for line in sysInfo if line.startswith(
@@ -322,26 +319,37 @@ class RunTimeInfo(dict):
             self['systemSec.pythonSSL'] = False
 
         # pyo for sound:
-        try:
-            travis = bool(str(os.environ.get('TRAVIS')).lower() == 'true')
-            assert not travis  # skip sound-related stuff on travis-ci.org
-
-            import pyo
-            self['systemPyoVersion'] = '%i.%i.%i' % pyo.getVersion()
+        if PY3:
+            import importlib.util
+            if importlib.util.find_spec('pyo') is not None:
+                self['systemPyoVersion'] = '-'
+        else:
+            import imp
             try:
-                # requires pyo svn r1024 or higher:
-                inp, out = pyo.pa_get_devices_infos()
-                for devList in [inp, out]:
-                    for key in devList:
-                        if isinstance(devList[key]['name'], str):
-                            devList[key]['name'] = devList[
-                                key]['name'].decode(osEncoding)
-                self['systemPyo.InputDevices'] = inp
-                self['systemPyo.OutputDevices'] = out
-            except AttributeError:
+                imp.find_module('pyo')
+                self['systemPyoVersion'] = '-'
+            except:
                 pass
-        except (AssertionError, ImportError):
-            pass
+        # try:
+        #     travis = bool(str(os.environ.get('TRAVIS')).lower() == 'true')
+        #     assert not travis  # skip sound-related stuff on travis-ci.org
+        # 
+        #     import pyo
+        #     self['systemPyoVersion'] = '%i.%i.%i' % pyo.getVersion()
+        #     try:
+        #         # requires pyo svn r1024 or higher:
+        #         import psychopy.sound
+        #         inp, out = psychopy.sound.get_devices_infos()
+        #         for devList in [inp, out]:
+        #             for key in devList:
+        #                 if isinstance(devList[key]['name'], str):
+        #                     devList[key]['name'] = devList[key]['name']
+        #         self['systemPyo.InputDevices'] = inp
+        #         self['systemPyo.OutputDevices'] = out
+        #     except AttributeError:
+        #         pass
+        # except (AssertionError, ImportError):
+        #     pass
 
         # flac (free lossless audio codec) for google-speech:
         flacv = ''

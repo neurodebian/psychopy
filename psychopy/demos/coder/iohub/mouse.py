@@ -5,13 +5,12 @@
 Demo of basic mouse handling from the ioHub (a separate asynchronous process for
 fetching and processing events from hardware; mice, keyboards, eyetrackers).
 
-Inital Version: May 6th, 2013, Sol Simpson
+Initial Version: May 6th, 2013, Sol Simpson
 Abbrieviated: May 2013, Jon Peirce
 Updated July, 2013, Sol, Added timeouts
 """
 
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 import sys
 
@@ -25,9 +24,6 @@ io = launchHubServer()
 display = io.devices.display
 keyboard = io.devices.keyboard
 mouse = io.devices.mouse
-
-# Hide the 'system mouse cursor'.
-mouse.setSystemCursorVisibility(False)
 
 # We can use display to find info for the Window creation, like the resolution
 # (which means PsychoPy won't warn you that the fullscreen does not match your requested size)
@@ -82,7 +78,7 @@ while not kb_events:
         fixSpot.setPos(position)
 
     if sys.platform == 'darwin':
-        # On OS X, both x and y mouse wheel events can be detected, assuming the mouse being used
+        # On macOS, both x and y mouse wheel events can be detected, assuming the mouse being used
         # supported 2D mouse wheel motion.
         wheelPosX, wheelPosY = mouse.getScroll()
     else:

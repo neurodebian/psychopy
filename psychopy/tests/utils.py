@@ -48,6 +48,11 @@ def compareScreenshot(fileName, win, crit=5.0):
         expected = Image.open(fileName)
         expDat = np.array(expected.getdata())
         imgDat = np.array(frame.getdata())
+        # for retina displays the frame data is 4x bigger than expected
+        if win.useRetina and imgDat.shape[0] == expDat.shape[0]*4:
+            frame = frame.resize(expected.size, resample=Image.LANCZOS)
+            imgDat = np.array(frame.getdata())
+            crit += 5  # be more relaxed because of the interpolation
         rms = np.std(imgDat-expDat)
         filenameLocal = fileName.replace('.png','_local.png')
         if rms >= crit/2:
@@ -134,11 +139,12 @@ def compareXlsxFiles(pathToActual, pathToCorrect):
             expVal = expVal.value
             # intercept lists-of-floats, which might mismatch by rounding error
             isListableFloatable = False
-            if str(expVal).startswith('['):
-                expValList = eval(str(expVal))
+            if u"{}".format(expVal).startswith('['):
+                expValList = eval(u"{}".format(expVal))
                 try:
                     expVal = np.array(expValList, dtype=float)
-                    actVal = np.array(eval(str(actVal)), dtype=float) # should go through if expVal does...
+                    actVal = np.array(eval(u"{}".format(actVal)),
+                                      dtype=float) # should go through if expVal does...
                     isListableFloatable = True
                 except Exception:
                     pass # non-list+float-able at this point = default

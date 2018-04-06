@@ -9,10 +9,12 @@ import shutil
 import json_tricks
 from tempfile import mkdtemp, mkstemp
 from operator import itemgetter
+import pytest
 
 from psychopy import data, logging
 from psychopy.tools.filetools import fromFile
 
+from psychopy.tests.utils import _travisTesting
 
 logging.console.setLevel(logging.DEBUG)
 DEBUG = False
@@ -331,6 +333,27 @@ class TestStairHandler(_BaseTestStairHandler):
                                       nReversals=len(step_sizes) + 1)
         assert staircase.nReversals == len(step_sizes) + 1
 
+    def test_applyInitialRule_False(self):
+        start_val = 10
+        step_sizes = 2
+        staircase = data.StairHandler(startVal=start_val, stepSizes=step_sizes,
+                                      nReversals=2, nUp=1, nDown=2,
+                                      applyInitialRule=False,
+                                      stepType='lin')
+
+        responses = [0, 1, 1, 0]
+        intensities = [10, 12, 12, 10]
+
+        for r in responses:
+            try:
+                staircase.__next__()
+                staircase.addResponse(r)
+            except StopIteration:
+                break
+
+        assert staircase.data == responses
+        assert staircase.intensities == intensities
+
     def test_comparison_equals(self):
         s1 = data.StairHandler(5)
         s2 = data.StairHandler(5)
@@ -360,7 +383,7 @@ class TestStairHandler(_BaseTestStairHandler):
         dump = s.saveAsJson()
 
         s.origin = ''
-        assert s == json_tricks.np.loads(dump)
+        assert s == json_tricks.loads(dump)
 
     def test_json_dump_with_data(self):
         s = data.StairHandler(5)
@@ -369,7 +392,7 @@ class TestStairHandler(_BaseTestStairHandler):
         dump = s.saveAsJson()
 
         s.origin = ''
-        assert s == json_tricks.np.loads(dump)
+        assert s == json_tricks.loads(dump)
 
     def test_json_dump_after_iteration(self):
         s = data.StairHandler(5)
@@ -377,7 +400,7 @@ class TestStairHandler(_BaseTestStairHandler):
         dump = s.saveAsJson()
 
         s.origin = ''
-        assert s == json_tricks.np.loads(dump)
+        assert s == json_tricks.loads(dump)
 
     def test_json_dump_with_data_after_iteration(self):
         s = data.StairHandler(5)
@@ -387,11 +410,12 @@ class TestStairHandler(_BaseTestStairHandler):
         dump = s.saveAsJson()
 
         s.origin = ''
-        assert s == json_tricks.np.loads(dump)
+        assert s == json_tricks.loads(dump)
 
     def test_json_dump_to_file(self):
         s = data.StairHandler(5)
-        s.saveAsJson(fileName=self.tmp_dir, fileCollisionMethod='overwrite')
+        _, path = mkstemp(dir=self.tmp_dir, suffix='.json')
+        s.saveAsJson(fileName=path, fileCollisionMethod='overwrite')
 
     def test_json_dump_and_reopen_file(self):
         s = data.StairHandler(5)
@@ -449,6 +473,9 @@ class TestQuestHandler(_BaseTestStairHandler):
         self.simulate()
         self.checkSimulationResults()
 
+        assert self.stairs.startVal == startVal
+        assert self.stairs.startValSd == startValSd
+
         assert np.allclose(self.stairs.mean(), mean)
         assert np.allclose(self.stairs.mode(), mode)
         assert np.allclose(self.stairs.quantile(), quantile)
@@ -500,7 +527,7 @@ class TestQuestHandler(_BaseTestStairHandler):
         dump = q.saveAsJson()
 
         q.origin = ''
-        assert q == json_tricks.np.loads(dump)
+        assert q == json_tricks.loads(dump)
 
     def test_json_dump_with_data(self):
         q = data.QuestHandler(0.5, 0.2, pThreshold=0.63, gamma=0.01,
@@ -510,7 +537,7 @@ class TestQuestHandler(_BaseTestStairHandler):
         dump = q.saveAsJson()
 
         q.origin = ''
-        assert q == json_tricks.np.loads(dump)
+        assert q == json_tricks.loads(dump)
 
     def test_json_dump_after_iteration(self):
         q = data.QuestHandler(0.5, 0.2, pThreshold=0.63, gamma=0.01,
@@ -519,7 +546,7 @@ class TestQuestHandler(_BaseTestStairHandler):
         dump = q.saveAsJson()
 
         q.origin = ''
-        assert q == json_tricks.np.loads(dump)
+        assert q == json_tricks.loads(dump)
 
     def test_json_dump_with_data_after_iteration(self):
         q = data.QuestHandler(0.5, 0.2, pThreshold=0.63, gamma=0.01,
@@ -530,12 +557,13 @@ class TestQuestHandler(_BaseTestStairHandler):
         dump = q.saveAsJson()
 
         q.origin = ''
-        assert q == json_tricks.np.loads(dump)
+        assert q == json_tricks.loads(dump)
 
     def test_json_dump_to_file(self):
+        _, path = mkstemp(dir=self.tmp_dir, suffix='.json')
         q = data.QuestHandler(0.5, 0.2, pThreshold=0.63, gamma=0.01,
                               nTrials=20, minVal=0, maxVal=1)
-        q.saveAsJson(fileName=self.tmp_dir, fileCollisionMethod='overwrite')
+        q.saveAsJson(fileName=path, fileCollisionMethod='overwrite')
 
     def test_json_dump_and_reopen_file(self):
         q = data.QuestHandler(0.5, 0.2, pThreshold=0.63, gamma=0.01,
@@ -554,6 +582,9 @@ class TestQuestHandler(_BaseTestStairHandler):
 
 class TestPsiHandler(_BaseTestStairHandler):
     def test_comparison_equals(self):
+        if _travisTesting:
+            pytest.skip()
+
         p1 = data.PsiHandler(nTrials=10, intensRange=[0.1, 10],
                              alphaRange=[0.1, 10], betaRange=[0.1, 3],
                              intensPrecision=0.1, alphaPrecision=0.1,
@@ -567,6 +598,9 @@ class TestPsiHandler(_BaseTestStairHandler):
         assert p1 == p2
 
     def test_comparison_equals_after_iteration(self):
+        if _travisTesting:
+            pytest.skip()
+
         p1 = data.PsiHandler(nTrials=10, intensRange=[0.1, 10],
                              alphaRange=[0.1, 10], betaRange=[0.1, 3],
                              intensPrecision=0.1, alphaPrecision=0.1,
@@ -582,6 +616,9 @@ class TestPsiHandler(_BaseTestStairHandler):
         assert p1 == p2
 
     def test_comparison_not_equal(self):
+        if _travisTesting:
+            pytest.skip()
+
         p1 = data.PsiHandler(nTrials=10, intensRange=[0.1, 10],
                              alphaRange=[0.1, 10], betaRange=[0.1, 3],
                              intensPrecision=0.1, alphaPrecision=0.1,
@@ -595,6 +632,9 @@ class TestPsiHandler(_BaseTestStairHandler):
         assert p1 != p2
 
     def test_comparison_not_equal_after_iteration(self):
+        if _travisTesting:
+            pytest.skip()
+
         p1 = data.PsiHandler(nTrials=10, intensRange=[0.1, 10],
                              alphaRange=[0.1, 10], betaRange=[0.1, 3],
                              intensPrecision=0.1, alphaPrecision=0.1,
@@ -610,6 +650,9 @@ class TestPsiHandler(_BaseTestStairHandler):
         assert p1 != p2
 
     def test_json_dump(self):
+        if _travisTesting:
+            pytest.skip()
+
         p = data.PsiHandler(nTrials=10, intensRange=[0.1, 10],
                             alphaRange=[0.1, 10], betaRange=[0.1, 3],
                             intensPrecision=1, alphaPrecision=1,
@@ -617,9 +660,12 @@ class TestPsiHandler(_BaseTestStairHandler):
         dump = p.saveAsJson()
 
         p.origin = ''
-        assert p == json_tricks.np.loads(dump)
+        assert p == json_tricks.loads(dump)
 
     def test_json_dump_with_data(self):
+        if _travisTesting:
+            pytest.skip()
+
         p = data.PsiHandler(nTrials=10, intensRange=[0.1, 10],
                             alphaRange=[0.1, 10], betaRange=[0.1, 3],
                             intensPrecision=1, alphaPrecision=1,
@@ -629,9 +675,12 @@ class TestPsiHandler(_BaseTestStairHandler):
         dump = p.saveAsJson()
 
         p.origin = ''
-        assert p == json_tricks.np.loads(dump)
+        assert p == json_tricks.loads(dump)
 
     def test_json_dump_after_iteration(self):
+        if _travisTesting:
+            pytest.skip()
+
         p = data.PsiHandler(nTrials=10, intensRange=[0.1, 10],
                             alphaRange=[0.1, 10], betaRange=[0.1, 3],
                             intensPrecision=1, alphaPrecision=1,
@@ -640,9 +689,12 @@ class TestPsiHandler(_BaseTestStairHandler):
         dump = p.saveAsJson()
 
         p.origin = ''
-        assert p == json_tricks.np.loads(dump)
+        assert p == json_tricks.loads(dump)
 
     def test_json_dump_with_data_after_iteration(self):
+        if _travisTesting:
+            pytest.skip()
+
         p = data.PsiHandler(nTrials=10, intensRange=[0.1, 10],
                             alphaRange=[0.1, 10], betaRange=[0.1, 3],
                             intensPrecision=1, alphaPrecision=1,
@@ -653,16 +705,23 @@ class TestPsiHandler(_BaseTestStairHandler):
         dump = p.saveAsJson()
 
         p.origin = ''
-        assert p == json_tricks.np.loads(dump)
+        assert p == json_tricks.loads(dump)
 
     def test_json_dump_to_file(self):
+        if _travisTesting:
+            pytest.skip()
+
+        _, path = mkstemp(dir=self.tmp_dir, suffix='.json')
         p = data.PsiHandler(nTrials=10, intensRange=[0.1, 10],
                             alphaRange=[0.1, 10], betaRange=[0.1, 3],
                             intensPrecision=1, alphaPrecision=1,
                             betaPrecision=0.5, delta=0.01)
-        p.saveAsJson(fileName=self.tmp_dir, fileCollisionMethod='overwrite')
+        p.saveAsJson(fileName=path, fileCollisionMethod='overwrite')
 
     def test_json_dump_and_reopen_file(self):
+        if _travisTesting:
+            pytest.skip()
+
         p = data.PsiHandler(nTrials=10, intensRange=[0.1, 10],
                             alphaRange=[0.1, 10], betaRange=[0.1, 3],
                             intensPrecision=1, alphaPrecision=1,

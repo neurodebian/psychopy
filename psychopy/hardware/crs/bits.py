@@ -11,12 +11,10 @@
 #    Shader code for mono++ and color++ modes was based on code in Psychtoolbox
 #    (Kleiner) but does not actually use that code directly
 
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import division
+from __future__ import absolute_import, division, print_function
 
-from future import standard_library
-standard_library.install_aliases()
+# from future import standard_library
+# standard_library.install_aliases()
 from builtins import range
 from builtins import object
 import os
@@ -264,10 +262,19 @@ class BitsPlusPlus(object):
         # do gamma correction if necessary
         if self.gammaCorrect == 'software':
             gamma = self.gamma
-            if hasattr(self.win.monitor, 'lineariseLums'):
-                lin = self.win.monitor.lineariseLums
+
+            try:
+                lin = self.win.monitor.linearizeLums
                 self.LUT[startII:endII, :] = lin(self.LUT[startII:endII, :],
                                                  overrideGamma=gamma)
+            except AttributeError:
+                try:
+                    lin = self.win.monitor.lineariseLums
+                    self.LUT[startII:endII, :] = lin(self.LUT[startII:endII, :],
+                                                     overrideGamma=gamma)
+                except AttributeError:
+                    pass
+
         # update the bits++ box with new LUT
         # get bits into correct order, shape and add to header
         # go from ubyte to uint16
@@ -423,7 +430,7 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
         bits.mode = 'mono++' # 'color++', 'mono++', 'bits++', 'status'
 
     """
-    name = 'CRS Bits#'
+    name = b'CRS Bits#'
 
     def __init__(self, win=None, portName=None, mode='', checkConfigLevel=1,
                  gammaCorrect='hardware', gamma=None, noComms=False):
@@ -572,17 +579,17 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
         self.read(timeout=0.5)  # clear input buffer
         info = {}
         # get product ('Bits_Sharp'?)
-        self.sendMessage('$ProductType\r')
+        self.sendMessage(b'$ProductType\r')
         time.sleep(0.1)
         info['ProductType'] = self.read().replace('#ProductType;', '')
         info['ProductType'] = info['ProductType'].replace(';\n\r', '')
         # get serial number
-        self.sendMessage('$SerialNumber\r')
+        self.sendMessage(b'$SerialNumber\r')
         time.sleep(0.1)
         info['SerialNumber'] = self.read().replace('#SerialNumber;', '')
         info['SerialNumber'] = info['SerialNumber'].replace('\x00\n\r', '')
         # get firmware date
-        self.sendMessage('$FirmwareDate\r')
+        self.sendMessage(b'$FirmwareDate\r')
         time.sleep(0.1)
         info['FirmwareDate'] = self.read().replace('#FirmwareDate;', '')
         info['FirmwareDate'] = info['FirmwareDate'].replace(';\n\r', '')
@@ -609,30 +616,30 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
         elif ('mode' in self.__dict__) and value == self.mode:
             return  # nothing to do here. Move along please
         elif value == 'status':
-            self.sendMessage('$statusScreen\r')
+            self.sendMessage(b'$statusScreen\r')
             self.__dict__['mode'] = 'status'
             return
         elif 'storage' in value.lower():
-            self.sendMessage('$USB_massStorage\r')
+            self.sendMessage(b'$USB_massStorage\r')
             self.__dict__['mode'] = 'massStorage'
         elif value.startswith('bits'):
-            self.sendMessage('$BitsPlusPlus\r')
+            self.sendMessage(b'$BitsPlusPlus\r')
             self.__dict__['mode'] = 'bits++'
             self.setLUT()
         elif value.startswith('mono'):
             if not self.win.useFBO:
                 raise Exception("Mono++ " + requiresFBO)
-            self.sendMessage('$monoPlusPlus\r')
+            self.sendMessage(b'$monoPlusPlus\r')
             self.__dict__['mode'] = 'mono++'
         elif value.startswith('colo'):
             if not self.win.useFBO:
                 raise Exception("Color++ " + requiresFBO)
-            self.sendMessage('$colorPlusPlus\r')
+            self.sendMessage(b'$colorPlusPlus\r')
             self.__dict__['mode'] = 'color++'
         elif value.startswith('auto'):
             if not self.win.useFBO:
                 raise Exception("Auto++ " + requiresFBO)
-            self.sendMessage('$autoPlusPlus\r')
+            self.sendMessage(b'$autoPlusPlus\r')
             self.__dict__['mode'] = 'auto++'
         else:
             msg = ("Bits# doesn't know how to use mode "
@@ -672,9 +679,9 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
     @temporalDithering.setter
     def temporalDithering(self, value):
         if value:
-            self.sendMessage('$TemporalDithering=[ON]\r')
+            self.sendMessage(b'$TemporalDithering=[ON]\r')
         else:
-            self.sendMessage('$TemporalDithering=[OFF]\r')
+            self.sendMessage(b'$TemporalDithering=[OFF]\r')
         self.__dict__['temporalDithering'] = value
 
     @property
@@ -686,7 +693,7 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
 
     @gammaCorrectFile.setter
     def gammaCorrectFile(self, value):
-        self.sendMessage('$enableGammaCorrection=[%s]\r' % (value))
+        self.sendMessage(b'$enableGammaCorrection=[%s]\r' % (value))
         self.__dict__['gammaCorrectFile'] = value
 
     @property
@@ -700,16 +707,16 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
 
     @monitorEDID.setter
     def monitorEDID(self, value):
-        self.sendMessage('$setMonitorType=[%s]\r' % (value))
+        self.sendMessage(b'$setMonitorType=[%s]\r' % (value))
         self.__dict__['monitorEDID'] = value
 
     # functions
     def beep(self, freq=800, dur=1):
         """Make a beep of a given frequency and duration
         """
-        self.sendMessage('$Beep=[%i, %.4f]\r' % (freq, dur))
+        self.sendMessage(b'$Beep=[%i, %.4f]\r' % (freq, dur))
 
-    def getVideoLine(self, lineN, nPixels, timeout=1.0, nAttempts=10):
+    def getVideoLine(self, lineN, nPixels, timeout=10.0, nAttempts=10):
         """Return the r,g,b values for a number of pixels on a particular
         video line
 
@@ -726,7 +733,7 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
         # define sub-function oneAttempt
         def oneAttempt():
             self.com.flushInput()
-            self.sendMessage('$GetVideoLine=[%i, %i]\r' % (lineN, nPixels))
+            self.sendMessage(b'$GetVideoLine=[%i, %i]\r' % (lineN, nPixels))
             # the box implicitly ends up in status mode
             self.__dict__['mode'] = 'status'
             # prepare to read
@@ -812,8 +819,7 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
                 self._warnTesting()
             else:
                 self.mode = prevMode
-                self.win.winHandle.setGammaRamp(
-                    self.win.winHandle, self.config.identityLUT)
+                self.win.gammaRamp = self.config.identityLUT
                 msg = "Bits# config matches current system: %s on %s"
                 logging.info(msg % (self.config.gfxCard, self.config.os))
                 return 1
@@ -827,9 +833,7 @@ class BitsSharp(BitsPlusPlus, serialdevice.SerialDevice):
                 logging.info("The current LUT didn't work as identity. "
                              "We'll try to find a working one.")
             else:
-                getRamp = self.win.winHandle.getGammaRamp
-                _winh = self.win.winHandle
-                self.config.identityLUT = getRamp(_winh).transpose()
+                self.config.identityLUT = self.win.backend.getGammaRamp().transpose()
                 self.config.save()
                 self.mode = prevMode
                 logging.info("We found a LUT and it worked as identity")

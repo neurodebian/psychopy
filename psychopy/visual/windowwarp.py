@@ -13,8 +13,7 @@ See the GNU General Public License Version 3 for more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see http://www.gnu.org/licenses/
 """
-from __future__ import print_function
-from __future__ import division
+from __future__ import absolute_import, division, print_function
 
 from builtins import map
 from builtins import range
@@ -200,7 +199,7 @@ class Warper(object):
         elif self.warp == 'warpfile':
             self.projectionWarpfile()
         else:
-            raise 'Unknown warp specification'
+            raise ValueError('Unknown warp specification: %s' % self.warp)
 
     def projectionNone(self):
         """No warp, same projection as original PsychoPy

@@ -1,4 +1,6 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
 """
 eye_tracker/run.py
 
@@ -9,8 +11,11 @@ with the Eye Tracker Technology chosen at the start of the demo via a
 drop down list. Exact same demo script is used regardless of the 
 Eye Tracker hardware used.
 
-Inital Version: May 6th, 2013, Sol Simpson
+Initial Version: May 6th, 2013, Sol Simpson
 """
+
+from __future__ import absolute_import, division, print_function
+
 from psychopy import visual
 from psychopy.data import TrialHandler,importConditions
 from psychopy.iohub import (EventConstants, EyeTrackerConstants, 
@@ -104,7 +109,7 @@ class ExperimentRuntime(ioHubExperimentRuntime):
         self.hub.clearEvents('all')
         t=0
         for trial in trials:    
-            # Update the instuction screen text...
+            # Update the instruction screen text...
             #            
             instuction_text="Press Space Key To Start Trial %d"%t
             instructions_text_stim.setText(instuction_text)        
@@ -192,7 +197,7 @@ class ExperimentRuntime(ioHubExperimentRuntime):
         #
         tracker.setConnectionState(False)
 
-        # Update the instuction screen text...
+        # Update the instruction screen text...
         #            
         instuction_text="Press Any Key to Exit Demo"
         instructions_text_stim.setText(instuction_text)        

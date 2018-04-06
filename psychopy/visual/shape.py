@@ -1,18 +1,21 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-'''Create geometric (vector) shapes by defining vertex locations.'''
+"""Create geometric (vector) shapes by defining vertex locations."""
 
 # Part of the PsychoPy library
 # Copyright (C) 2015 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL)
 
+from __future__ import absolute_import, print_function
+
+from builtins import str
+from past.builtins import basestring
+
 # Ensure setting pyglet.options['debug_gl'] to False is done prior to any
 # other calls to pyglet or pyglet submodules, otherwise it may not get picked
 # up by the pyglet GL engine and have no effect.
 # Shaders will work but require OpenGL2.0 drivers AND PyOpenGL3.0+
-from builtins import str
-from past.builtins import basestring
 import pyglet
 pyglet.options['debug_gl'] = False
 GL = pyglet.gl
@@ -25,6 +28,7 @@ from psychopy import logging
 from psychopy.tools.monitorunittools import cm2pix, deg2pix
 from psychopy.tools.attributetools import (attributeSetter, logAttrib,
                                            setAttribute)
+from psychopy.tools.arraytools import val2array
 from psychopy.visual.basevisual import (BaseVisualStim, ColorMixin,
                                         ContainerMixin)
 from psychopy.visual.helpers import setColor
@@ -309,6 +313,9 @@ class BaseShapeStim(BaseVisualStim, ColorMixin, ContainerMixin):
             win = self.win
         self._selectWindow(win)
 
+        if win._haveShaders:
+            _prog = self.win._progSignedFrag
+            GL.glUseProgram(_prog)
         # will check if it needs updating (check just once)
         vertsPix = self.verticesPix
         nVerts = vertsPix.shape[0]
@@ -353,6 +360,8 @@ class BaseShapeStim(BaseVisualStim, ColorMixin, ContainerMixin):
             else:
                 GL.glDrawArrays(GL.GL_LINE_STRIP, 0, nVerts)
         GL.glDisableClientState(GL.GL_VERTEX_ARRAY)
+        if win._haveShaders:
+            GL.glUseProgram(0)
         if not keepMatrix:
             GL.glPopMatrix()
 
@@ -378,7 +387,7 @@ class ShapeStim(BaseShapeStim):
     and contains() are not supported for multi-loop stimuli.
 
     `windingRule` is an advanced feature to allow control over the GLU
-    tesselator winding rule (default: GLU_TESS_WINDING_ODD). This is relevant
+    tessellator winding rule (default: GLU_TESS_WINDING_ODD). This is relevant
     only for self-crossing or multi-loop shapes. Cannot be set dynamically.
 
     See Coder demo > stimuli > shapes.py
@@ -439,7 +448,7 @@ class ShapeStim(BaseShapeStim):
 
         self.closeShape = closeShape
         self.windingRule = windingRule
-        self._initVertices(vertices)
+        self.vertices = vertices
 
         # remove deprecated params (from ShapeStim.__init__):
         self._initParams = self._initParamsOrig
@@ -450,19 +459,14 @@ class ShapeStim(BaseShapeStim):
         if self.autoLog:
             logging.exp("Created %s = %s" % (self.name, str(self)))
 
-    def _initVertices(self, newVertices):
-        """Set the .vertices and .border to new values, invoking tesselation.
+    def _tesselate(self, newVertices):
+        """Set the .vertices and .border to new values, invoking tessellation.
         """
         # TO-DO: handle borders properly for multiloop stim like holes
         # likely requires changes in ContainerMixin to iterate over each
         # border loop
 
-        # check if this is a name of one of our known shapes
-        if isinstance(newVertices, basestring) and newVertices in knownShapes:
-            newVertices = knownShapes[newVertices]
-
         self.border = copy.deepcopy(newVertices)
-        
         if self.closeShape:
             # convert original vertices to triangles (= tesselation) if
             # possible. (not possible if closeShape is False, don't even try)
@@ -488,7 +492,7 @@ class ShapeStim(BaseShapeStim):
             raise tesselate.TesselateError("Could not properly tesselate")
         else:
             initVertices = tessVertices
-        self.__dict__['vertices'] = numpy.array(initVertices, float)
+        self.__dict__['_tesselVertices'] = numpy.array(initVertices, float)
 
     @attributeSetter
     def vertices(self, newVerts):
@@ -499,13 +503,15 @@ class ShapeStim(BaseShapeStim):
 
         :ref:`Operations <attrib-operations>` supported with `.setVertices()`.
         """
-        self._initVertices(newVerts)
+        # check if this is a name of one of our known shapes
+        if isinstance(newVerts, basestring) and newVerts in knownShapes:
+            newVerts = knownShapes[newVerts]
 
         # Check shape
-        vsh = self.vertices.shape
-        if not (vsh == (2,) or (len(vsh) == 2 and vsh[1] == 2)):
-            raise ValueError("New value for setXYs should be 2x1 or Nx2")
+        self.__dict__['vertices'] = val2array(newVerts, withNone=True,
+                                              withScalar=True, length=2)
         self._needVertexUpdate = True
+        self._tesselate(self.vertices)
 
     @property
     def verticesPix(self):
@@ -536,6 +542,12 @@ class ShapeStim(BaseShapeStim):
         if not keepMatrix:
             GL.glPushMatrix()
             win.setScale('pix')
+
+        # setup the shaderprogram
+        if win._haveShaders:
+            _prog = self.win._progSignedFrag
+            GL.glUseProgram(_prog)
+
         # load Null textures into multitexteureARB - or they modulate glColor
         GL.glActiveTexture(GL.GL_TEXTURE0)
         GL.glEnable(GL.GL_TEXTURE_2D)
@@ -576,5 +588,7 @@ class ShapeStim(BaseShapeStim):
             GL.glDrawArrays(gl_line, 0, self._borderPix.shape[0])
 
         GL.glDisableClientState(GL.GL_VERTEX_ARRAY)
+        if win._haveShaders:
+            GL.glUseProgram(0)
         if not keepMatrix:
             GL.glPopMatrix()
