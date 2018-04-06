@@ -1,22 +1,42 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Audio capture and analysis using pyo"""
 
 # Part of the PsychoPy library
 # Copyright (C) 2015 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
+"""Audio capture and analysis using pyo"""
+
 # Author: Jeremy R. Gray, March 2012, March 2013
 
-from __future__ import division
-from future import standard_library
-standard_library.install_aliases()
+from __future__ import absolute_import, division, print_function
+
+# from future import standard_library
+# standard_library.install_aliases()
 from builtins import str
 from past.builtins import basestring
 from builtins import object
 import os
 import glob
 import threading
-import urllib.request, urllib.error, urllib.parse
+from psychopy.constants import PY3
+
+if PY3:
+    import urllib.request
+    import urllib.error
+    import urllib.parse
+else:
+    import urllib2
+    # import urllib.request, urllib.error, urllib.parse
+
+    class FakeURLlib(object):
+
+        def __init__(self, lib):
+            self.request = lib
+            self.error = lib
+            self.parse = lib
+    urllib = FakeURLlib(urllib2)
+
 import json
 import numpy as np
 from scipy.io import wavfile
@@ -90,7 +110,7 @@ class AudioCapture(object):
         def run(self, filename, sec, sampletype=0, buffering=16,
                 chnl=0, chnls=2):
             self.running = True
-            # chnl from pyo.pa_get_input_devices()
+            # chnl from psychopy.sound.backend.get_input_devices()
             inputter = pyo.Input(chnl=chnl, mul=1)
             self.recorder = pyo.Record(inputter, filename, chnls=chnls,
                                        fileformat=0, sampletype=sampletype,

@@ -1,10 +1,14 @@
-"""To build simple dialogues etc. (requires wxPython)
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 # Part of the PsychoPy library
 # Copyright (C) 2015 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
-from __future__ import absolute_import
+"""To build simple dialogues etc. (requires wxPython)
+"""
+
+from __future__ import absolute_import, print_function
 
 from builtins import str
 from builtins import super
@@ -13,7 +17,8 @@ from psychopy import logging
 import wx
 import numpy
 import os
-from psychopy.app.localization import _translate
+from psychopy.localization import _translate
+from pkg_resources import parse_version
 
 OK = wx.ID_OK
 
@@ -25,7 +30,7 @@ def ensureWxApp():
         wx.Dialog(None, -1)  # not shown; FileDialog gives same exception
         return True
     except wx._core.PyNoAppError:
-        if wx.version() < '2.9':
+        if parse_version(wx.__version__) < parse_version('2.9'):
             return wx.PySimpleApp()
         else:
             return wx.App(False)
@@ -57,14 +62,16 @@ class Dlg(wx.Dialog):
     """
 
     def __init__(self, title=_translate('PsychoPy dialogue'),
-                 pos=None, size=wx.DefaultSize,
+                 pos=wx.DefaultPosition, size=wx.DefaultSize,
                  style=wx.DEFAULT_DIALOG_STYLE | wx.DIALOG_NO_PARENT,
                  labelButtonOK=_translate(" OK "),
                  labelButtonCancel=_translate(" Cancel ")):
         style = style | wx.RESIZE_BORDER
         global app  # avoid recreating for every gui
+        if pos is None:
+            pos = wx.DefaultPosition
         app = ensureWxApp()
-        super().__init__(parent=None, id=-1, title=title, style=style)
+        super().__init__(parent=None, id=-1, title=title, style=style, pos=pos)
         self.inputFields = []
         self.inputFieldTypes = []
         self.inputFieldNames = []
@@ -402,7 +409,7 @@ def fileOpenDlg(tryFilePath="",
     global app  # avoid recreating for every gui
     app = ensureWxApp()
     dlg = wx.FileDialog(None, prompt, tryFilePath, tryFileName, allowed,
-                        wx.FD_OPEN | wx.FILE_MUST_EXIST | wx.MULTIPLE)
+                        wx.FD_OPEN | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE)
     if dlg.ShowModal() == OK:
         # get names of images and their directory
         fullPaths = dlg.GetPaths()

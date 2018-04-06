@@ -1,3 +1,10 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# Part of the PsychoPy library
+# Copyright (C) 2015 Jonathan Peirce
+# Distributed under the terms of the GNU General Public License (GPL).
+
 """Cedrus make a variety of input devices.
 See http://www.cedrus.com/
 
@@ -8,9 +15,7 @@ pyxid package instead (bundled with Standalone PsychoPy)::
 
 ----------
 """
-# Part of the PsychoPy library
-# Copyright (C) 2015 Jonathan Peirce
-# Distributed under the terms of the GNU General Public License (GPL).
+from __future__ import absolute_import, print_function
 
 from builtins import range
 from builtins import object
@@ -153,12 +158,12 @@ class RB730(object):
 
     def measureRoundTrip(self):
         # round trip
-        self.sendMessage('e4')  # start round trip
+        self.sendMessage(b'e4')  # start round trip
         # wait for 'X'
         while True:
             if self.readMessage() == 'X':
                 break
-        self.sendMessage('X')  # send it back
+        self.sendMessage(b'X')  # send it back
 
         # wait for final time info
         msgBack = ''
@@ -180,15 +185,15 @@ class RB730(object):
         return keys
 
     def resetTrialTimer(self):
-        self.sendMessage('e5')
+        self.sendMessage(b'e5')
 
     def resetBaseTimer(self):
-        self.sendMessage('e1')
+        self.sendMessage(b'e1')
 
     def getBaseTimer(self):
         """Retrieve the current time on the base timer
         """
-        self.sendMessage('e3')
+        self.sendMessage(b'e3')
         # core.wait(0.05)
         localTimer = core.Clock()
 
@@ -201,6 +206,6 @@ class RB730(object):
     def getInfo(self):
         """Get the name of this device
         """
-        self.sendMessage('_d1')
+        self.sendMessage(b'_d1')
         core.wait(0.1)
         return self.readMessage()

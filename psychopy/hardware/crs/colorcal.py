@@ -12,14 +12,11 @@
 # Acknowledgements
 #    This code was written by Jon Peirce
 
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import division
+from __future__ import absolute_import, division, print_function
 
 
 from builtins import bytes
 from builtins import range
-from past.utils import old_div
 from builtins import object
 import sys
 try:
@@ -180,7 +177,7 @@ class ColorCAL(object):
 
         """
         # use a long timeout for measurement:
-        val = self.sendMessage('MES', timeout=5)
+        val = self.sendMessage(b'MES', timeout=5)
         vals = val.split(',')
         ok = (vals[0] == 'OK00')
         # transform raw x,y,z by calibration matrix
@@ -209,7 +206,7 @@ class ColorCAL(object):
         Other values will be a string or None.
 
         """
-        val = self.sendMessage('IDR').split(',')
+        val = self.sendMessage(b'IDR').split(',')
         ok = (val[0] == 'OK00')
         if ok:
             firmware = val[2]
@@ -250,7 +247,7 @@ class ColorCAL(object):
 
             ColorCAL.getNeedsCalibrateZero()
         """
-        val = self.sendMessage("UZC", timeout=1.0)
+        val = self.sendMessage(b"UZC", timeout=1.0)
         if val == 'OK00':
             pass
         elif val == 'ER11':
@@ -346,11 +343,11 @@ def _minolta2float(inVal):
     # handle single vals
     if arr.shape == ():
         if inVal < 50000:
-            return old_div(inVal, 10000.0)
+            return inVal/10000.0
         else:
-            return old_div((-inVal + 50000.0), 10000.0)
+            return (-inVal + 50000.0)/10000.0
     # handle arrays
     negs = (arr > 50000)  # find negative values
-    out = old_div(arr, 10000.0)  # these are the positive values
-    out[negs] = old_div((-arr[negs] + 50000.0), 10000.0)
+    out = arr/10000.0  # these are the positive values
+    out[negs] = (-arr[negs] + 50000.0)/10000.0
     return out

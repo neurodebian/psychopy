@@ -3,23 +3,25 @@
 
 """Provides class BaseVisualStim and mixins; subclass to get visual stimuli
 """
-from __future__ import absolute_import
-from __future__ import division
 
 # Part of the PsychoPy library
 # Copyright (C) 2015 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
+
+from __future__ import absolute_import, division, print_function
+
+from builtins import object
+from past.builtins import basestring
 
 # Ensure setting pyglet.options['debug_gl'] to False is done prior to any
 # other calls to pyglet or pyglet submodules, otherwise it may not get picked
 # up by the pyglet GL engine and have no effect.
 # Shaders will work but require OpenGL2.0 drivers AND PyOpenGL3.0+
 
-from builtins import object
-from past.builtins import basestring
 import pyglet
 pyglet.options['debug_gl'] = False
 GL = pyglet.gl
+
 try:
     from PIL import Image
 except ImportError:
@@ -497,7 +499,9 @@ class ContainerMixin(object):
         if hasattr(self, 'flipVert') and self.flipVert:
             flip[1] = -1 # True=(-1), False->(+1)
 
-        if hasattr(self, 'vertices'):
+        if hasattr(self, '_tesselVertices'):  # Shapes need to render from this
+            verts = self._tesselVertices
+        elif hasattr(self, 'vertices'):
             verts = self.vertices
         else:
             verts = self._verticesBase
@@ -571,6 +575,14 @@ class ContainerMixin(object):
         # ourself in pixels
         if hasattr(self, 'border'):
             poly = self._borderPix  # e.g., outline vertices
+        elif hasattr(self, 'boundingBox'):
+            if abs(self.ori) > 0.1:
+                raise RuntimeError("TextStim.contains() doesn't currently "
+                                   "support rotated text.")
+            w, h = self.boundingBox  # e.g., outline vertices
+            x, y = self.posPix
+            poly = numpy.array([[x+w/2, y-h/2], [x-w/2, y-h/2],
+                                [x-w/2, y+h/2], [x+w/2, y+h/2]])
         else:
             poly = self.verticesPix  # e.g., tesselated vertices
 
@@ -1268,6 +1280,12 @@ class BaseVisualStim(MinimalStim, WindowMixin, LegacyVisualMixin):
             else:
                 # we have an image; calculate the size in `units` that matches
                 # original pixel size
+                # also scale for retina display (virtual pixels are bigger)
+                if self.win.useRetina:
+                    winSize = self.win.size / 2
+                else:
+                    winSize = self.win.size
+                # then handle main scale
                 if self.units == 'pix':
                     value = numpy.array(self._origSize)
                 elif self.units in ('deg', 'degFlatPos', 'degFlat'):
@@ -1277,9 +1295,9 @@ class BaseVisualStim(MinimalStim, WindowMixin, LegacyVisualMixin):
                     value = pix2deg(array(self._origSize, float),
                                     self.win.monitor)
                 elif self.units == 'norm':
-                    value = 2 * array(self._origSize, float) / self.win.size
+                    value = 2 * array(self._origSize, float) / winSize
                 elif self.units == 'height':
-                    value = array(self._origSize, float) / self.win.size[1]
+                    value = array(self._origSize, float) / winSize[1]
                 elif self.units == 'cm':
                     value = pix2cm(array(self._origSize, float),
                                    self.win.monitor)

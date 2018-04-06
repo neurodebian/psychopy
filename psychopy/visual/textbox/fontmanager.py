@@ -1,13 +1,14 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
 """
 Created on Sun Nov 10 12:18:45 2013
 
 @author: Sol
 """
 
-from __future__ import print_function
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import absolute_import, division, print_function
+
 from builtins import chr
 from builtins import object
 import os
@@ -169,7 +170,7 @@ class FontManager(object):
         a monospace font (as only monospace fonts are currently supported by
         TextBox).
 
-        Adding fonts to the FontManager is not persistant across runs of
+        Adding fonts to the FontManager is not persistent across runs of
         the script, so any extra font paths need to be added each time the
         script starts.
         """

@@ -1,13 +1,16 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 """Migration helper script for Coder demos: Do the conversion
 
   For all demos/coder/subdir/*.py (there are ~70 or so total), write out a new file: coder_updated/subdir/*
 """
-from __future__ import print_function
+from __future__ import absolute_import, print_function
 
 import sys, glob, os, re
 
 
-_valid_var_re = re.compile(r"^[a-zA-Z_][\w]*$")
+valid_var_re = re.compile(r"^[a-zA-Z_][\w]*$")
 coding = '# -*- coding: utf-8 -*-\n'
 demo_license = '\n# The contents of this file are in the public domain.\n'
 division = 'from __future__ import division'
@@ -131,7 +134,7 @@ def replace_commas_etc(f1):
 
 
 def is_var_name(name):
-    return all([_valid_var_re.match(n) for n in name.split('.')])
+    return all([valid_var_re.match(n) for n in name.split('.')])
 
 
 def replace_equals(f1):

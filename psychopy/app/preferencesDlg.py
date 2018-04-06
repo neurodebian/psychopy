@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 from __future__ import absolute_import, print_function
 
@@ -11,10 +13,11 @@ import platform
 import re
 import copy
 
-from . import localization, dialogs
-from psychopy import logging
+from . import dialogs
+from psychopy import logging, localization
 from psychopy.exceptions import DependencyError
-from .localization import _translate
+from psychopy.localization import _translate
+from pkg_resources import parse_version
 
 # this will be overridden by the size of the scrolled panel making the prefs
 dlgSize = (520, 600)
@@ -80,6 +83,7 @@ _localized = {
     'close': _translate('close'),
     'quit': _translate('quit'),
     'preferences': _translate('preferences'),
+    'exportHTML': _translate('export HTML'),
     'cut': _translate('cut'),
     'copy': _translate('copy'),
     'paste': _translate('paste'),
@@ -93,7 +97,10 @@ _localized = {
     'redo': _translate('redo'),
     'comment': _translate('comment'),
     'uncomment': _translate('uncomment'),
+    'toggle comment': _translate('toggle comment'),
     'fold': _translate('fold'),
+    'enlargeFont': _translate('enlarge Font'),
+    'shrinkFont': _translate('shrink Font'),
     'analyseCode': _translate('analyze code'),
     'compileScript': _translate('compile script'),
     'runScript': _translate('run script'),
@@ -104,8 +111,9 @@ _localized = {
     'newRoutine': _translate('new Routine'),
     'copyRoutine': _translate('copy Routine'),
     'pasteRoutine': _translate('paste Routine'),
-    'renameRoutine': _translate('rename Routine'),
+    'pasteCompon': _translate('paste Component'),
     'toggleOutputPanel': _translate('toggle output panel'),
+    'renameRoutine': _translate('rename Routine'),
     'switchToBuilder': _translate('switch to Builder'),
     'switchToCoder': _translate('switch to Coder'),
     'largerFlow': _translate('larger Flow'),
@@ -113,6 +121,11 @@ _localized = {
     'largerRoutine': _translate('larger routine'),
     'smallerRoutine': _translate('smaller routine'),
     'toggleReadme': _translate('toggle readme'),
+    'projectsLogIn': _translate('login to projects'),
+    'projectsSync': _translate('sync projects'),
+    'projectsFind': _translate('find projects'),
+    'projectsOpen': _translate('open projects'),
+    'projectsNew': _translate('new projects'),
     # pref wxChoice lists:
     'last': _translate('same as last session'),
     'both': _translate('both Builder & Coder'),
@@ -375,13 +388,15 @@ class PrefCtrls(object):
                 options = copy.copy(value)
                 value = value[0]
                 try:
-                    from psychopy import sound
-                    if hasattr(sound, 'getDevices'):
-                        devs = sound.getDevices('output')
-                        for thisDevName in devs:
+                    # getting device name using sounddevice
+                    import sounddevice
+                    devices = sounddevice.query_devices()
+                    for device in devices:
+                        if device['max_output_channels'] > 0:
+                            thisDevName = device['name']
                             if thisDevName not in options:
                                 options.append(thisDevName)
-                except DependencyError:
+                except (ValueError, OSError, ImportError):
                     pass
             else:
                 options = spec.replace("option(", "").replace("'", "")
@@ -468,7 +483,7 @@ class PrefCtrls(object):
 
 if __name__ == '__main__':
     from psychopy import preferences
-    if wx.version() < '2.9':
+    if parse_version(wx.__version__) < parse_version('2.9'):
         app = wx.PySimpleApp()
     else:
         app = wx.App(False)

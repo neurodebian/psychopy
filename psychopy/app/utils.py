@@ -8,7 +8,7 @@
 """utility classes for the Builder
 """
 
-from __future__ import (absolute_import, print_function, division)
+from __future__ import absolute_import, division, print_function
 from builtins import object
 
 import sys
@@ -34,6 +34,7 @@ class FileDropTarget(wx.FileDropTarget):
             else:
                 logging.warning(
                     'dropped file ignored: did not end in .psyexp or .py')
+        return True
 
 
 class WindowFrozen(object):
@@ -55,7 +56,11 @@ class WindowFrozen(object):
         # Freeze should not be called if platform is win32.
         if sys.platform == 'win32':
             return self.ctrl
+
         # check it hasn't been deleted
+        #
+        # Don't use StrictVersion() here, as `wx` doesn't follow the required
+        # numbering scheme.
         if self.ctrl is not None and wx.__version__[:3] <= '2.8':
             self.ctrl.Freeze()
         return self.ctrl

@@ -8,27 +8,27 @@
 """Dialog classes for the Builder
 """
 
-from __future__ import absolute_import, print_function, division
+from __future__ import absolute_import, division, print_function
 
 from builtins import str
 import re
 import sys
 
+from pkg_resources import parse_version
 import numpy
 import wx
-import wx.aui
 import wx.stc
 from wx.lib import platebtn
 try:
-    from wx.adv import PseudoDC
-except ImportError:
     from wx import PseudoDC
+except ImportError:
+    from wx.adv import PseudoDC
 
 from psychopy import logging, data
 from psychopy.app.utils import FileDropTarget
 from .dialogs import DlgLoopProperties
 from .. import dialogs
-from ..localization import _translate
+from psychopy.localization import _translate
 
 
 canvasColor = [200, 200, 200]  # in prefs? ;-)
@@ -43,9 +43,6 @@ darkgrey = wx.Colour(65, 65, 65, 255)
 white = wx.Colour(255, 255, 255, 255)
 darkblue = wx.Colour(30, 30, 150, 255)
 codeSyntaxOkay = wx.Colour(220, 250, 220, 255)  # light green
-
-# regular expression to check for unescaped '$' to indicate code:
-_unescapedDollarSign_re = re.compile(r"^\$|[^\\]\$")
 
 
 class FlowPanel(wx.ScrolledWindow):
@@ -77,7 +74,7 @@ class FlowPanel(wx.ScrolledWindow):
 
         # create a PseudoDC to record our drawing
         self.pdc = PseudoDC()
-        if wx.version()<"4":
+        if parse_version(wx.__version__) < parse_version('4.0.0a1'):
             self.pdc.DrawRoundedRectangle = self.pdc.DrawRoundedRectangleRect
         self.pen_cache = {}
         self.brush_cache = {}

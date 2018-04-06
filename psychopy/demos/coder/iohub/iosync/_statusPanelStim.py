@@ -1,4 +1,8 @@
-from __future__ import division
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import absolute_import, division, print_function
+
 from builtins import object
 __author__ = 'Sol'
 
@@ -7,9 +11,9 @@ import numpy as np
 
 class AnalogMeter(object):
     """
-    Displays an analog guage style graphic (think fuel guage, etc, but very
-    simple). A label can be displayed below the guage, and the guage value
-    can be displayed as part of the guage background itself.
+    Displays an analog gauge style graphic (think fuel gauge, etc, but very
+    simple). A label can be displayed below the gauge, and the gauge value
+    can be displayed as part of the gauge background itself.
 
     The graphics are created using several standard PsychoPy stim types
     together.

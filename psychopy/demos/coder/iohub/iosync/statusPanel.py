@@ -1,4 +1,6 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
 """
 This demo requires that an ioSync device is correctly connected to the computer
 running this script.
@@ -6,7 +8,7 @@ running this script.
 This demo displays the ioSync digital and analog input values in real time.
 The GUI can also be used to toggle the state of any of the digital output lines.
 """
-from __future__ import division
+from __future__ import absolute_import, division, print_function
 
 from builtins import range
 LUX_AIN = 0
@@ -189,7 +191,7 @@ def main():
             io.clearEvents('all')
             io.quit()
 
-# Misc. constaints for ioSync
+# Misc. constraints for ioSync
 MAX_RAW = 2.0 ** 16
 MAX_LUX = 15.0 # in k lux
 MAX_AIN_V = 3.3

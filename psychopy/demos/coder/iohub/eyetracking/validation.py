@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import absolute_import, division, print_function
+
 from psychopy import core, visual
 from psychopy.iohub import launchHubServer, ioHubConnection, EventConstants
 from psychopy.iohub import TimeTrigger, DeviceEventTrigger
@@ -62,7 +67,7 @@ positions = PositionGrid(
 # the first position).
 positions.randomize()
 
-# Specifiy the Triggers to use to move from target point to point during
+# Specify the Triggers to use to move from target point to point during
 # the validation sequence....
 
 # Use DeviceEventTrigger to create a keyboard char event trigger

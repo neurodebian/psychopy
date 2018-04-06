@@ -7,8 +7,10 @@
 # Copyright (C) 2015 Jonathan Peirce
 # Distributed under the terms of the GNU General Public License (GPL).
 
-from future import standard_library
-standard_library.install_aliases()
+from __future__ import absolute_import, print_function
+
+# from future import standard_library
+# standard_library.install_aliases()
 
 from builtins import object
 import sys
@@ -25,7 +27,7 @@ if PY3:
     import urllib.parse
 else:
     import urllib2
-    import urllib.request, urllib.error, urllib.parse
+    # import urllib.request, urllib.error, urllib.parse
 
     class FakeURLlib(object):
 

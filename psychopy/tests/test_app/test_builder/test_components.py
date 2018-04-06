@@ -6,7 +6,9 @@ import pytest
 
 from psychopy import prefs
 from psychopy.app import builder, projects
-from psychopy.app.builder.components import getAllComponents
+from psychopy.experiment import getAllComponents
+from psychopy import experiment
+from pkg_resources import parse_version
 
 # use "python genComponsTemplate.py --out" to generate a new profile to test against
 #   = analogous to a baseline image to compare screenshots
@@ -32,7 +34,7 @@ ignoreParallelOutAddresses = True
 class TestComponents(object):
     @classmethod
     def setup_class(cls):
-        cls.exp = builder.experiment.Experiment() # create once, not every test
+        cls.exp = experiment.Experiment() # create once, not every test
         cls.here = os.path.abspath(os.path.dirname(__file__))
         cls.baselineProfile = os.path.join(cls.here, profile)
 
@@ -41,7 +43,7 @@ class TestComponents(object):
             cls.allComp = getAllComponents(fetchIcons=False)
         except Exception:
             import wx
-            if wx.version() < '2.9':
+            if parse_version(wx.__version__) < parse_version('2.9'):
                 tmpApp = wx.PySimpleApp()
             else:
                 tmpApp = wx.App(False)
@@ -62,11 +64,11 @@ class TestComponents(object):
         """This setup is done for each test individually
         """
         pass
+
     def teardown(self):
         pass
 
     def test_component_attribs(self):
-
         target = open(self.baselineProfile, 'rU').read()
         targetLines = target.splitlines()
         targetTag = {}
@@ -79,7 +81,7 @@ class TestComponents(object):
                 # handle multi-line default values, eg TextComponent.text.default
                 targetTag[t] += '\n' + line  # previous t value
 
-        param = builder.experiment.Param('', '')  # want its namespace
+        param = experiment.Param('', '')  # want its namespace
         ignore = ['__doc__', '__init__', '__module__', '__str__', 'next',
                   '__unicode__', '__native__', '__nonzero__', '__long__']
 
@@ -100,15 +102,18 @@ class TestComponents(object):
         for compName in sorted(self.allComp):
             comp = self.allComp[compName](parentName='x', exp=self.exp)
             order = '%s.order:%s' % (compName, eval("comp.order"))
-            if not order+'\n' in target:
+
+            if order+'\n' not in target:
                 tag = order.split(':',1)[0]
                 try:
                     mismatch = order + ' <== ' + targetTag[tag]
                 except IndexError: # missing
                     mismatch = order + ' <==> NEW (no matching param in the reference profile)'
                 print(mismatch.encode('utf8'))
+
                 if not ignoreOrder:
                     err.append(mismatch)
+
             for parName in comp.params:
                 # default is what you get from param.__str__, which returns its value
                 default = '%s.%s.default:%s' % (compName, parName, comp.params[parName])
@@ -131,8 +136,13 @@ class TestComponents(object):
                         'SettingsComponent.Use version.__dict__' in line):
                         # versions available on travis-ci are only local
                         continue
+                    origMatch = line+'\n' in target
+                    lineAlt = (line.replace(":\'", ":u'")
+                                    .replace("\\\\","\\")
+                                    .replace("\\'", "'"))
                     # start checking params
-                    if not line+'\n' in target:
+                    if not (line+'\n' in target
+                            or lineAlt+'\n' in target):
                         # mismatch, so report on the tag from orig file
                         # match checks tag + multi-line, because line is multi-line and target is whole file
                         tag = line.split(':',1)[0]

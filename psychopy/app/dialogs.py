@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 """This is for general purpose dialogs/widgets, not particular functionality
 
 MessageDialog:
@@ -10,7 +13,7 @@ ListWidget:
     the user to add/remove entries. e.g. expInfo control
 """
 
-from __future__ import absolute_import
+from __future__ import absolute_import, print_function
 
 from builtins import str
 from builtins import range
@@ -18,15 +21,17 @@ import wx
 from wx.lib.newevent import NewEvent
 
 from psychopy import logging
-from .localization import _translate
+from psychopy.localization import _translate
+from pkg_resources import parse_version
 
 
 class MessageDialog(wx.Dialog):
-    """For some reason the wx built-in message dialog has issues on Mac OS X
+    """For some reason the wx built-in message dialog has issues on macOS
     (buttons don't always work) so we need to use this instead.
     """
 
-    def __init__(self, parent=None, message='', type='Warning', title=None):
+    def __init__(self, parent=None, message='', type='Warning', title=None,
+                 timeout=None):
         # select and localize a title
         if not title:
             title = type
@@ -67,6 +72,7 @@ class MessageDialog(wx.Dialog):
         sizer.Add(btnSizer, flag=wx.ALIGN_RIGHT | wx.ALL, border=5)
         self.Center()
         self.SetSizerAndFit(sizer)
+        self.timeout = timeout
 
     def onButton(self, event):
         self.EndModal(event.GetId())
@@ -74,6 +80,14 @@ class MessageDialog(wx.Dialog):
     def onEscape(self, event):
         self.EndModal(wx.ID_CANCEL)
 
+    def onEnter(self, event=None):
+        self.EndModal(wx.ID_OK)
+
+    def ShowModal(self):
+        if self.timeout:
+            timeout = wx.CallLater(self.timeout, self.onEnter)
+            timeout.Start()
+        return wx.Dialog.ShowModal(self)
 
 # Event for GlobSizer-----------------------------------------------------
 (GBSizerExLayoutEvent, EVT_GBSIZEREX_LAYOUT) = NewEvent()
@@ -546,7 +560,7 @@ class ListWidget(GlobSizer):
         """The plus button has been pressed
         """
         btn = self.FindItem(event.GetEventObject())
-        row, col = btn.GetPosTuple()
+        row, col = btn.GetPos()
         self.InsertRow(row)
         newEntry = {}
         for fieldName in self.fieldNames:
@@ -559,7 +573,7 @@ class ListWidget(GlobSizer):
         """Called when the minus button is pressed.
         """
         btn = self.FindItem(event.GetEventObject())
-        row, col = btn.GetPosTuple()
+        row, col = btn.GetPos()
         self.DeleteRow(row)
         self.Layout()
         self.parent.Fit()
@@ -591,7 +605,7 @@ class ListWidget(GlobSizer):
 
 
 if __name__ == '__main__':
-    if wx.version() < '2.9':
+    if parse_version(wx.__version__) < parse_version('2.9'):
         app = wx.PySimpleApp()
     else:
         app = wx.App(False)

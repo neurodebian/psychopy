@@ -1,11 +1,16 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# Part of the PsychoPy library
+# Copyright (C) 2015 Jonathan Peirce
+# Distributed under the terms of the GNU General Public License (GPL).
+
 """Minolta light-measuring devices
 See http://www.konicaminolta.com/instruments
 
 ----------
 """
-# Part of the PsychoPy library
-# Copyright (C) 2015 Jonathan Peirce
-# Distributed under the terms of the GNU General Public License (GPL).
+from __future__ import absolute_import, print_function
 
 from builtins import range
 from builtins import object
@@ -57,7 +62,7 @@ class LS100(object):
             logging.console.setLevel(logging.INFO)  # more info
             logging.console.setLevel(logging.DEBUG)  # log all communications
 
-        If you're using a keyspan adapter (at least on OS X) be aware that
+        If you're using a keyspan adapter (at least on macOS) be aware that
         it needs a driver installed. Otherwise no ports wil be found.
 
         Error messages:
@@ -116,7 +121,8 @@ class LS100(object):
             'ER30\r\n': 'Photometer battery exhausted', }
 
         # try to open the port
-        if sys.platform in ['darwin', 'win32']:
+        _linux = sys.platform.startswith('linux')
+        if sys.platform in ('darwin', 'win32') or _linux:
             try:
                 self.com = serial.Serial(self.portString)
             except Exception:
@@ -126,7 +132,7 @@ class LS100(object):
         else:
             msg = "I don't know how to handle serial ports on %s"
             self._error(msg % sys.platform)
-        # setup the params for PR650 comms
+        # setup the params for comms
         if self.OK:
             self.com.close()  # not sure why this helps but on win32 it does!!
             # this is a slightly odd characteristic of the Minolta LS100
@@ -148,7 +154,7 @@ class LS100(object):
                 time.sleep(0.2)
                 for n in range(10):
                     # set to use absolute measurements
-                    reply = self.sendMessage('MDS,04')
+                    reply = self.sendMessage(b'MDS,04')
                     if reply[0:2] == 'OK':
                         self.OK = True
                         break
@@ -169,13 +175,13 @@ class LS100(object):
 
         See user manual for other modes
         """
-        reply = self.sendMessage('MDS,%s' % mode)
+        reply = self.sendMessage(b'MDS,%s' % mode)
         return self.checkOK(reply)
 
     def measure(self):
         """Measure the current luminance and set .lastLum to this value
         """
-        reply = self.sendMessage('MES')
+        reply = self.sendMessage(b'MES')
         if self.checkOK(reply):
             lum = float(reply.split()[-1])
             return lum
@@ -190,7 +196,7 @@ class LS100(object):
     def clearMemory(self):
         """Clear the memory of the device from previous measurements
         """
-        reply = self.sendMessage('CLE')
+        reply = self.sendMessage(b'CLE')
         ok = self.checkOK(reply)
         return ok
 
