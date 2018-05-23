@@ -26,7 +26,7 @@ ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	echo "I: Running tests using default Python"
 	cd build \
 		&& USER=nobody TRAVIS=true \
-		$(XVFB_RUN) python -m pytest --tb=line -s -m "not needs_sound" ../psychopy || { echo "TESTS FAILED"; $(failed_tests_cmd); }
+		$(XVFB_RUN) python -m pytest --tb=line -s -v -m "not needs_sound" ../psychopy || { echo "TESTS FAILED"; $(failed_tests_cmd); }
 endif
 ## Fix up permissions on images -- pushed upstream, but left here
 ## just to make sure everything is ok

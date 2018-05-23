@@ -4,6 +4,7 @@ Priority: optional
 Maintainer: NeuroDebian Team <team@neuro.debian.net>
 Uploaders: Yaroslav Halchenko <debian@onerussian.com>, Michael Hanke <michael.hanke@gmail.com>
 Build-Depends: debhelper (>= 7),
+               dh-python,
                python, python-setuptools,
                help2man, imagemagick,
                python-configobj,
