@@ -1,4 +1,10 @@
-psychopy (1.90.1.dfsg-1) unstable; urgency=medium
+psychopy (1.85.3.dfsg-1) unstable; urgency=medium
+
+  * Fresh upstream release
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 23 May 2018 09:19:15 -0400
+
+psychopy (1.90.1.dfsg-1) UNRELEASED; urgency=medium
 
   * Fresh upstream release
   * debian/rules
@@ -6,7 +12,7 @@ psychopy (1.90.1.dfsg-1) unstable; urgency=medium
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 06 Apr 2018 00:24:58 -0400
 
-psychopy (1.85.4.dfsg-1) unstable; urgency=medium
+psychopy (1.85.4.dfsg-1) UNRELEASED; urgency=medium
 
   * Fresh upstream release
 
