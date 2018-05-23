@@ -1,6 +1,6 @@
 --- a/psychopy/tests/test_app/test_Wizard.py
 +++ b/psychopy/tests/test_app/test_Wizard.py
-@@ -27,11 +27,17 @@ class TestWizard():
+@@ -28,11 +28,17 @@ class TestWizard(object):
              psychopy.tools.wizard.cardOkay = tmpcardOkay
  
      def test_firstrunWizard(self):
