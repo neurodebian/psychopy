@@ -1,0 +1,12 @@
+--- a/setup.py
++++ b/setup.py
+@@ -24,7 +24,8 @@ PY3 = version_info >= (3, 0)
+ required = ['requests[security]',
+             'numpy', 'scipy', 'matplotlib', 'pandas', 'pillow',
+             'wxPython', 'pyglet', 'pygame', 'configobj', 'pyopengl',
+-            'soundfile', 'sounddevice',
++            # packaging: TODO
++            # 'soundfile', 'sounddevice',
+             'python-bidi', 'cffi',
+             'future', 'json_tricks',
+             'pyosf',
