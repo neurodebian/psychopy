@@ -1,12 +1,40 @@
 --- a/setup.py
 +++ b/setup.py
-@@ -24,7 +24,8 @@ PY3 = version_info >= (3, 0)
+@@ -24,19 +24,30 @@ PY3 = version_info >= (3, 0)
  required = ['requests[security]',
              'numpy', 'scipy', 'matplotlib', 'pandas', 'pillow',
              'wxPython', 'pyglet', 'pygame', 'configobj', 'pyopengl',
 -            'soundfile', 'sounddevice',
+-            'python-bidi', 'cffi',
 +            # packaging: TODO
-+            # 'soundfile', 'sounddevice',
-             'python-bidi', 'cffi',
++            'soundfile', 
++            #'sounddevice',
++            #'python-bidi', 
++            'cffi',
              'future', 'json_tricks',
-             'pyosf',
+-            'pyosf',
++            #'pyosf',
+             'xlrd', 'openpyxl',  # MS Excel
+             'pyserial', 'pyparallel',
+-            'pyyaml', 'gevent', 'msgpack-python', 'psutil', 'tables', 'zmq',
+-            'moviepy']
++            'pyyaml', 'gevent', 
++            # packaged and available IIRC
++            # 'msgpack-python',
++            'psutil', 'tables', 
++            # packaged and available IIRC
++            # 'zmq',
++            # TODO
++            #'moviepy'
++            ]
+ 
+ # `opencv` package should be installed via conda instead
+ # cf. https://github.com/ContinuumIO/anaconda-issues/issues/1554
+-if 'CONDA_PREFIX' not in os.environ:
+-    required.append('opencv-python')
++# Debian: packaged but not detected by pip
++#if 'CONDA_PREFIX' not in os.environ:
++#    required.append('opencv-python')
+ 
+ # some optional dependencies
+ if platform == 'win32':

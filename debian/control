@@ -25,6 +25,7 @@ Build-Depends: debhelper (>= 7),
                python-pytest,
                python-pandas,
                python-future,
+               python-zmq,
 Vcs-Git: git://git.debian.org/git/pkg-exppsy/psychopy.git
 Vcs-Browser: http://git.debian.org/?p=pkg-exppsy/psychopy.git
 Standards-Version: 3.9.6
@@ -57,6 +58,7 @@ Recommends: python-wxgtk3.0,
             libxxf86vm1,
             ipython,
             python-future,
+            python-zmq,
 Conflicts: libavbin0 (= 7-4+b1)
 Suggests: python-iolabs, python-pyxid, libavbin0,
 Provides: ${python:Provides}
